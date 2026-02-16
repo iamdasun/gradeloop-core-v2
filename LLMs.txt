@@ -153,165 +153,38 @@ Docker Compose (infra/compose)
 If you need additional detail for any other service folder structures or want the Go iam-service README expanded with exact commands and examples, let me know and I will add the expanded how-to and examples (DB migration commands, sample `.env`, sample requests, etc.).
 
 
-Traefik API Gateway Implementation Guide (v3.0)
-----------------------------------------------
-This section contains a ready-to-copy Docker Compose example (modular, commented), Traefik label examples for the existing `iam-service`, a reusable "Future Service Template" (commented-out labels you can copy/paste for new services), and verification steps using `curl`. The provided compose and traefik examples are intentionally self-contained for local/dev use and assume Traefik v3.0.
+# API Gateway (KrakenD)
 
-Important notes (w.r.t. the repo)
-- The `iam-service` in this repo lives at `apps/services/iam-service` and listens internally on port `3000`. The compose/labels below keep that service unreachable from the host (no published ports) so Traefik is the only entrypoint.
-- The Traefik provider uses the Docker socket for service discovery. The Docker provider is configured with `exposedByDefault=false` so only services with explicit `traefik.enable=true` labels become routable.
-- Network: a dedicated Docker network `gateway_network` is used so Traefik and services discover each other safely.
+The project uses **KrakenD** as the high-performance API Gateway. It aggregates and routes requests to microservices (like `iam-service`).
 
-Example compose.yaml
-- Place this file where you keep infra manifests (e.g., `infra/compose/docker-compose.yaml`). It is presented here as an example you can copy/paste.
+## Configuration
+- **Config File**: `apps/gateway/krakend.json`
+- **Docker Compose**: The gateway runs as the `api-gateway` service, mounting the local config file.
 
-```/dev/null/compose.yaml#L1-260
-version: "3.8"
+## Standard Endpoint Definition
+When adding new routes (e.g., for a new service), add an entry to the `endpoints` array in `krakend.json`:
 
-services:
-  traefik:
-    image: traefik:v3.0
-    command:
-      # Static configuration for Traefik (entrypoints, providers, dashboard)
-      - --entryPoints.web.address=:80                      # public HTTP
-      - --entryPoints.traefik.address=:8080               # Traefik dashboard
-      - --providers.docker=true                           # enable Docker provider
-      - --providers.docker.exposedbydefault=false         # only explicit services are exposed
-      - --api.dashboard=true                              # enable dashboard
-      - --log.level=INFO
-    ports:
-      - "80:80"       # web entrypoint
-      - "8080:8080"   # traefik (dashboard) entrypoint
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro      # Docker socket for service discovery
-    networks:
-      - gateway_network
-    # Keep Traefik container lightweight; use labels if you want to secure the dashboard with auth.
-
-  iam-service:
-    image: my-registry/iam-service:latest                # placeholder image (replace with your registry)
-    environment:
-      - PORT=3000
-      # add other ENV variables the service needs (SECRET, DB connection, etc.)
-    expose:
-      - "3000"                                             # internal port only — no host port mapping
-    labels:
-      # Enable Traefik for this container
-      - "traefik.enable=true"
-
-      # Router: map requests with PathPrefix /api/auth to this service
-      - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)"
-      - "traefik.http.routers.auth.entrypoints=web"
-
-      # Attach middlewares (strip prefix so internal service sees /login instead of /api/auth/login,
-      # and rateLimit to limit requests to protect against brute-force)
-      - "traefik.http.routers.auth.middlewares=auth-stripprefix@docker,auth-ratelimit@docker"
-
-      # Middleware: strip the /api/auth prefix before forwarding to the service
-      - "traefik.http.middlewares.auth-stripprefix.stripPrefix.prefixes=/api/auth"
-
-      # Middleware: rate limiting (average = allowed reqs per second, burst = allowed burst)
-      - "traefik.http.middlewares.auth-ratelimit.rateLimit.average=10"
-      - "traefik.http.middlewares.auth-ratelimit.rateLimit.burst=20"
-
-      # Service: tell Traefik to forward to internal port 3000
-      - "traefik.http.services.auth.loadbalancer.server.port=3000"
-
-      # Optional: add a healthcheck path to the router (if your service exposes /health)
-      # - "traefik.http.routers.auth.rule=PathPrefix(`/api/auth`) && PathPrefix(`/health`)"
-
-      # Inline comments above explain purpose of each label. Remove comments if copying labels elsewhere.
-    networks:
-      - gateway_network
-    # NOTE: Do NOT publish ports here — the service must be reachable only via Traefik for this architecture.
-
-networks:
-  gateway_network:
-    name: gateway_network
-    driver: bridge
+```json
+{
+  "endpoint": "/api/v1/resource",
+  "method": "POST",
+  "output_encoding": "json",
+  "backend": [
+    {
+      "url_pattern": "/resource",
+      "method": "POST",
+      "host": ["http://service-name:8081"],
+      "disable_host_sanitize": true
+    }
+  ]
+}
 ```
 
-Traefik static/dynamic config notes
-- The compose above uses command-line args for the minimum static configuration (entrypoints, docker provider).
-- The dashboard is enabled via `--api.dashboard=true`. For production you should secure the dashboard (auth, IP allowlist, or remove dashboard exposure).
-- We use the Docker provider + socket so Traefik discovers services and their labels automatically.
-- `exposedByDefault=false` prevents accidental exposure of containers; only containers explicitly labeled with `traefik.enable=true` will be routed.
+### Key Fields
+- `endpoint`: The external path exposed to the frontend (e.g., `/api/v1/auth/login`).
+- `backend.url_pattern`: The internal path on the microservice (e.g., `/auth/login`).
+- `backend.host`: The internal Docker DNS name of the service (e.g., `http://iam-service:8081`).
+- `extra_config`: Use `github_com/devopsfaith/krakend/proxy` to allow specific status codes (like 400/401) to pass through without error wrapping.
 
-Labels explained (short)
-- `traefik.enable=true`: expose container to Traefik.
-- `traefik.http.routers.<name>.rule`: routing rule (PathPrefix/Host/Path).
-- `traefik.http.routers.<name>.entrypoints`: which entrypoint(s) the router listens on (`web`/`traefik`).
-- `traefik.http.routers.<name>.middlewares`: comma-separated middleware list.
-- `traefik.http.middlewares.<name>.stripPrefix.prefixes`: prefixes to strip from the request path.
-- `traefik.http.middlewares.<name>.rateLimit.average` and `.burst`: rate limiting settings.
-- `traefik.http.services.<name>.loadbalancer.server.port`: internal container port to forward traffic to.
-
-Future Service Template (copy-paste)
-- Use this commented block when you add more microservices. Copy the labels and adjust service name, internal port, and path.
-
-```/dev/null/future-service-template.txt#L1-120
-# ---------------------------
-# Future service labels template
-# ---------------------------
-# - Replace <svc> with your service name (e.g., "users")
-# - Replace /api/<svc> with the route you'd like exposed
-#
-# Example labels to add under the service in docker-compose:
-#
-# - "traefik.enable=true"
-# - "traefik.http.routers.<svc>.rule=PathPrefix(`/api/<svc>`)"
-# - "traefik.http.routers.<svc>.entrypoints=web"
-# - "traefik.http.routers.<svc>.middlewares=<svc>-stripprefix@docker,<svc>-ratelimit@docker"
-# - "traefik.http.middlewares.<svc>-stripprefix.stripPrefix.prefixes=/api/<svc>"
-# - "traefik.http.middlewares.<svc>-ratelimit.rateLimit.average=10"
-# - "traefik.http.middlewares.<svc>-ratelimit.rateLimit.burst=20"
-# - "traefik.http.services.<svc>.loadbalancer.server.port=<INTERNAL_PORT>"
-#
-# Adjust rateLimit values to suit the endpoint (e.g., lower for auth endpoints).
-```
-
-Verifying routing with curl
-- Basic health check (GET):
-  - curl -i http://localhost/api/auth/health
-    - This should reach your iam-service `/health` endpoint (since the `/api/auth` prefix is stripped).
-- Login example (POST JSON):
-  - curl -i -X POST http://localhost/api/auth/login \
-      -H "Content-Type: application/json" \
-      -d '{"username":"alice","password":"secret"}'
-    - Traefik will forward the request to the auth service as `/login`.
-- Inspect headers / debug:
-  - curl -i -H "Host: localhost" http://localhost/api/auth/...
-  - Use `-v` for verbose output and to confirm the connection.
-- Verify rate limiting:
-  - Use a simple loop to send >10 requests/second and observe HTTP 429 responses when the rate limit is exceeded:
-    - for i in $(seq 1 50); do curl -s -o /dev/null -w "%{http_code}\n" http://localhost/api/auth/health & done
-    - Look for 429's among the results (behavior depends on burst settings and service response times).
-
-Traefik Dashboard
-- Dashboard (for dev): http://localhost:8080/dashboard/
-  - Use with caution on public networks. In production secure it (basic auth, IP whitelist, or remove the port mapping).
-
-Security & production notes
-- In production:
-  - Do not enable the dashboard as "insecure/unprotected".
-  - Use TLS (define `entryPoints.web.http.tls=true` / configure certresolver).
-  - Use stricter rate limits for auth endpoints and add other security middlewares (IP allowlist, auth middleware for management endpoints).
-  - Consider running Traefik outside of Docker socket access or use socket with limited permissions and careful CI/CD practices.
-- Secrets: pass service secrets (e.g., `SECRET`) via environment variables managed by your secret store or CI/CD — do not bake them in images.
-
-How this avoids conflicts with the repo's `iam-service`
-- The compose example uses `my-registry/iam-service:latest` as a placeholder. If you prefer building from local context, set the `build:` context to `./apps/services/iam-service` (but the instructions above were to use images for "plug-and-play" usage).
-- The labels assume the service listens internally on `3000` — which matches the `iam-service` documented in this repo. Because we do NOT publish ports in compose, there is no port collision with the host or other services. Traefik routes to the container's internal port only.
-
-Next steps / suggestions
-- Copy the `compose.yaml` into `infra/compose/` or your chosen infra folder and run:
-  - docker compose up -d
-- Confirm `gateway_network` exists after startup. Compose will create it if not present.
-- If you want me to add a real `infra/compose/docker-compose.yaml` file into this repository or a small CONTRIBUTING.md section describing how to run the gateway, I can add that as a follow-up change.
-
-If you'd like, I can:
-- Create the actual `infra/compose/docker-compose.yaml` file in the repo (with the Traefik and iam-service entries).
-- Add a short "How to run the gateway" subsection to `CONTRIBUTING.md` and commit both files.
-- Generate a minimal `traefik` static config file in `infra/traefik/` and wire it into compose.
-
-Tell me which of those you'd like done next and I will prepare the files and edits.
+## Service Discovery
+KrakenD communicates with services via Docker internal networking. Ensure your backend service is on the same network (e.g., `gradeloop-network`) and referenced by its container name (e.g., `iam-service`).

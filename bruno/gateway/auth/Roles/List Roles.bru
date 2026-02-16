@@ -13,3 +13,7 @@ get {
 auth:bearer {
   token: {{access_token}}
 }
+
+vars:pre-request {
+  gateway_url: http://localhost:8080
+}
