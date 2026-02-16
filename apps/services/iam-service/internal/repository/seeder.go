@@ -105,25 +105,42 @@ func Seed(db *gorm.DB) error {
 	var superAdmin domain.User
 	if err := db.Where("email = ?", superAdminEmail).First(&superAdmin).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			// Create Super Admin
-			hashedPassword, _ := utils.HashPassword(superAdminPass)
+			// Check if a user with the same EmployeeID already exists (to avoid duplicate key error)
+			var existingUser domain.User
+			if err := db.Where("employee_id = ?", "SYSADMIN").First(&existingUser).Error; err == nil {
+				// User exists with SYSADMIN ID but different email. Update it.
+				hashedPassword, _ := utils.HashPassword(superAdminPass)
+				existingUser.Email = superAdminEmail
+				existingUser.PasswordHash = hashedPassword
+				existingUser.FullName = "Super Admin"
+				existingUser.IsActive = true
+				
+				if err := db.Save(&existingUser).Error; err != nil {
+					return err
+				}
+				log.Printf("Updated existing SYSADMIN user to: %s", superAdminEmail)
+				superAdmin = existingUser
+			} else {
+				// Create Super Admin
+				hashedPassword, _ := utils.HashPassword(superAdminPass)
 
-			superAdmin = domain.User{
-				ID:           utils.GenerateUUID(),
-				Email:        superAdminEmail,
-				FullName:     "Super Admin",
-				PasswordHash: hashedPassword,
-				UserType:     domain.UserTypeEmployee,
-				IsActive:     true,
-				// Create dummy employee details for validation if strict
-				EmployeeID:   &[]string{"SYSADMIN"}[0],
-				Designation:  &[]string{"System Administrator"}[0],
-				EmployeeType: &[]string{"Permanent"}[0],
+				superAdmin = domain.User{
+					ID:           utils.GenerateUUID(),
+					Email:        superAdminEmail,
+					FullName:     "Super Admin",
+					PasswordHash: hashedPassword,
+					UserType:     domain.UserTypeEmployee,
+					IsActive:     true,
+					// Create dummy employee details for validation if strict
+					EmployeeID:   &[]string{"SYSADMIN"}[0],
+					Designation:  &[]string{"System Administrator"}[0],
+					EmployeeType: &[]string{"Permanent"}[0],
+				}
+				if err := db.Create(&superAdmin).Error; err != nil {
+					return err
+				}
+				log.Printf("Created Super Admin: %s", superAdminEmail)
 			}
-			if err := db.Create(&superAdmin).Error; err != nil {
-				return err
-			}
-			log.Printf("Created Super Admin: %s", superAdminEmail)
 		} else {
 			return err
 		}
