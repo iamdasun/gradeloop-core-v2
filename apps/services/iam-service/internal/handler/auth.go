@@ -108,3 +108,20 @@ func (h *AuthHandler) ResetPassword(c fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"message": "Password reset successfully"})
 }
+
+func (h *AuthHandler) ChangePassword(c fiber.Ctx) error {
+	var req dto.ChangePasswordRequest
+	if err := c.Bind().Body(&req); err != nil {
+		return errors.New(400, "Invalid request body", err)
+	}
+
+	userID := c.Locals("user_id").(string)
+	if err := h.authService.ChangePassword(c.Context(), userID, req.OldPassword, req.NewPassword); err != nil {
+		if appErr, ok := err.(*errors.AppError); ok {
+			return c.Status(appErr.Code).JSON(fiber.Map{"error": appErr.Message})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"message": "Password changed successfully"})
+}

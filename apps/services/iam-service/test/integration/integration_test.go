@@ -22,8 +22,13 @@ type mockEmailClient struct {
 	lastLink string
 }
 
-func (m *mockEmailClient) SendPasswordResetEmail(ctx context.Context, to, link string) error {
+func (m *mockEmailClient) SendPasswordResetEmail(ctx context.Context, to, name, link string) error {
 	m.lastLink = link
+	return nil
+}
+
+func (m *mockEmailClient) SendWelcomeEmail(ctx context.Context, to, name, password string) error {
+	m.lastLink = password // hacking this to verify password was sent
 	return nil
 }
 

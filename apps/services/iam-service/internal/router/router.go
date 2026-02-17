@@ -24,7 +24,9 @@ func SetupRoutes(app *fiber.App, config Config) {
 	auth.Post("/refresh", config.AuthHandler.Refresh)
 	auth.Post("/logout", config.AuthHandler.Logout)
 	auth.Post("/forgot-password", config.AuthHandler.RequestPasswordReset)
+	auth.Post("/forgot-password", config.AuthHandler.RequestPasswordReset)
 	auth.Post("/reset-password", config.AuthHandler.ResetPassword)
+	auth.Post("/change-password", middleware.AuthMiddleware(), config.AuthHandler.ChangePassword)
 
 	// Protected Routes
 	// api := app.Group("/api", middleware.AuthMiddleware()) // /api prefix? Or just root?

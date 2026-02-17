@@ -6,6 +6,9 @@ type UserRepository interface {
 	Create(ctx context.Context, user *User) error
 	FindByID(ctx context.Context, id string) (*User, error)
 	FindByEmail(ctx context.Context, email string) (*User, error)
+	FindByEmailForAuth(ctx context.Context, email string) (*User, error) // Optimized for auth - no preloads
+	FindByStudentID(ctx context.Context, studentID string) (*User, error)
+	FindByEmployeeID(ctx context.Context, employeeID string) (*User, error)
 	FindAll(ctx context.Context, skip, limit int) ([]User, error)
 	Update(ctx context.Context, user *User) error
 	Delete(ctx context.Context, id string) error // Soft delete

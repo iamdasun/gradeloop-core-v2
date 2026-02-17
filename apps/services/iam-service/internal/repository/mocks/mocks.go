@@ -33,6 +33,32 @@ func (m *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 	return args.Get(0).(*domain.User), args.Error(1)
 }
 
+func (m *UserRepository) FindByEmailForAuth(ctx context.Context, email string) (*domain.User, error) {
+	args := m.Called(ctx, email)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.User), args.Error(1)
+}
+
+// FindByStudentID returns a mocked lookup by student ID
+func (m *UserRepository) FindByStudentID(ctx context.Context, studentID string) (*domain.User, error) {
+	args := m.Called(ctx, studentID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.User), args.Error(1)
+}
+
+// FindByEmployeeID returns a mocked lookup by employee ID
+func (m *UserRepository) FindByEmployeeID(ctx context.Context, employeeID string) (*domain.User, error) {
+	args := m.Called(ctx, employeeID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.User), args.Error(1)
+}
+
 func (m *UserRepository) FindAll(ctx context.Context, skip, limit int) ([]domain.User, error) {
 	args := m.Called(ctx, skip, limit)
 	return args.Get(0).([]domain.User), args.Error(1)
