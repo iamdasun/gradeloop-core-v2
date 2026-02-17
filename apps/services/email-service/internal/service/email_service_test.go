@@ -118,3 +118,34 @@ func TestSendEmail_Success(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 	mockProducer.AssertExpectations(t)
 }
+
+func TestSendEmail_WithCustomBody(t *testing.T) {
+	mockRepo := new(MockRepo)
+	mockProducer := new(MockProducer)
+
+	svc := NewEmailService(mockRepo, mockProducer)
+
+	ctx := context.Background()
+	req := &domain.SendEmailRequest{
+		Subject:    "Custom Body Subject",
+		Recipients: []string{"custom@example.com"},
+		BodyHTML:   "<p>Custom HTML</p>",
+		BodyText:   "Custom Text",
+		Variables:  map[string]interface{}{},
+	}
+
+	// Expectations
+	mockRepo.On("CreateMessage", ctx, mock.AnythingOfType("*domain.EmailMessage")).Return(nil)
+	mockRepo.On("CreateRecipient", ctx, mock.AnythingOfType("*domain.EmailRecipient")).Return(nil)
+
+	// Verify that published message contains body_html and body_text
+	mockProducer.On("Publish", ctx, "email.send", mock.MatchedBy(func(payload map[string]interface{}) bool {
+		return payload["body_html"] == "<p>Custom HTML</p>" && payload["body_text"] == "Custom Text"
+	})).Return(nil)
+
+	_, err := svc.SendEmail(ctx, req)
+
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+	mockProducer.AssertExpectations(t)
+}

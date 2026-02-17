@@ -46,6 +46,8 @@ type EmailService interface {
 type SendEmailRequest struct {
 	TemplateName string
 	Subject      string // Override or fallback
+	BodyHTML     string // Custom HTML body
+	BodyText     string // Custom text body
 	Recipients   []string
 	Variables    map[string]interface{}
 	Attachments  []AttachmentDTO

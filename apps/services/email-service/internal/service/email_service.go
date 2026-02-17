@@ -79,6 +79,8 @@ func (s *emailService) SendEmail(ctx context.Context, req *domain.SendEmailReque
 		"template_id":   templateID,
 		"template_name": req.TemplateName,
 		"subject":       subject,
+		"body_html":     req.BodyHTML,
+		"body_text":     req.BodyText,
 		"recipients":    req.Recipients,
 		"variables":     req.Variables,
 		"timestamp":     time.Now(),
