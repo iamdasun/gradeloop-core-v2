@@ -32,16 +32,24 @@ export function RouteGuard({
   const auth = useAuth();
   const [isChecking, setIsChecking] = React.useState(true);
 
+  // Check if auth is disabled (for development)
+  const isAuthDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === "true";
+
   React.useEffect(() => {
+    // Skip all auth checks if disabled
+    if (isAuthDisabled) {
+      setIsChecking(false);
+      return;
+    }
+
     // Initial auth check
     const checkAuth = () => {
       setIsChecking(false);
 
       // If authentication is required but user is not authenticated
+      // Do not automatically redirect to the login page; allow the
+      // component to render the unauthorized fallback instead.
       if (requireAuth && !auth.isAuthenticated) {
-        const currentPath = window.location.pathname;
-        const returnUrl = currentPath !== "/" ? `?returnTo=${encodeURIComponent(currentPath)}` : "";
-        router.replace(`${redirectTo}${returnUrl}`);
         return;
       }
 
@@ -75,6 +83,11 @@ export function RouteGuard({
       return <>{fallback}</>;
     }
     return showFallback ? <RouteGuardSkeleton /> : null;
+  }
+
+  // Skip all checks if auth is disabled
+  if (isAuthDisabled) {
+    return <>{children}</>;
   }
 
   // Check authentication requirement

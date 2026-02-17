@@ -1,0 +1,25 @@
+meta {
+  name: Assign Role
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{auth_url}}/users/:id/roles
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: USER_ID_HERE
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "role_id": "ROLE_ID_HERE"
+  }
+}

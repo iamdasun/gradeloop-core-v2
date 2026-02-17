@@ -5,20 +5,26 @@ import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
 import type { PropsWithChildren } from "react";
 
-export function AppShell({ children }: PropsWithChildren) {
+export default function AppShell({ children }: PropsWithChildren) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("gradeloop:theme");
-    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const theme = stored ?? (prefersDark ? "dark" : "light");
-    applyTheme(theme);
+    try {
+      const stored = localStorage.getItem("gradeloop:theme");
+      const prefersDark = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const theme = stored ?? (prefersDark ? "dark" : "light");
+      applyTheme(theme);
+    } catch (e) {
+      // defensive: localStorage/matchMedia may throw in some environments
+    }
 
     function onToggle() {
       const current = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
       const next = current === "dark" ? "light" : "dark";
-      localStorage.setItem("gradeloop:theme", next);
+      try {
+        localStorage.setItem("gradeloop:theme", next);
+      } catch (_) {}
       applyTheme(next);
     }
 
@@ -53,5 +59,3 @@ export function AppShell({ children }: PropsWithChildren) {
     </div>
   );
 }
-
-export default AppShell;

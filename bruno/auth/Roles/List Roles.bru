@@ -1,0 +1,15 @@
+meta {
+  name: List Roles
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{auth_url}}/roles
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}

@@ -299,10 +299,10 @@ class TokenManager {
     const authStore = useAuthStore.getState();
     authStore.logout();
 
-    // Redirect to login if in browser
-    if (typeof window !== "undefined") {
-      window.location.replace("/login");
-    }
+    // Do not perform an automatic client-side redirect here.
+    // Clearing tokens and logging out is sufficient - UI route guards
+    // will show the appropriate unauthorized UI and let the user
+    // initiate a sign-in if desired.
   }
 
   /**

@@ -21,1029 +21,170 @@ This project is a high-performance web client built with **Bun**, **Next.js (App
 
 ---
 
-# Java Backend
-
-- **Runtime / JDK**: Java 21 (use JDK 21 for all JVM services under `apps/services/*`).
-- **Build Tool**: Maven via the project's wrapper (`./mvnw`) — prefer the wrapper over a system `mvn` invocation.
-- **Local / CI rules**:
-  - Use JDK 21 in local development, CI, and Docker images.
-  - Build: `./mvnw -DskipTests package`
-  - Run tests: `./mvnw test`
-  - Run (service-specific): use the service's recommended Maven goal (for Spring Boot services: `./mvnw spring-boot:run`).
-  - Ensure `maven.compiler.source` / `maven.compiler.target` (or `release`) is set to `21` in `pom.xml`.
-
-
 # Development Standards & Patterns
 
----
-
-## 1. Data Fetching & Type Safety (The "Golden Pipeline")
-
-All API interactions must strictly follow this pipeline:
-
-1. **Define Zod Schema**
-2. **Axios fetcher**
-3. **Validate with `Schema.parse()`**
-4. **Wrap in TanStack Query hook**
-
-### Rules
-
-- ❌ Never use `as Type` assertions
-- ❌ Never return unvalidated response data
-- ✅ Always validate using Zod before returning
-
-### Required Pattern
-
-```ts
-// schemas/user.schema.ts
-import { z } from "zod";
-
-export const UserSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string().email(),
-  role: z.enum(["student", "instructor", "admin"]),
-});
-
-export type User = z.infer<typeof UserSchema>;
-```
-
-```ts
-// features/users/api/get-user.ts
-import { api } from "@/lib/api";
-import { UserSchema } from "@/schemas/user.schema";
-
-export const getUser = async (id: string) => {
-  const res = await api.get(`/users/${id}`);
-  return UserSchema.parse(res.data);
-};
-```
-
-```ts
-// features/users/hooks/use-user.ts
-import { useQuery } from "@tanstack/react-query";
-import { getUser } from "../api/get-user";
-
-export const useUser = (id: string) =>
-  useQuery({
-    queryKey: ["user", id],
-    queryFn: () => getUser(id),
-  });
-```
+(keep the same expectations as before for the web client; see sections below for specific rules)
 
 ---
 
-## 2. UI & Styling (shadcn/ui + Motion + TailwindCSS v4)
+# Go Backend Development (Fiber)
 
-### Component Source
+This project uses **Go** with **Fiber v3** for high-performance microservices (e.g., `apps/services/iam-service`).
 
-* All UI components must be generated via **shadcn/ui CLI**
-* Components live in `/components/ui`
-* Built on **Radix UI primitives**
-* Styled via TailwindCSS + design tokens
+## Standard Directory Structure
+All Go services MUST follow this internal package layout:
 
-### Theming Rules
-
-* Use semantic CSS variables (no raw hex in components)
-* All components inherit tokens
-* Dark mode via `.dark` class
-* No inline styles
-* No arbitrary Tailwind color values
-
----
-
-### Animation Rules
-
-Use **Motion** package only.
-
-✅ Correct imports:
-
-```ts
-import { motion } from "motion/react";
-// or
-import { motion } from "motion";
-```
-
-🚫 Never use:
-
-```ts
-import { motion } from "framer-motion";
-```
-
-### Animation Standards
-
-* 60fps smooth transitions
-* Prefer transform + opacity
-* Avoid layout thrashing
-* Use motion for:
-  * Dialog transitions
-  * Page transitions
-  * Sidebar animations
-  * Hover micro-interactions
-
----
-
-## 3. Form Handling (React Hook Form + Zod)
-
-Always use schema-first validation.
-
-```ts
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-
-const formSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-});
-
-type FormValues = z.infer<typeof formSchema>;
-
-const form = useForm<FormValues>({
-  resolver: zodResolver(formSchema),
-});
-```
-
-### UI Pattern
-
-* Use shadcn `<Form />` wrappers
-* Use `<FormField />`
-* Display errors using `<FormMessage />`
-
----
-
-## 4. State Management (Zustand v5)
-
-Use typed store pattern:
-
-```ts
-import { create } from "zustand";
-
-interface ThemeState {
-  theme: "light" | "dark";
-  setTheme: (theme: "light" | "dark") => void;
-}
-
-export const useThemeStore = create<ThemeState>((set) => ({
-  theme: "light",
-  setTheme: (theme) => set({ theme }),
-}));
-```
-
-### Rules
-
-* Use selectors to avoid re-renders
-* Do NOT store TanStack Query server data
-* Persist only:
-  * Auth session
-  * Theme preference
-
----
-
-## 5. UI Component Standards (shadcn)
-
-All components must:
-
-* Be in `/components/ui`
-* Use `cn()` utility for class merging
-* Be accessible (Radix handles most)
-* Support dark mode automatically
-* Use semantic tokens only
-
-### Required Base Components
-
-* Button
-* Input
-* Textarea
-* Select
-* Card
-* Table
-* Badge
-* Alert
-* Dialog
-* DropdownMenu
-* Tabs
-* Tooltip
-* Sheet (for mobile sidebar)
-* Skeleton
-
----
-
-# Project Structure Reference
-
-```
-/apps/web/
-├── app/
-│   ├── globals.css
-│   ├── layout.tsx
-│   └── page.tsx
-├── components/
-│   ├── ui/               # shadcn components
-│   └── layout/           # App layout components
-├── features/
-│   ├── auth/
-│   ├── dashboard/
-│   ├── assignments/
-│   └── courses/
-├── lib/
-│   ├── api.ts
-│   ├── query-client.ts
-│   └── utils.ts
-├── store/
-├── schemas/
-├── public/
-├── tailwind.config.ts
-└── postcss.config.mjs
-```
-
----
-
-# Root Layout Requirements
-
-### `layout.tsx` must:
-
-* Wrap app in `QueryClientProvider`
-* Include Theme provider (class strategy)
-* Avoid hydration mismatch
-* Be server-safe
-
-### Client Providers Wrapper Pattern
-
-```ts
-// components/providers.tsx
-"use client";
-
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/lib/query-client";
-
-export function Providers({ children }: { children: React.ReactNode }) {
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
-}
-```
-
----
-
-# Package Management (STRICT)
-
-### Install
-
-```bash
-bun install
-```
-
-### Add dependency
-
-```bash
-bun add <package>
-```
-
-### Dev
-
-```bash
-bun run dev
-```
-
-🚫 Never use npm
-🚫 Never use yarn
-
----
-
-# Accessibility Standards
-
-* WCAG 2.1 AA minimum
-* 4.5:1 text contrast
-* 3:1 UI component contrast
-* Keyboard accessible
-* Focus rings visible and styled
-* No color-only state indicators
-
----
-
-# Performance Requirements
-
-* Initial page load < 2s
-* 60fps animations
-* Proper TanStack Query caching
-* Avoid unnecessary re-renders
-* Use dynamic imports where appropriate
-* Avoid client components unless required
-
----
-
-# Business Context
-
-GradeLoop is an AI-integrated LMS serving:
-
-* Students
-* Instructors
-* Administrators
-
-The UI must feel:
-
-* Professional
-* Fast
-* Clean
-* Ergonomic for long coding sessions
-* Cohesive across roles
-
----
-
-# Key Features to Implement
-
-* Role-based dashboards
-* Assignment management
-* AI plagiarism interface
-* Real-time notifications
-* Grade analytics
-* Course enrollment workflows
-* Authentication & authorization
-
----
-
-# Critical Development Rules
-
-* Strict TypeScript (no `any`)
-* No raw API data without Zod parsing
-* No direct fetch without Axios instance
-* No hardcoded theme colors
-* No framer-motion
-* No HeroUI
-* No Pages Router patterns
-
-## Critical Instructions for AI Agents
-
-### Package Management
-- **No NPM/Yarn**: Use `bun add` and `bun run` exclusively.
-- **Installation**: Always use `bun install` for dependency installation.
-- **Scripts**: Run development with `bun run dev`, build with `bun run build`.
-
-### Framework Specifics
-- **shadcn/ui**: Use shadcn/ui CLI for component generation; components are based on Radix UI primitives.
-- **Next.js**: Use App Router patterns, not Pages Router.
-- **React**: Version 19+ with concurrent features.
-
-### Error Handling
-- Always wrap Zod parsing in try/catch within fetchers or allow TanStack Query to handle the error state for the UI.
-- Use proper error boundaries for React error handling.
-
-### Hydration & SSR
-- Ensure `QueryClientProvider` is implemented in the root layout with a Client Component wrapper.
-- Handle hydration mismatches properly with Next.js patterns.
-
-### Development Workflow
-1. **Dependencies**: All major dependencies are configured in package.json.
-2. **Linting**: ESLint with Next.js configuration is set up.
-4. **TypeScript**: Strict mode with proper path mapping (`@/*` for root imports).
-4. **Git**: Follow conventional commits as specified in CONTRIBUTING.md.
-
-# Spring Boot 4 Service Implementation Guidelines
-
-## Purpose
-This document defines **mandatory best practices** for implementing production-grade services using **Spring Boot 4**.  
-All generated or written code must follow these standards to ensure maintainability, performance, scalability, and security.
-
----
-
-# 1. Core Platform Requirements
-
-## Mandatory Versions
-- Spring Boot **4.x**
-- Java **21+ (Required baseline)**
-- Jakarta EE 11 (`jakarta.*`, NOT `javax.*`)
-
-## Dependency Requirements
-- Use Spring Boot BOM dependency management
-- Only include required starters
-- Avoid unused dependencies
-- Prefer modular starters
-
----
-
-# 2. Architecture Principles
-
-## Required Architecture Pattern
-Follow **Clean Architecture + Spring Boot conventions**
-
-### Mandatory Layers
-```
-
-Controller Layer → HTTP handling
-Service Layer → Business logic
-Repository Layer → Database access
-Domain Layer → Entities and business models
-DTO Layer → API contracts
-
-```
-
----
-
-# 3. Package Organization
-
-## Feature-Based Packaging (Preferred)
-
-```
-
-com.gradeloop.iam
-├ user
-│ ├ UserController
-│ ├ UserService
-│ ├ UserRepository
-│ ├ UserEntity
-│ ├ UserDTO
-│
-├ auth
-│ ├ AuthController
-│ ├ AuthService
-│ ├ AuthDTO
-
-```
-
----
-
-# 4. Coding Standards
-
-## Dependency Injection
-### ✅ Required
-Constructor injection only.
-
-```java
-@RequiredArgsConstructor
-@Service
-public class UserService {
-  private final UserRepository userRepository;
-}
-```
-
-### ❌ Forbidden
-
-```java
-@Autowired
-private UserRepository userRepository;
-```
-
----
-
-# 5. Controller Guidelines
-
-Controllers MUST:
-
-* Handle HTTP only
-* Never contain business logic
-* Call services only
-
-Example:
-
-```java
-@RestController
-@RequestMapping("/api/users")
-@RequiredArgsConstructor
-public class UserController {
-
-  private final UserService userService;
-
-  @GetMapping("/{id}")
-  public UserResponseDTO getUser(@PathVariable UUID id) {
-    return userService.getUser(id);
-  }
-}
-```
-
----
-
-# 6. Service Layer Guidelines
-
-Services MUST:
-
-* Contain business logic
-* Handle transactions
-* Handle validation
-* Handle domain rules
-
-Example:
-
-```java
-@Service
-@RequiredArgsConstructor
-@Transactional
-public class UserService {
-
-  private final UserRepository userRepository;
-
-  public UserResponseDTO getUser(UUID id) {
-    User user = userRepository.findById(id)
-      .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-    return UserMapper.toDTO(user);
-  }
-}
-```
-
----
-
-# 7. Repository Guidelines
-
-Use Spring Data JPA:
-
-```java
-@Repository
-public interface UserRepository extends JpaRepository<User, UUID> {
-}
-```
-
-Avoid manual DAO implementations unless absolutely necessary.
-
----
-
-# 8. DTO Usage (Mandatory)
-
-Never expose entities directly.
-
-Example:
-
-```java
-public class UserResponseDTO {
-  private UUID id;
-  private String email;
-}
-```
-
----
-
-# 9. Entity Guidelines
-
-Example:
-
-```java
-@Entity
-@Table(name = "users")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class User {
-
-  @Id
-  private UUID id;
-
-  private String email;
-
-  private Instant createdAt;
-
-  private Instant deletedAt;
-}
-```
-
----
-
-# 10. Exception Handling
-
-## 10.1 Custom Exceptions
-
-Always define **domain-specific exceptions**:
-
-```java
-public class ResourceNotFoundException extends RuntimeException {
-  public ResourceNotFoundException(String message) {
-    super(message);
-  }
-}
-
-public class InvalidRequestException extends RuntimeException {
-  public InvalidRequestException(String message) {
-    super(message);
-  }
-}
-
-public class UnauthorizedException extends RuntimeException {
-  public UnauthorizedException(String message) {
-    super(message);
-  }
-}
-```
-
----
-
-## 10.2 Global Exception Handler
-
-Use **one global exception handler** using `@RestControllerAdvice`:
-
-```java
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-
-  @ExceptionHandler(ResourceNotFoundException.class)
-  public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
-    return ResponseEntity.status(HttpStatus.NOT_FOUND)
-      .body(new ErrorResponse(HttpStatus.NOT_FOUND.value(), ex.getMessage()));
-  }
-
-  @ExceptionHandler(InvalidRequestException.class)
-  public ResponseEntity<ErrorResponse> handleBadRequest(InvalidRequestException ex) {
-    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-      .body(new ErrorResponse(HttpStatus.BAD_REQUEST.value(), ex.getMessage()));
-  }
-
-  @ExceptionHandler(UnauthorizedException.class)
-  public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException ex) {
-    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-      .body(new ErrorResponse(HttpStatus.UNAUTHORIZED.value(), ex.getMessage()));
-  }
-
-  @ExceptionHandler(Exception.class)
-  public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-      .body(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal server error"));
-  }
-}
-```
-
----
-
-## 10.3 Error Response DTO
-
-```java
-public class ErrorResponse {
-  private int status;
-  private String message;
-
-  public ErrorResponse(int status, String message) {
-    this.status = status;
-    this.message = message;
-  }
-
-  // getters/setters
-}
-```
-
----
-
-## 10.4 Best Practices for Exceptions
-
-* Never catch exceptions in controllers
-* Always throw **custom domain-specific exceptions** in services
-* Map exceptions to **proper HTTP status codes**
-* Log exceptions appropriately in the global handler
-
----
-
-# 11. Validation
-
-Use Jakarta Validation.
-
-```java
-public class CreateUserRequest {
-
-  @NotBlank
-  private String email;
-}
-```
-
-Controller:
-
-```java
-@PostMapping
-public void createUser(@Valid @RequestBody CreateUserRequest request)
-```
-
----
-
-# 12. Configuration Management
-
-Mandatory:
-
-* Externalize all configuration
-* Use environment profiles
-
-```
-application.yml
-application-dev.yml
-application-prod.yml
-```
-
-Never hardcode credentials.
-
----
-
-# 13. Logging
-
-Use structured logging.
-
-```java
-private static final Logger log =
-  LoggerFactory.getLogger(UserService.class);
-
-log.info("Creating user with email {}", email);
-```
-
-Never use `System.out.println()`.
-
----
-
-# 14. Transaction Management
-
-Use:
-
-```java
-@Transactional
-```
-
-Only at service layer.
-
----
-
-# 15. Security Guidelines
-
-Mandatory:
-
-* Use Spring Security
-* Stateless authentication (JWT or OAuth2)
-* Hash passwords (BCrypt)
-
-Example:
-
-```java
-@Bean
-public PasswordEncoder passwordEncoder() {
-  return new BCryptPasswordEncoder();
-}
-```
-
----
-
-# 16. API Design Standards
-
-Follow REST standards:
-
-```
-GET    /api/users/{id}
-POST   /api/users
-PUT    /api/users/{id}
-DELETE /api/users/{id}
-```
-
-Return proper HTTP status codes.
-
----
-
-# 17. Database Guidelines
-
-Mandatory:
-
-* UUID primary keys
-* Soft delete (`deleted_at`)
-* Proper indexes
-* Use migrations (Flyway or Liquibase)
-
----
-
-# 18. Performance Best Practices
-
-Mandatory:
-
-* Use connection pooling
-* Use pagination
-* Avoid N+1 queries
-* Use lazy loading properly
-
----
-
-# 19. Observability
-
-Mandatory:
-Enable Actuator:
-
-```
-/actuator/health
-/actuator/info
-/actuator/metrics
-```
-
----
-
-# 20. Testing Guidelines
-
-## Unit Tests
-
-* Service layer
-
-## Integration Tests
-
-* Controller layer
-* Repository layer
-
-Use:
-
-* JUnit 5
-* Mockito
-* SpringBootTest
-
----
-
-# 21. Production Readiness Checklist
-
-All services MUST include:
-
-* Global exception handling
-* Logging
-* Health checks
-* External configuration
-* Secure authentication
-* DTO separation
-* Transaction boundaries
-
----
-
-# 22. Spring Boot 4 Specific Requirements
-
-Mandatory:
-
-* Java 21+
-* jakarta.* packages only
-* Modular starters
-* Compatible dependency versions
-* No deprecated APIs
-
----
-
-# 23. Mandatory LLM Implementation Rules
-
-When generating code, LLM MUST:
-
-* Follow layered architecture
-* Use constructor injection
-* Use DTOs
-* Implement global exception handling
-* Follow REST conventions
-* Use Jakarta APIs
-* Use modern security practices
-* Generate production-grade code only
-* Avoid deprecated or legacy patterns
-* Never place business logic in controllers
-* Always implement domain-specific exceptions
-
----
-
-# End of Document
-
-````
- 
-# 🚀 GradeLoop Core V2 - AI Agent Optimization Guide  
-*Strict, actionable patterns for code generation. Zero ambiguity.*
-
----
-
-## 🔑 CRITICAL RULES (NON-NEGOTIABLE)  
-| Category | ✅ MUST | ❌ NEVER |
-|----------|---------|----------|
-| **Package Mgmt** | `bun install`, `bun add`, `./mvnw` | `npm`, `yarn`, system `mvn` |
-| **Frontend Runtime** | Bun + Next.js App Router | Pages Router, Node.js runtime |
-| **Animations** | `import { motion } from "motion/react"` | `framer-motion`, inline styles |
-| **Type Safety** | Zod `.parse()` on ALL API responses | `as Type`, unvalidated data |
-| **Backend Injection** | Constructor injection (`@RequiredArgsConstructor`) | Field `@Autowired` |
-| **Backend Packages** | `jakarta.*` (EE 11) | `javax.*` |
-| **API Contracts** | DTOs for ALL endpoints | Expose JPA entities |
-| **Colors** | Semantic CSS variables | Raw hex/arbitrary values |
-
----
-
-## 🌐 FRONTEND: NEXT.JS (APP ROUTER)  
-### Golden Pipeline (MANDATORY)
-```ts
-// 1. Schema (schemas/user.schema.ts)
-export const UserSchema = z.object({ id: z.string(), email: z.string().email() });
-export type User = z.infer<typeof UserSchema>;
-
-// 2. Fetcher (features/users/api/get-user.ts)
-export const getUser = async (id: string) => 
-  UserSchema.parse((await api.get(`/users/${id}`)).data); // VALIDATES HERE
-
-// 3. Hook (features/users/hooks/use-user.ts)
-export const useUser = (id: string) => 
-  useQuery({ queryKey: ['user', id], queryFn: () => getUser(id) });
-```
-⚠️ **Failure = Rejection**: Skip Zod parsing? Code invalid.
-
-### UI & Styling
-- **Components**: `bunx shadcn@latest add [component]` → `/components/ui/`
-- **Theming**: `.dark` class + CSS variables only (`--color-primary`)
-- **Forms**: `zodResolver` + shadcn `<Form>` wrappers
-- **State**: Zustand *only* for theme/auth session (never server data)
-
-### Critical Checks
-```ts
-// ✅ VALID
-import { motion } from "motion/react";
-import { Button } from "@/components/ui/button";
-
-// ❌ INVALID (REJECT)
-import { motion } from "framer-motion"; // BANNED
-<div style={{ color: "#ff0000" }}> // BANNED
-```
-
----
-
-## ⚙️ BACKEND: SPRING BOOT 4 (JAVA 21)  
-### Layered Pattern (NON-NEGOTIABLE)
-```java
-// CONTROLLER (HTTP ONLY)
-@RestController @RequiredArgsConstructor
-@RequestMapping("/api/users")
-public class UserController {
-  private final UserService userService; // Constructor-injected
-  
-  @GetMapping("/{id}") 
-  public UserResponseDTO get(@PathVariable UUID id) {
-    return userService.get(id); // Delegates ALL logic
-  }
-}
-
-// SERVICE (BUSINESS LOGIC)
-@Service @RequiredArgsConstructor @Transactional
-public class UserService {
-  private final UserRepository repo;
-  
-  public UserResponseDTO get(UUID id) {
-    return repo.findById(id)
-      .map(UserMapper::toDTO)
-      .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-  }
-}
-
-// GLOBAL EXCEPTION HANDLER (MANDATORY)
-@RestControllerAdvice
-public class GlobalExceptionHandler {
-  @ExceptionHandler(ResourceNotFoundException.class)
-  ResponseEntity<ErrorResponse> handleNotFound(...) { /* 404 */ }
-}
-```
-
-### Critical Enforcement
-| Layer | Rule | Violation Example |
-|-------|------|-------------------|
-| **Controller** | Zero business logic | `if (user.isActive()) { ... }` in controller |
-| **Service** | Throw domain exceptions | `throw new RuntimeException("...")` |
-| **DTOs** | Never expose entities | `public UserEntity getUser()` |
-| **Validation** | `@Valid` + Jakarta annotations | Manual null checks in service |
-| **Security** | BCrypt passwords | Plaintext storage |
-
-### Package Structure (Feature-Based)
-```
-com.gradeloop.iam/
-├── user/
-│   ├── UserController.java
-│   ├── UserService.java
-│   ├── UserRepository.java
-│   ├── UserEntity.java
-│   └── dto/
-│       ├── UserResponseDTO.java
-│       └── CreateUserRequest.java
-├── auth/
-└── common/
-    ├── exception/ (GlobalExceptionHandler + custom exceptions)
-    └── ErrorResponse.java
-```
-
----
-
-## 📦 CROSS-CUTTING COMMANDS  
-| Action | Frontend | Backend |
-|--------|----------|---------|
-| **Install** | `bun install` | `./mvnw clean install -DskipTests` |
-| **Dev Start** | `bun run dev` | `./mvnw spring-boot:run` |
-| **Build** | `bun run build` | `./mvnw package -DskipTests` |
-| **Test** | *(Project-specific)* | `./mvnw test` |
-
----
-
-## ✅ AI GENERATION CHECKLIST  
-Before outputting code, verify:  
-- [ ] **Frontend**: Zod schema → Axios fetcher → TanStack Query hook chain complete  
-- [ ] **Frontend**: `motion` imported from `"motion/react"` (NOT framer-motion)  
-- [ ] **Backend**: Constructor injection via `@RequiredArgsConstructor`  
-- [ ] **Backend**: Jakarta EE 11 packages (`jakarta.validation`, NOT `javax`)  
-- [ ] **Backend**: DTOs used in ALL controller signatures  
-- [ ] **Both**: No hardcoded secrets/colors/values  
-- [ ] **Both**: Java 21 / Bun runtime explicitly satisfied  
-
----
-
-## 🚫 ABSOLUTE PROHIBITIONS  
 ```text
-FRONTEND: 
-  framer-motion | npm/yarn | Pages Router | as Type assertions | raw hex colors
-
-BACKEND:
-  javax.* packages | field @Autowired | entity exposure | System.out | 
-  business logic in controllers | RuntimeException throws
+apps/services/<service-name>/
+├── cmd/
+│   └── main.go           # Entrypoint: App, DB, and Dependency Injection wiring
+├── internal/
+│   ├── config/           # Environment loading and configuration
+│   ├── domain/           # Core business entities (GORM models)
+│   ├── dto/              # Data Transfer Objects (Request/Response structs)
+│   ├── handler/          # HTTP Handlers (controllers)
+│   ├── middleware/       # Custom middleware (Auth, RBAC, etc.)
+│   ├── repository/       # Data Access Layer (GORM)
+│   ├── router/           # Route registration
+│   ├── service/          # Business Logic Layer
+│   └── utils/            # Helper functions
+├── go.mod
+└── Dockerfile
 ```
 
-> 💡 **AI Directive**: When uncertain, DEFAULT TO STRICTEST INTERPRETATION.  
-> Reject ambiguous requests. Demand schema definitions before generating API code.  
-> *This document overrides all prior context.*  
+## Implementation Guidelines
 
-✨ **You are the gatekeeper of GradeLoop's integrity. Enforce rigor.** ✨
+### 1. Entrypoint (`cmd/main.go`)
+- Initialize the `fiber.App`.
+- Connect to the Database (`repository.NewPostgresRepository`).
+- Run Auto-Migrations and Seeding.
+- Initialize Repositories, Services, and Handlers (Dependency Injection).
+- Setup Routes via `router.SetupRoutes`.
+- Start the server using the configured port.
 
+### 2. Router (`internal/router`)
+- Define a `Config` struct to hold Handler dependencies.
+- Use `func SetupRoutes(app *fiber.App, config Config)` to register endpoints.
+- Group routes logically (e.g., `auth := app.Group("/auth")`).
+- Apply middleware at the group or route level.
+
+### 3. Handlers (`internal/handler`)
+- Handlers should be structs containing Service dependencies.
+- Methods signature: `func (h *Handler) Action(c fiber.Ctx) error`.
+- Use `c.Bind().Body(&req)` for parsing request bodies.
+- Use `c.Locals("user_id")` to access authenticated user data.
+- Return errors using the standardized path or `c.Status(code).JSON()`.
+
+### 4. Database & Models (`internal/domain` & `internal/repository`)
+- Use **GORM** for ORM patterns.
+- Models struct tags: `` `gorm:"..." json:"..."` ``.
+- Repositories should encapsulate all DB queries.
+- Use dependency injection to pass `gorm.DB` instances.
+
+### 5. Configuration (`internal/config` & `.env`)
+- Use `github.com/joho/godotenv` to load `.env`.
+- Access config via helper functions (e.g., `config.Config("KEY")`).
+- **Never hardcode secrets**.
+
+## Critical Rules for Go Services
+- **Fiber v3**: Use the `v3` branch of Fiber.
+- **Dependency Injection**: Always inject dependencies (Service -> Repository -> DB) to enable testability.
+- **Error Handling**: Use a centralized error handling mechanism or custom AppError types.
+- **Strict Typing**: Use DTOs for all API requests and responses. Do not use `map[string]interface{}` unless absolutely necessary.
+
+---
+
+# Project Structure Reference (web + selected services)
+
+```
+/apps/web/                # frontend (Next.js + Bun)
+  ├── app/
+  ├── components/
+  ├── features/
+  ├── lib/
+  └── ...
+
+/apps/services/           # microservices
+  ├── iam-service/       # Go service (see structure above)
+  ├── (other services...) # Java services removed from LLMs context unless present locally
+```
+
+---
+
+# Critical Development Rules (summary)
+- Strict TypeScript in the web client (no `any`).
+- No raw API data without Zod parsing on the frontend.
+- No NPM/Yarn for the web client: use Bun exclusively.
+- For Go services:
+  - Keep configuration in env files or external secret stores.
+  - Do not hardcode DB credentials or secrets.
+  - Use the Aiven-compatible connection flow when provided.
+
+---
+
+# Agent Instructions (for LLMs / automation)
+- When asked to run or build services, verify the required directories exist in the repo before running `docker build` or `go build`.
+- Prefer using prebuilt images for services not present locally (do not attempt to `build` when `context` path is missing).
+- Use `POSTGRES_URL_BASE` + `IAM_SVC_DB_NAME` for iam-service when available; fall back to `DB_*` env vars only when necessary.
+- Do not instruct the agent to assume Java-based services are available unless their directories and build files exist.
+
+---
+
+# Quick reference commands
+
+Frontend
+- Install: `bun install`
+- Dev: `bun run dev`
+- Build: `bun run build`
+
+IAM-service (Go)
+- Build: `go build ./...` or `go build -o ./bin/auth ./cmd/main.go`
+- Run: `go run ./cmd/main.go`
+- Docker build: `docker build -t gradeloop-iam-service .` (from `apps/services/iam-service`)
+- Lint & format: `gofmt -w . && goimports -w . && golangci-lint run ./...`
+
+Docker Compose (infra/compose)
+- From `infra/compose/`:
+  - `docker compose up --build` (ensure build contexts exist or use images)
+  - If using Aiven, populate `../../.env` with `POSTGRES_URL_BASE`, `IAM_SVC_DB_NAME`, and `POSTGRES_SSLMODE=require` (and leave local DB vars empty).
+
+---
+
+If you need additional detail for any other service folder structures or want the Go iam-service README expanded with exact commands and examples, let me know and I will add the expanded how-to and examples (DB migration commands, sample `.env`, sample requests, etc.).
+
+
+# API Gateway (KrakenD)
+
+The project uses **KrakenD** as the high-performance API Gateway. It aggregates and routes requests to microservices (like `iam-service`).
+
+## Configuration
+- **Config File**: `apps/gateway/krakend.json`
+- **Docker Compose**: The gateway runs as the `api-gateway` service, mounting the local config file.
+
+## Standard Endpoint Definition
+When adding new routes (e.g., for a new service), add an entry to the `endpoints` array in `krakend.json`:
+
+```json
+{
+  "endpoint": "/api/v1/resource",
+  "method": "POST",
+  "output_encoding": "json",
+  "backend": [
+    {
+      "url_pattern": "/resource",
+      "method": "POST",
+      "host": ["http://service-name:8081"],
+      "disable_host_sanitize": true
+    }
+  ]
+}
+```
+
+### Key Fields
+- `endpoint`: The external path exposed to the frontend (e.g., `/api/v1/auth/login`).
+- `backend.url_pattern`: The internal path on the microservice (e.g., `/auth/login`).
+- `backend.host`: The internal Docker DNS name of the service (e.g., `http://iam-service:8081`).
+- `extra_config`: Use `github_com/devopsfaith/krakend/proxy` to allow specific status codes (like 400/401) to pass through without error wrapping.
+
+## Service Discovery
+KrakenD communicates with services via Docker internal networking. Ensure your backend service is on the same network (e.g., `gradeloop-network`) and referenced by its container name (e.g., `iam-service`).

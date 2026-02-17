@@ -1,21 +1,20 @@
-FROM maven:3.9.6-eclipse-temurin-21 AS builder
-WORKDIR /workspace
+FROM golang:latest
 
-# Cache Maven deps by copying only the files required for dependency resolution first
-COPY pom.xml ./
-COPY .mvn .mvn
-COPY mvnw ./
+# Enviroment variable
+WORKDIR /usr/src/some-api
 
-# Copy sources and build
-COPY src ./src
-RUN chmod +x mvnw && ./mvnw -B -DskipTests clean package
+RUN go install github.com/air-verse/air@latest
 
-FROM eclipse-temurin:21-jre-jammy
-WORKDIR /app
+#Copying files to work directory
+COPY go.mod ./
+RUN go mod download && go mod verify
+COPY . .
 
-# Copy the built Spring Boot jar (use wildcard to be resilient to versioned names)
-COPY --from=builder /workspace/target/*.jar ./app.jar
+# Build the binary for production
+RUN CGO_ENABLED=0 GOOS=linux go build -o /usr/local/bin/auth ./cmd/main.go
 
-EXPOSE 8080
-ENV JAVA_OPTS="-Xms256m -Xmx512m"
-ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar /app/app.jar"]
+# Expose default container port 3000
+EXPOSE 8081
+
+# Default command: if DEV_MODE=1 use air for dev hot reload, otherwise run the compiled binary
+CMD ["sh", "-c", "if [ \"$DEV_MODE\" = \"1\" ]; then air cmd/main.go -b 0.0.0.0; else /usr/local/bin/auth; fi"]

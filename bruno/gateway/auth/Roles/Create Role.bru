@@ -1,0 +1,22 @@
+meta {
+  name: Create Role
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{gateway_url}}/api/v1/roles
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "name": "NEW_ROLE",
+    "description": "Description of the new role"
+  }
+}

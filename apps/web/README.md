@@ -1,16 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GradeLoop Web Client
+
+Next.js 16 web application for GradeLoop LMS.
+
+## Environment Configuration
+
+**This app uses the root `.env` file** via symlink (`.env.local` → `../../.env`).
+
+All environment variables are managed in the project root. Do not create separate .env files in this directory.
+
+For local development without authentication:
+```bash
+# In root .env file:
+DISABLE_AUTH=true
+```
 
 ## Getting Started
 
-First, run the development server:
+Run the development server:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
 bun dev
 ```
 

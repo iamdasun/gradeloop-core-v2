@@ -1,0 +1,20 @@
+meta {
+  name: List Users
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{auth_url}}/users?page=1&limit=10
+  body: none
+  auth: bearer
+}
+
+query {
+  page: 1
+  limit: 10
+}
+
+auth:bearer {
+  token: {{access_token}}
+}

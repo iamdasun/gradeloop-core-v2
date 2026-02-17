@@ -13,6 +13,11 @@ async function proxy(req: Request, path: string) {
   // Forward the path as-is to the IAM service, adding /api prefix
   const cleanPath = path;
   const url = `${API_BASE}/api/${cleanPath}`;
+
+  // 1. Check if we are in development mode
+  const isDev = process.env.NODE_ENV === "development";
+
+
   
   console.log("[PROXY] Incoming path:", path);
   console.log("[PROXY] Clean path:", cleanPath);
@@ -24,12 +29,21 @@ async function proxy(req: Request, path: string) {
   for (const [k, v] of req.headers) {
     // Do not forward host header
     if (k.toLowerCase() === "host") continue;
+
+    // Remove AUTH FOR DEV:::: Skip auth headers if DISABLE_AUTH is set
+    if (process.env.DISABLE_AUTH === "true" && (k.toLowerCase() === "cookie" || k.toLowerCase() === "authorization")) continue;
+
+
     outHeaders[k] = v;
   }
 
   // Forward cookies from incoming request (important for HTTPOnly auth cookies)
+  // const cookie = req.headers.get("cookie");
+  // if (cookie) outHeaders["cookie"] = cookie;
+
+  // Remove AUTH FOR DEV::::Only forward cookies manually if auth is NOT disabled
   const cookie = req.headers.get("cookie");
-  if (cookie) outHeaders["cookie"] = cookie;
+  if (cookie && process.env.DISABLE_AUTH !== "true") outHeaders["cookie"] = cookie;
 
   const init = {
     method: req.method,

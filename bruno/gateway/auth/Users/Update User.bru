@@ -1,0 +1,26 @@
+meta {
+  name: Update User
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{gateway_url}}/api/v1/users/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: USER_ID_HERE
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "full_name": "Updated Name",
+    "is_active": true
+  }
+}

@@ -48,6 +48,13 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     
     const initializeAuth = async () => {
+      // Skip auth initialization if disabled
+      if (process.env.NEXT_PUBLIC_DISABLE_AUTH === "true") {
+        console.log("[AuthProvider] Auth disabled - skipping initialization");
+        authStore.setLoading(false);
+        return;
+      }
+
       // Skip if already authenticated or loading
       if (authStore.isAuthenticated || authStore.isLoading) {
         console.log("[AuthProvider] Skipping initialization - already authenticated or loading");

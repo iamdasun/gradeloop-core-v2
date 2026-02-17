@@ -1,0 +1,24 @@
+meta {
+  name: Create Template
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/v1/emails/templates
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "welcome_email",
+    "subject": "Welcome!",
+    "body_html": "<h1>Welcome {{.name}}!</h1>",
+    "body_text": "Welcome {{.name}}!"
+  }
+}
+
+vars:pre-request {
+  base_url: http://localhost:8082
+}

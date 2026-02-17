@@ -1,0 +1,19 @@
+meta {
+  name: List Roles
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{gateway_url}}/api/v1/roles
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+vars:pre-request {
+  gateway_url: http://localhost:8080
+}

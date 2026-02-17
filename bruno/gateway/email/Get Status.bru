@@ -1,0 +1,15 @@
+meta {
+  name: Get Email Status
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{gateway_url}}/api/v1/email/status/{{email_id}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}

@@ -73,7 +73,12 @@ export async function proxy(request: NextRequest) {
     // Handle protected routes
     if (isProtectedRoute(pathname)) {
       if (!authResult.isAuthenticated) {
-        return redirectToLogin(request);
+        // Do not perform a server-side redirect to `/login`.
+        // Allow the request to continue so the client can render
+        // the appropriate unauthorized UI. Attach a header so
+        // client code can detect unauthenticated responses if needed.
+        response.headers.set("x-user-authenticated", "false");
+        return addSecurityHeaders(response);
       }
 
       // Check role-based access for admin routes
@@ -87,7 +92,8 @@ export async function proxy(request: NextRequest) {
       }
 
       // No token refresh needed as auth is handled externally
-      // Update last activity
+      // Update last activity and indicate authenticated
+      response.headers.set("x-user-authenticated", "true");
       updateLastActivity(response, authResult.sessionId);
     }
 

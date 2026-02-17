@@ -1,0 +1,25 @@
+meta {
+  name: Assign Permission
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{auth_url}}/roles/:id/permissions
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: ROLE_ID_HERE
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+body:json {
+  {
+    "permission_id": "PERMISSION_ID_HERE"
+  }
+}

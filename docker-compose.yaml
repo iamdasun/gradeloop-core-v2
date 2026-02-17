@@ -1,0 +1,73 @@
+services:
+  iam-service:
+    build:
+      context: ./apps/services/iam-service
+      dockerfile: Dockerfile
+    container_name: iam-service
+    env_file:
+      - .env
+    environment:
+      - SERVER_PORT=${IAM_SVC_PORT}
+      - ENABLE_PREFORK=${IAM_SVC_ENABLE_PREFORK}
+      - DB_HOST=${GRA_DB_HOST}
+      - DB_PORT=${GRA_DB_PORT}
+      - DB_USER=${GRA_DB_USER}
+      - DB_PASSWORD=${GRA_DB_PASSWORD}
+      - DB_NAME=${IAM_SVC_DB_NAME}
+      - DB_SSLMODE=${GRA_DB_SSLMODE}
+      - EMAIL_SERVICE_URL=http://email-service:8082
+      - FRONTEND_URL=${FRONTEND_URL}
+    ports:
+      - "8081:8081"
+    networks:
+      - gradeloop-network
+
+  email-service:
+    build:
+      context: ./apps/services/email-service
+      dockerfile: Dockerfile
+    container_name: email-service
+    env_file:
+      - .env
+    environment:
+      - APP_PORT=8082
+      - DB_HOST=${GRA_DB_HOST}
+      - DB_PORT=${GRA_DB_PORT}
+      - DB_USER=${GRA_DB_USER}
+      - DB_PASSWORD=${GRA_DB_PASSWORD}
+      - DB_NAME=${EMAIL_SVC_DB_NAME}
+      - DB_SSLMODE=${GRA_DB_SSLMODE}
+      - SMTP_PASSWORD=${SMTP_PASS}
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    ports:
+      - "8082:8082"
+    depends_on:
+      - rabbitmq
+    networks:
+      - gradeloop-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - gradeloop-network
+
+  api-gateway:
+    image: krakend:latest
+    container_name: api-gateway
+    volumes:
+      - ./apps/gateway/krakend.json:/etc/krakend/krakend.json
+    ports:
+      - "8080:8080"
+    command: [ "run", "-c", "/etc/krakend/krakend.json" ]
+    depends_on:
+      - iam-service
+    networks:
+      - gradeloop-network
+
+networks:
+  gradeloop-network:
+    driver: bridge
