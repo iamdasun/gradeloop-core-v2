@@ -6,9 +6,25 @@ type LoginRequest struct {
 }
 
 type AuthResponse struct {
-	AccessToken             string `json:"access_token"`
-	RefreshToken            string `json:"refresh_token"`
-	IsPasswordResetRequired bool   `json:"is_password_reset_required"`
+	AccessToken             string           `json:"access_token"`
+	RefreshToken            string           `json:"refresh_token"`
+	IsPasswordResetRequired bool             `json:"is_password_reset_required"`
+	User                    AuthUserResponse `json:"user"`
+}
+
+type AuthUserResponse struct {
+	ID       string             `json:"id"`
+	Email    string             `json:"email"`
+	FullName string             `json:"full_name"`
+	IsActive bool               `json:"is_active"`
+	UserType string             `json:"user_type"`
+	Roles    []AuthRoleResponse `json:"roles"`
+}
+
+type AuthRoleResponse struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Permissions []string `json:"permissions"`
 }
 
 type RefreshRequest struct {

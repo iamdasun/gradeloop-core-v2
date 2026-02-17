@@ -67,6 +67,7 @@ export const LoginResponseSchema = z.object({
   token_type: z.literal("Bearer"),
   expires_in: z.number(), // seconds until access token expires
   session_id: z.string().uuid(),
+  is_password_reset_required: z.boolean().optional(),
 });
 
 export type LoginResponse = z.infer<typeof LoginResponseSchema>;

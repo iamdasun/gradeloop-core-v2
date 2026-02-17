@@ -44,7 +44,7 @@ class MiddlewareError extends Error {
   }
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const response = NextResponse.next();
 
@@ -181,8 +181,8 @@ async function getAuthenticationStatus(request: NextRequest): Promise<{
     // Call IAM service to validate authentication
     // Forward the cookies from the original request to the IAM service
     const cookie = request.headers.get("cookie");
-    
-    const response = await fetch("http://localhost:8080/api/v1/auth/validate", {
+
+    const response = await fetch("http://localhost:8080/api/v1/auth/session", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -199,7 +199,7 @@ async function getAuthenticationStatus(request: NextRequest): Promise<{
         shouldRefresh: false,
       };
     }
-    
+
     return {
       isAuthenticated: false,
       user: null,

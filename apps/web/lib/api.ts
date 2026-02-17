@@ -28,6 +28,7 @@ let lastRateLimitToastAt = 0;
 const IAMAuthResponseSchema = z.object({
   access_token: z.string(),
   refresh_token: z.string(),
+  is_password_reset_required: z.boolean().optional(),
   user: z.object({
     id: z.string().uuid(),
     email: z.string().email(),
@@ -47,6 +48,7 @@ const IAMAuthResponseSchema = z.object({
 const IAMRefreshResponseSchema = z.object({
   access_token: z.string(),
   refresh_token: z.string(),
+  is_password_reset_required: z.boolean().optional(),
   user: z.object({
     id: z.string().uuid(),
     email: z.string().email(),
@@ -330,7 +332,7 @@ api.interceptors.request.use(
     // Skip token refresh for auth endpoints that don't need tokens
     const noTokenEndpoints = [
       "/auth/login",
-      "/auth/forgot-password",
+      "/auth/request-reset",
       "/auth/reset-password",
     ];
     const isNoTokenEndpoint = noTokenEndpoints.some((endpoint) =>
@@ -501,6 +503,7 @@ export const apiClient = {
     token_type: "Bearer";
     expires_in: number;
     session_id: string;
+    is_password_reset_required?: boolean;
   }> {
     // Login via IAM service - cookies are set automatically by the service
     const response = await api.post("/auth/login", credentials);
@@ -522,6 +525,7 @@ export const apiClient = {
       token_type: "Bearer" as const,
       expires_in: 900, // 15 minutes in seconds
       session_id: authData.user.id,
+      is_password_reset_required: authData.is_password_reset_required,
     };
   },
 
@@ -598,7 +602,7 @@ export const apiClient = {
         console.log("[API] 401 response - no valid session");
         return { valid: false };
       }
-      
+
       // Detect rate limit either via our RateLimitError class or an Axios response status
       let isRateLimited = false;
       let retryAfterSeconds: number | undefined;
@@ -644,7 +648,7 @@ export const apiClient = {
   },
 
   async forgotPassword(data: { email: string }): Promise<{ message: string }> {
-    const response = await api.post("/auth/forgot-password", data);
+    const response = await api.post("/auth/request-reset", data);
     return response.data;
   },
 
@@ -652,7 +656,10 @@ export const apiClient = {
     token: string;
     password: string;
   }): Promise<{ message: string }> {
-    const response = await api.post("/auth/reset-password", data);
+    const response = await api.post("/auth/reset-password", {
+      token: data.token,
+      new_password: data.password,
+    });
     return response.data;
   },
 

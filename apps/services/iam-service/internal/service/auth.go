@@ -22,6 +22,7 @@ type AuthService interface {
 	RequestPasswordReset(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
 	ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error
+	Session(ctx context.Context, userID string) (*dto.AuthUserResponse, error)
 }
 
 type authService struct {
@@ -264,10 +265,66 @@ func (s *authService) generateTokens(ctx context.Context, user *domain.User, ip,
 		return nil, err
 	}
 
+	// Map domain roles to DTO roles
+	authRoles := make([]dto.AuthRoleResponse, 0, len(user.Roles))
+	for _, r := range user.Roles {
+		perms := make([]string, 0, len(r.Permissions))
+		for _, p := range r.Permissions {
+			perms = append(perms, p.Name)
+		}
+		authRoles = append(authRoles, dto.AuthRoleResponse{
+			ID:          r.ID,
+			Name:        r.Name,
+			Permissions: perms,
+		})
+	}
+
 	return &dto.AuthResponse{
 		AccessToken:             at,
 		RefreshToken:            rawRT,
 		IsPasswordResetRequired: user.IsPasswordResetRequired,
+		User: dto.AuthUserResponse{
+			ID:       user.ID,
+			Email:    user.Email,
+			FullName: user.FullName,
+			IsActive: user.IsActive,
+			UserType: string(user.UserType),
+			Roles:    authRoles,
+		},
+	}, nil
+}
+
+func (s *authService) Session(ctx context.Context, userID string) (*dto.AuthUserResponse, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, errors.New(404, "User not found", err)
+	}
+
+	if !user.IsActive {
+		return nil, errors.New(403, "Account inactive", nil)
+	}
+
+	// Map roles/permissions (reuse logic or extract to helper)
+	authRoles := make([]dto.AuthRoleResponse, 0, len(user.Roles))
+	for _, r := range user.Roles {
+		perms := make([]string, 0, len(r.Permissions))
+		for _, p := range r.Permissions {
+			perms = append(perms, p.Name)
+		}
+		authRoles = append(authRoles, dto.AuthRoleResponse{
+			ID:          r.ID,
+			Name:        r.Name,
+			Permissions: perms,
+		})
+	}
+
+	return &dto.AuthUserResponse{
+		ID:       user.ID,
+		Email:    user.Email,
+		FullName: user.FullName,
+		IsActive: user.IsActive,
+		UserType: string(user.UserType),
+		Roles:    authRoles,
 	}, nil
 }
 

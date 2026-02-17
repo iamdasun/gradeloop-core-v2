@@ -125,3 +125,19 @@ func (h *AuthHandler) ChangePassword(c fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"message": "Password changed successfully"})
 }
+
+func (h *AuthHandler) Session(c fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	user, err := h.authService.Session(c.Context(), userID)
+	if err != nil {
+		if appErr, ok := err.(*errors.AppError); ok {
+			return c.Status(appErr.Code).JSON(fiber.Map{"error": appErr.Message})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{
+		"valid": true,
+		"user":  user,
+	})
+}
