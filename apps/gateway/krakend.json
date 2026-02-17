@@ -3,7 +3,7 @@
   "version": 3,
   "name": "GradeLoop API Gateway",
   "port": 8080,
-  "timeout": "3000ms",
+  "timeout": "50000ms",
   "cache_ttl": "300s",
   "output_encoding": "json",
   "endpoints": [
@@ -11,16 +11,12 @@
       "endpoint": "/api/v1/auth/login",
       "method": "POST",
       "output_encoding": "json",
-      "extra_config": {
-        "github_com/devopsfaith/krakend/proxy": {
-          "allow_status": [401]
-        }
-      },
       "backend": [
         {
           "url_pattern": "/auth/login",
-          "method": "POST",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -29,16 +25,16 @@
       "endpoint": "/api/v1/auth/logout",
       "method": "POST",
       "output_encoding": "json",
-      "extra_config": {
-        "github_com/devopsfaith/krakend/proxy": {
-          "allow_status": [401]
-        }
-      },
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/auth/logout",
-          "method": "POST",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -47,16 +43,16 @@
       "endpoint": "/api/v1/auth/refresh",
       "method": "POST",
       "output_encoding": "json",
-      "extra_config": {
-        "github_com/devopsfaith/krakend/proxy": {
-          "allow_status": [401]
-        }
-      },
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/auth/refresh",
-          "method": "POST",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -65,16 +61,12 @@
       "endpoint": "/api/v1/auth/request-reset",
       "method": "POST",
       "output_encoding": "json",
-      "extra_config": {
-        "github_com/devopsfaith/krakend/proxy": {
-          "allow_status": [401]
-        }
-      },
       "backend": [
         {
           "url_pattern": "/auth/request-reset",
-          "method": "POST",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -83,16 +75,30 @@
       "endpoint": "/api/v1/auth/reset-password",
       "method": "POST",
       "output_encoding": "json",
-      "extra_config": {
-        "github_com/devopsfaith/krakend/proxy": {
-          "allow_status": [401]
-        }
-      },
       "backend": [
         {
           "url_pattern": "/auth/reset-password",
-          "method": "POST",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
+          "disable_host_sanitize": true
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/v1/auth/change-password",
+      "method": "POST",
+      "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
+      "backend": [
+        {
+          "url_pattern": "/auth/change-password",
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -101,12 +107,23 @@
       "endpoint": "/api/v1/users",
       "method": "POST",
       "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/users",
           "method": "POST",
-          "host": ["http://iam-service:8081"],
-          "disable_host_sanitize": true
+          "host": [
+            "http://iam-service:8081"
+          ],
+          "disable_host_sanitize": true,
+          "extra_config": {
+            "backend/http": {
+              "return_error_code": true
+            }
+          }
         }
       ]
     },
@@ -114,11 +131,17 @@
       "endpoint": "/api/v1/users",
       "method": "GET",
       "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/users",
           "method": "GET",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -127,11 +150,17 @@
       "endpoint": "/api/v1/users/{id}",
       "method": "GET",
       "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/users/{id}",
           "method": "GET",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -140,11 +169,17 @@
       "endpoint": "/api/v1/users/{id}",
       "method": "PUT",
       "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/users/{id}",
           "method": "PUT",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -153,11 +188,17 @@
       "endpoint": "/api/v1/users/{id}",
       "method": "DELETE",
       "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/users/{id}",
           "method": "DELETE",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -166,11 +207,17 @@
       "endpoint": "/api/v1/users/{id}/roles",
       "method": "POST",
       "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/users/{id}/roles",
           "method": "POST",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -179,11 +226,17 @@
       "endpoint": "/api/v1/roles",
       "method": "POST",
       "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/roles",
           "method": "POST",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -192,11 +245,17 @@
       "endpoint": "/api/v1/roles",
       "method": "GET",
       "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/roles",
           "method": "GET",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -205,11 +264,17 @@
       "endpoint": "/api/v1/roles/{id}/permissions",
       "method": "POST",
       "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/roles/{id}/permissions",
           "method": "POST",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
@@ -218,11 +283,17 @@
       "endpoint": "/api/v1/audit-logs",
       "method": "GET",
       "output_encoding": "json",
+      "input_headers": [
+        "Authorization",
+        "Content-Type"
+      ],
       "backend": [
         {
           "url_pattern": "/audit-logs",
           "method": "GET",
-          "host": ["http://iam-service:8081"],
+          "host": [
+            "http://iam-service:8081"
+          ],
           "disable_host_sanitize": true
         }
       ]
