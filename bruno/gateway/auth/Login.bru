@@ -25,5 +25,6 @@ script:post-response {
   if (res.status === 200) {
     bru.setEnvVar("access_token", res.body.access_token);
     bru.setEnvVar("refresh_token", res.body.refresh_token);
+    bru.setEnvVar("is_password_reset_required", res.body.is_password_reset_required);
   }
 }

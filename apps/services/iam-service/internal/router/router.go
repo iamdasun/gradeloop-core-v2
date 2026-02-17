@@ -23,8 +23,7 @@ func SetupRoutes(app *fiber.App, config Config) {
 	auth.Post("/login", config.AuthHandler.Login)
 	auth.Post("/refresh", config.AuthHandler.Refresh)
 	auth.Post("/logout", config.AuthHandler.Logout)
-	auth.Post("/forgot-password", config.AuthHandler.RequestPasswordReset)
-	auth.Post("/forgot-password", config.AuthHandler.RequestPasswordReset)
+	auth.Post("/request-reset", config.AuthHandler.RequestPasswordReset)
 	auth.Post("/reset-password", config.AuthHandler.ResetPassword)
 	auth.Post("/change-password", middleware.AuthMiddleware(), config.AuthHandler.ChangePassword)
 
