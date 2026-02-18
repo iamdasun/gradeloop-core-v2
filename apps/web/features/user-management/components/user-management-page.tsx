@@ -5,13 +5,31 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Upload, Download, Plus, Users, BadgeCheck, GraduationCap, ChevronRight } from "lucide-react";
-import { useUsers, useUserCounts, useDeleteUser, useUpdateUserStatus } from "../hooks/use-users";
+import {
+  Upload,
+  Download,
+  Plus,
+  Users,
+  BadgeCheck,
+  GraduationCap,
+  ChevronRight,
+} from "lucide-react";
+import {
+  useUsers,
+  useUserCounts,
+  useDeleteUser,
+  useUpdateUserStatus,
+} from "../hooks/use-users";
 import { FilterControls } from "../components/filter-controls";
 import { TableHeader } from "../components/table-header";
 import { UserRow } from "../components/user-row";
 import { PaginationControls } from "../components/pagination-controls";
-import type { UserManagement, UserRole, UserStatus } from "@/schemas/user-management.schema";
+import type {
+  UserManagement,
+  UserRole,
+  UserStatus,
+  UserFilterParams,
+} from "@/schemas/user-management.schema";
 import Link from "next/link";
 
 export function UserManagementPage() {
@@ -19,29 +37,35 @@ export function UserManagementPage() {
   const [searchValue, setSearchValue] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
   const [statusFilter, setStatusFilter] = useState<UserStatus | "all">("all");
-  const [currentTab, setCurrentTab] = useState<"all" | "employees" | "students">("all");
-  
+  const [currentTab, setCurrentTab] = useState<
+    "all" | "employees" | "students"
+  >("all");
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
-  
+
   // Selection states
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
-  
+
   // Sort states
   const [sortField, setSortField] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(
+    null,
+  );
 
   // Build query params
   const queryParams = useMemo(() => {
-    const params: any = {
+    const params = {
       page: currentPage,
       per_page: perPage,
-    };
+    } as UserFilterParams;
 
     if (searchValue) params.search = searchValue;
-    if (roleFilter !== "all") params.role = roleFilter;
-    if (statusFilter !== "all") params.status = statusFilter;
+    if (roleFilter !== "all")
+      params.role = roleFilter as UserFilterParams["role"];
+    if (statusFilter !== "all")
+      params.status = statusFilter as UserFilterParams["status"];
 
     return params;
   }, [searchValue, roleFilter, statusFilter, currentPage, perPage]);
@@ -91,16 +115,25 @@ export function UserManagementPage() {
     }
   };
 
-  const handleStatusChange = (user: UserManagement, status: "active" | "inactive" | "suspended") => {
+  const handleStatusChange = (
+    user: UserManagement,
+    status: "active" | "inactive" | "suspended",
+  ) => {
     updateStatusMutation.mutate({ id: user.id, status });
   };
 
-  const allSelected = usersData?.data && selectedUsers.size === usersData.data.length && usersData.data.length > 0;
+  const allSelected =
+    usersData?.data &&
+    selectedUsers.size === usersData.data.length &&
+    usersData.data.length > 0;
 
   return (
     <div className="max-w-[1440px] mx-auto p-6 lg:p-8">
       {/* Breadcrumb */}
-      <nav aria-label="Breadcrumb" className="flex text-sm text-muted-foreground mb-6">
+      <nav
+        aria-label="Breadcrumb"
+        className="flex text-sm text-muted-foreground mb-6"
+      >
         <ol className="inline-flex items-center space-x-1 md:space-x-3">
           <li className="inline-flex items-center">
             <Link href="/" className="hover:text-primary transition-colors">
@@ -110,7 +143,10 @@ export function UserManagementPage() {
           <li>
             <div className="flex items-center">
               <ChevronRight className="h-4 w-4 text-gray-400" />
-              <Link href="/admin" className="ml-1 hover:text-primary transition-colors md:ml-2">
+              <Link
+                href="/admin"
+                className="ml-1 hover:text-primary transition-colors md:ml-2"
+              >
                 Administration
               </Link>
             </div>
@@ -118,7 +154,9 @@ export function UserManagementPage() {
           <li aria-current="page">
             <div className="flex items-center">
               <ChevronRight className="h-4 w-4 text-gray-400" />
-              <span className="ml-1 font-medium text-foreground md:ml-2">User Management</span>
+              <span className="ml-1 font-medium text-foreground md:ml-2">
+                User Management
+              </span>
             </div>
           </li>
         </ol>
@@ -149,7 +187,13 @@ export function UserManagementPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as any)} className="mb-6">
+      <Tabs
+        value={currentTab}
+        onValueChange={(value: string) =>
+          setCurrentTab(value as "all" | "employees" | "students")
+        }
+        className="mb-6"
+      >
         <TabsList>
           <TabsTrigger value="all" className="gap-2">
             <Users className="h-4 w-4" />
@@ -213,7 +257,10 @@ export function UserManagementPage() {
                 ))
               ) : error ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-red-600">
+                  <td
+                    colSpan={6}
+                    className="px-6 py-4 text-center text-red-600"
+                  >
                     Error loading users. Please try again.
                   </td>
                 </tr>
@@ -223,7 +270,9 @@ export function UserManagementPage() {
                     key={user.id}
                     user={user}
                     isSelected={selectedUsers.has(user.id)}
-                    onSelectChange={(checked) => handleSelectUser(user.id, checked)}
+                    onSelectChange={(checked) =>
+                      handleSelectUser(user.id, checked)
+                    }
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     onStatusChange={handleStatusChange}
@@ -231,7 +280,10 @@ export function UserManagementPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                  <td
+                    colSpan={6}
+                    className="px-6 py-12 text-center text-muted-foreground"
+                  >
                     No users found. Try adjusting your filters.
                   </td>
                 </tr>
