@@ -312,10 +312,10 @@ export const useAuthStore = create<AuthState>()(
             try {
               const permissions = state.user
                 ? normalizePermissions(
-                    state.user?.roles?.flatMap(
-                      (r: any) => r.permissions ?? [],
-                    ) ?? [],
-                  )
+                  state.user?.roles?.flatMap(
+                    (r: any) => r.permissions ?? [],
+                  ) ?? [],
+                )
                 : [];
               setSessionCookie({
                 session_id: session.id ?? null,
@@ -476,7 +476,7 @@ export const useAuthStore = create<AuthState>()(
       // Authorization Getters
       hasRole: (role) => {
         const { getUserRoles } = get();
-        return getUserRoles().includes(role);
+        return getUserRoles().some((r) => r.toLowerCase() === role.toLowerCase());
       },
 
       hasPermission: (permission) => {
