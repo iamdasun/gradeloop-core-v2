@@ -1,29 +1,136 @@
-# GradeLoop Core V2 - Web Client Context
+# GradeLoop Core V2
 
-This project is a high-performance web client built with **Bun**, **Next.js (App Router)**, and a strictly typed ecosystem for an AI-integrated Learning Management System (LMS).
+This project is an AI-integrated Learning Management System (LMS) built with a microservices architecture.
 
 ---
 
-# Primary Tech Stack
+# Frontend (SvelteKit)
+
+This project uses **Svelte v5** with **SvelteKit** for a high-performance, type-safe web client.
+
+## Primary Tech Stack
 
 - **Runtime**: Bun (Strictly use `bun` for scripts and package management)
-- **Framework**: Next.js 16+ (App Router)
-- **UI Architecture**: shadcn/ui (Radix UI + TailwindCSS v4)
-- **Animation**: Motion (`motion` package only — never `framer-motion`)
-- **State Management**: Zustand v5 (Store-based, immutable state)
-- **Data Layer**: TanStack Query v5
-- **HTTP Client**: Axios (Instance-based)
-- **Form Handling**: React Hook Form v7 with Hookform Resolvers
-- **Validation**: Zod v4 (Schema-first development)
-- **Styling**: TailwindCSS v4 with PostCSS
-- **Utilities**: clsx (or `cn` utility), date-fns
-- **Icons**: lucide-react
+- **Framework**: SvelteKit with Svelte v5 (Runes-based)
+- **UI Components**: shadcn-svelte (built on Bits UI primitives)
+- **Styling**: TailwindCSS v3 with PostCSS
+- **State Management**: Svelte 5 Runes (`$state`, `$derived`, `$effect`)
+- **HTTP Client**: Native Fetch API
+- **Form Handling**: Superforms with Zod validation
+- **Validation**: Zod (Schema-first development)
+- **Icons**: lucide-svelte
 
----
+## shadcn-svelte Theme Configuration
 
-# Development Standards & Patterns
+Use the following color palette in your CSS variables (`app.css`):
 
-(keep the same expectations as before for the web client; see sections below for specific rules)
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--background` | `#F8FAFB` | Very faint blue-grey base |
+| `--foreground` | `#002333` | Primary text color |
+| `--card` | `#FFFFFF` | Card/popover surfaces |
+| `--card-foreground` | `#002333` | Card text color |
+| `--popover` | `#FFFFFF` | Popover surfaces |
+| `--popover-foreground` | `#002333` | Popover text color |
+| `--primary` | `#159A9C` | Brand teal for actions |
+| `--primary-foreground` | `#FFFFFF` | Text on primary |
+| `--secondary` | `#DEEFE7` | Soft region for badges/buttons |
+| `--secondary-foreground` | `#002333` | Text on secondary |
+| `--muted` | `#F1F5F9` | Inactive states |
+| `--muted-foreground` | `#64748B` | Muted text |
+| `--accent` | `#DEEFE7` | Accent highlights |
+| `--accent-foreground` | `#002333` | Text on accent |
+| `--destructive` | `#EF4444` | Error/destructive actions |
+| `--destructive-foreground` | `#FFFFFF` | Text on destructive |
+| `--border` | `#B4BEC9` | Borders and dividers |
+| `--input` | `#B4BEC9` | Input borders |
+| `--ring` | `#159A9C` | Focus ring color |
+
+## Component Styling Guidelines
+
+Apply the theme colors consistently across shadcn-svelte components:
+
+### Buttons
+- **Primary**: `bg-primary text-primary-foreground hover:bg-primary/90`
+- **Secondary**: `bg-secondary text-secondary-foreground hover:bg-secondary/80`
+- **Destructive**: `bg-destructive text-destructive-foreground hover:bg-destructive/90`
+- **Outline**: `border border-input bg-background hover:bg-accent hover:text-accent-foreground`
+- **Ghost**: `hover:bg-accent hover:text-accent-foreground`
+- **Link**: `text-primary underline-offset-4 hover:underline`
+
+### Cards
+- Container: `bg-card text-card-foreground rounded-lg border shadow-sm`
+- Header: `border-b px-6 py-4`
+- Title: `text-lg font-semibold text-foreground`
+- Description: `text-sm text-muted-foreground`
+- Content: `px-6 py-4`
+- Footer: `border-t px-6 py-4 flex items-center`
+
+### Forms & Inputs
+- Input: `border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`
+- Label: `text-sm font-medium text-foreground`
+- Description: `text-sm text-muted-foreground`
+- Error: `text-sm font-medium text-destructive`
+
+### Badges
+- **Default**: `bg-primary text-primary-foreground`
+- **Secondary**: `bg-secondary text-secondary-foreground`
+- **Outline**: `border border-input text-foreground`
+- **Destructive**: `bg-destructive text-destructive-foreground`
+
+### Alerts
+- **Default**: `border-l-4 border-primary bg-background text-foreground`
+- **Destructive**: `border-l-4 border-destructive bg-destructive/10 text-destructive`
+
+### Tables
+- Header: `bg-muted/50 text-muted-foreground`
+- Row: `border-b border-border hover:bg-muted/50`
+- Cell: `p-4 text-foreground`
+
+### Dialogs/Sheets
+- Content: `bg-card border border-border shadow-lg`
+- Header: `border-b border-border pb-3`
+- Title: `text-lg font-semibold text-foreground`
+- Description: `text-sm text-muted-foreground`
+- Footer: `border-t border-border pt-3`
+
+### Navigation
+- Active: `bg-accent text-accent-foreground`
+- Inactive: `text-muted-foreground hover:text-foreground hover:bg-accent`
+
+## Development Standards
+
+- Use Svelte v5 Runes syntax (`$state`, `$derived`, `$effect`) — no legacy stores for new code
+- Strict TypeScript (no `any`)
+- Use shadcn-svelte CLI for component installation: `bunx shadcn-svelte add <component>`
+- All API responses must be validated with Zod schemas
+- Use Bun exclusively for package management (no npm/yarn/pnpm)
+
+## Project Structure
+
+```
+/apps/web/
+  ├── src/
+  │   ├── lib/
+  │   │   ├── components/     # shadcn-svelte components
+  │   │   ├── features/       # Feature-based modules
+  │   │   ├── hooks/          # Composable utilities
+  │   │   └── utils.ts        # Helper functions (cn, etc.)
+  │   ├── routes/             # SvelteKit file-based routing
+  │   ├── app.html
+  │   └── app.css
+  ├── components.json         # shadcn-svelte configuration
+  ├── tailwind.config.js
+  ├── svelte.config.js
+  └── vite.config.ts
+```
+
+## Quick Commands
+
+- Install: `bun install`
+- Dev: `bun run dev`
+- Build: `bun run build`
+- Add component: `bunx shadcn-svelte add <component>`
 
 ---
 
@@ -94,27 +201,28 @@ apps/services/<service-name>/
 
 ---
 
-# Project Structure Reference (web + selected services)
+# Project Structure Reference
 
 ```
-/apps/web/                # frontend (Next.js + Bun)
-  ├── app/
-  ├── components/
-  ├── features/
-  ├── lib/
+/apps/web/                  # SvelteKit frontend
+  ├── src/
+  ├── components.json
   └── ...
 
-/apps/services/           # microservices
-  ├── iam-service/       # Go service (see structure above)
-  ├── (other services...) # Java services removed from LLMs context unless present locally
+/apps/services/             # microservices
+  ├── iam-service/          # Go service (see structure above)
+  ├── (other services...)   # Additional services
 ```
 
 ---
 
 # Critical Development Rules (summary)
-- Strict TypeScript in the web client (no `any`).
-- No raw API data without Zod parsing on the frontend.
-- No NPM/Yarn for the web client: use Bun exclusively.
+- Frontend (SvelteKit):
+  - Use Svelte v5 Runes syntax (`$state`, `$derived`, `$effect`)
+  - Strict TypeScript (no `any`)
+  - All API data must be validated with Zod schemas
+  - Use Bun exclusively for package management
+  - Use shadcn-svelte CLI for component installation
 - For Go services:
   - Keep configuration in env files or external secret stores.
   - Do not hardcode DB credentials or secrets.
@@ -132,10 +240,11 @@ apps/services/<service-name>/
 
 # Quick reference commands
 
-Frontend
+Frontend (SvelteKit)
 - Install: `bun install`
 - Dev: `bun run dev`
 - Build: `bun run build`
+- Add component: `bunx shadcn-svelte add <component>`
 
 IAM-service (Go)
 - Build: `go build ./...` or `go build -o ./bin/auth ./cmd/main.go`
