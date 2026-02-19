@@ -21,6 +21,7 @@ apps/services/iam-service/
 │   ├── domain/                    # Business entities (GORM models)
 │   ├── dto/                       # Data Transfer Objects
 │   ├── handler/                   # HTTP handlers
+│   ├── jwt/                       # JWT authentication utilities
 │   ├── middleware/                # Custom middleware
 │   ├── repository/                # Data access layer
 │   │   └── migrations/            # GORM migrations & seeder
