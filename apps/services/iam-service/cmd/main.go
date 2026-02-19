@@ -13,6 +13,7 @@ import (
 	"github.com/gradeloop/iam-service/internal/handler"
 	"github.com/gradeloop/iam-service/internal/middleware"
 	"github.com/gradeloop/iam-service/internal/repository"
+	"github.com/gradeloop/iam-service/internal/repository/migrations"
 	"github.com/gradeloop/iam-service/internal/router"
 	"github.com/gradeloop/iam-service/internal/service"
 	"github.com/gradeloop/iam-service/internal/utils"
@@ -45,8 +46,14 @@ func run() error {
 	}
 	defer db.Close()
 
-	if err := db.DB.AutoMigrate(); err != nil {
-		return fmt.Errorf("running auto migration: %w", err)
+	migrator := migrations.NewMigrator(db.DB, logger)
+	if err := migrator.Run(); err != nil {
+		return fmt.Errorf("running migrations: %w", err)
+	}
+
+	seeder := migrations.NewSeeder(db.DB, logger)
+	if err := seeder.Seed(); err != nil {
+		return fmt.Errorf("seeding database: %w", err)
 	}
 
 	baseRepo := repository.NewBaseRepository(db.DB)
