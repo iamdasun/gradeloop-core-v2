@@ -14,6 +14,7 @@ type UserRepository interface {
 	GetUserByUsername(ctx context.Context, username string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	UpdateUser(ctx context.Context, user *domain.User) error
+	SoftDeleteUser(ctx context.Context, userID uuid.UUID) error
 	RoleExists(ctx context.Context, roleID uuid.UUID) (bool, error)
 }
 
@@ -84,6 +85,33 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*dom
 
 func (r *userRepository) UpdateUser(ctx context.Context, user *domain.User) error {
 	return r.db.WithContext(ctx).Save(user).Error
+}
+
+func (r *userRepository) SoftDeleteUser(ctx context.Context, userID uuid.UUID) error {
+	tx := r.db.WithContext(ctx).Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Soft delete the user
+	if err := tx.Model(&domain.User{}).
+		Where("id = ?", userID).
+		Update("deleted_at", gorm.Expr("NOW()")).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Revoke all refresh tokens for the deleted user
+	if err := tx.Model(&domain.RefreshToken{}).
+		Where("user_id = ? AND revoked_at IS NULL", userID).
+		Update("revoked_at", gorm.Expr("NOW()")).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit().Error
 }
 
 func (r *userRepository) RoleExists(ctx context.Context, roleID uuid.UUID) (bool, error) {

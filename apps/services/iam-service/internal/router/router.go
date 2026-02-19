@@ -49,6 +49,10 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	permissions.Get("/", cfg.PermissionHandler.GetAllPermissions)
 	permissions.Post("/", middleware.RequirePermission("permissions:write"), cfg.PermissionHandler.CreatePermission)
 
+	// Admin routes with authentication middleware
+	adminProtected := app.Group("", middleware.AuthMiddleware(cfg.JWTSecretKey))
+	cfg.AuthHandler.RegisterAdminRoutes(adminProtected)
+
 	app.Get("/", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"service": "iam-service",

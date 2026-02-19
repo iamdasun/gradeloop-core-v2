@@ -209,6 +209,12 @@ Created from environment variables at application startup:
 | GET | `/permissions` | List all permissions | Yes |
 | POST | `/permissions` | Create new permission | Yes (`permissions:write`) |
 
+### Session Management
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/admin/users/:id/revoke-sessions` | Revoke all user sessions | Yes (`users:write` or `users:delete`) |
+
 ### System
 
 | Method | Endpoint | Description | Auth Required |
@@ -840,6 +846,53 @@ Create a new permission. **Requires `permissions:write` permission.**
 | 403 | - | Permission denied (requires `permissions:write`) |
 | 409 | - | Permission already exists |
 
+---
+
+## Session Management Endpoints
+
+### POST `/admin/users/:id/revoke-sessions`
+
+Revoke all active sessions for a user. **Requires `users:write` or `users:delete` permission.**
+
+**Request:**
+```http
+POST /admin/users/550e8400-e29b-41d4-a716-446655440000/revoke-sessions
+Authorization: Bearer <access_token>
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "message": "Revoked 3 active session(s)"
+}
+```
+
+**Behavior:**
+- Sets `revoked_at` timestamp on all non-revoked refresh tokens for the user
+- Returns count of sessions that were revoked
+- User will be logged out from all devices
+- Existing access tokens remain valid until expiration (15 minutes)
+- Refresh tokens cannot be reused after revocation
+
+**Automatic Revocation:**
+- **Password change**: All sessions revoked when user changes password
+- **Password reset**: All sessions revoked when password is reset via email
+- **User soft-delete**: All sessions revoked when user is deleted
+
+**Security Notes:**
+- Revoked tokens are checked on every refresh token request
+- Revoked tokens cannot be reused
+- User must re-authenticate to obtain new tokens
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 400 | - | Invalid user ID format |
+| 401 | - | Unauthorized (missing or invalid token) |
+| 403 | - | Permission denied (requires `users:write` or `users:delete`) |
+| 404 | - | User not found |
+
 ## Environment Variables
 
 | Variable | Description | Default | Required |
@@ -1118,7 +1171,12 @@ type TokenPair struct {
 - **Password Hashing**: bcrypt with cost factor 10
 - **Password Strength**: Enforced on change/reset (8+ chars, uppercase, lowercase, digit, special char)
 - **Reset Token Security**: Single-use, 1-hour expiry, hashed storage
-- **Session Invalidation**: All refresh tokens revoked on password change/reset
+- **Session Invalidation**:
+  - All refresh tokens revoked on password change
+  - All refresh tokens revoked on password reset
+  - All refresh tokens revoked on user soft-delete
+  - Admin endpoint to revoke user sessions (`/admin/users/:id/revoke-sessions`)
+- **Revoked Token Enforcement**: Revoked tokens checked on every refresh request, cannot be reused
 - **Error Handling**:
   - `ErrInvalidToken` - Token structure or signature invalid
   - `ErrExpiredToken` - Token has expired

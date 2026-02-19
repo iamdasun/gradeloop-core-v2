@@ -37,6 +37,11 @@ func (h *AuthHandler) RegisterRoutes(app *fiber.App) {
 	auth.Post("/change-password", h.ChangePassword)
 }
 
+// RegisterAdminRoutes registers admin-only routes
+func (h *AuthHandler) RegisterAdminRoutes(router fiber.Router) {
+	router.Post("/admin/users/:id/revoke-sessions", h.RevokeUserSessions)
+}
+
 func (h *AuthHandler) Login(c fiber.Ctx) error {
 	var req dto.LoginRequest
 
@@ -163,6 +168,26 @@ func (h *AuthHandler) ResetPassword(c fiber.Ctx) error {
 	}
 
 	response, err := h.passwordService.ResetPassword(c.RequestCtx(), req.Token, req.NewPassword)
+	if err != nil {
+		return handleAuthError(err)
+	}
+
+	return c.JSON(response)
+}
+
+func (h *AuthHandler) RevokeUserSessions(c fiber.Ctx) error {
+	userID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	// Get actor permissions from context
+	permissions, ok := c.Locals("permissions").([]string)
+	if !ok || permissions == nil {
+		return fiber.NewError(fiber.StatusForbidden, "Permission denied")
+	}
+
+	response, err := h.authService.RevokeUserSessions(c.RequestCtx(), userID, permissions)
 	if err != nil {
 		return handleAuthError(err)
 	}

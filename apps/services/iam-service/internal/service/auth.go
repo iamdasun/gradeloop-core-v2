@@ -30,6 +30,7 @@ type AuthService interface {
 	Login(ctx context.Context, username, password string) (*dto.LoginResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*dto.RefreshTokenResponse, error)
 	Logout(ctx context.Context, refreshToken string) error
+	RevokeUserSessions(ctx context.Context, userID uuid.UUID, actorPermissions []string) (*dto.RevokeUserSessionsResponse, error)
 }
 
 type authService struct {
@@ -134,6 +135,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*d
 	tokenHash := jwt.HashToken(refreshToken)
 
 	// Get refresh token from database
+	// Note: GetRefreshToken already checks revoked_at IS NULL and expiry
 	token, err := s.authRepo.GetRefreshToken(ctx, tokenHash)
 	if err != nil {
 		return nil, fmt.Errorf("fetching refresh token: %w", err)
@@ -141,16 +143,6 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*d
 
 	if token == nil {
 		return nil, ErrRefreshTokenNotFound
-	}
-
-	// Check if expired
-	if token.ExpiresAt.Before(time.Now()) {
-		return nil, ErrRefreshTokenExpired
-	}
-
-	// Check if revoked
-	if token.RevokedAt != nil {
-		return nil, ErrRefreshTokenRevoked
 	}
 
 	// Get user to check status and get updated permissions
@@ -274,4 +266,38 @@ func (s *authService) getUserByID(ctx context.Context, userID uuid.UUID) (*dto.U
 	user.Permissions = permissions
 
 	return &user, nil
+}
+
+func (s *authService) RevokeUserSessions(ctx context.Context, userID uuid.UUID, actorPermissions []string) (*dto.RevokeUserSessionsResponse, error) {
+	// Check if actor has permission to manage user sessions
+	hasPermission := false
+	for _, perm := range actorPermissions {
+		if perm == "users:write" || perm == "users:delete" {
+			hasPermission = true
+			break
+		}
+	}
+	if !hasPermission {
+		return nil, ErrUnauthorized
+	}
+
+	// Get active sessions count before revocation
+	activeCount, err := s.authRepo.GetActiveSessionsCount(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("checking active sessions: %w", err)
+	}
+
+	// Revoke all refresh tokens for the user
+	if err := s.authRepo.InvalidateAllRefreshTokens(ctx, userID); err != nil {
+		return nil, fmt.Errorf("revoking sessions: %w", err)
+	}
+
+	message := "All user sessions have been revoked"
+	if activeCount > 0 {
+		message = fmt.Sprintf("Revoked %d active session(s)", activeCount)
+	}
+
+	return &dto.RevokeUserSessionsResponse{
+		Message: message,
+	}, nil
 }

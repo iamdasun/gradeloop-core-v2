@@ -90,3 +90,9 @@ type ResetPasswordRequest struct {
 type ResetPasswordResponse struct {
 	Message string `json:"message"`
 }
+
+// Session Management DTOs
+
+type RevokeUserSessionsResponse struct {
+	Message string `json:"message"`
+}

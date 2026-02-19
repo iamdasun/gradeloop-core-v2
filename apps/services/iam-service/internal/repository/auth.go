@@ -20,6 +20,7 @@ type AuthRepository interface {
 	CreatePasswordResetToken(ctx context.Context, token *domain.PasswordResetToken) error
 	GetPasswordResetToken(ctx context.Context, tokenHash string) (*domain.PasswordResetToken, error)
 	UsePasswordResetToken(ctx context.Context, tokenID uuid.UUID) error
+	GetActiveSessionsCount(ctx context.Context, userID uuid.UUID) (int64, error)
 }
 
 type authRepository struct {
@@ -93,7 +94,7 @@ func (r *authRepository) GetRefreshToken(ctx context.Context, tokenHash string) 
 	}
 
 	// Check if expired
-	if token.ExpiresAt.Before(token.CreatedAt) {
+	if token.ExpiresAt.Before(time.Now()) {
 		return nil, nil
 	}
 
@@ -149,4 +150,19 @@ func (r *authRepository) UsePasswordResetToken(ctx context.Context, tokenID uuid
 		Model(&domain.PasswordResetToken{}).
 		Where("id = ?", tokenID).
 		Update("used_at", now).Error
+}
+
+func (r *authRepository) GetActiveSessionsCount(ctx context.Context, userID uuid.UUID) (int64, error) {
+	var count int64
+
+	query := r.db.WithContext(ctx).
+		Model(&domain.RefreshToken{}).
+		Where("user_id = ? AND revoked_at IS NULL AND expires_at > NOW()", userID).
+		Count(&count)
+
+	if query.Error != nil {
+		return 0, query.Error
+	}
+
+	return count, nil
 }
