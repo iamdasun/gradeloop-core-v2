@@ -4,157 +4,56 @@ This project is an AI-integrated Learning Management System (LMS) built with a m
 
 ---
 
-# Frontend (SvelteKit)
+# Frontend (Next.js)
 
-This project uses **Svelte v5** with **SvelteKit** for a high-performance, type-safe web client.
+This project uses **Next.js** with the **Bun** runtime. The UI is built with **ShadCN**, **React Hook Forms**, **Zustand**, **React Query**, and **Motion**.
 
 ## Primary Tech Stack
 
 - **Runtime**: Bun (Strictly use `bun` for scripts and package management)
-- **Framework**: SvelteKit with Svelte v5 (Runes-based)
-- **UI Components**: shadcn-svelte (built on Bits UI primitives)
-- **Styling**: TailwindCSS v3 with PostCSS
-- **State Management**: Svelte 5 Runes (`$state`, `$derived`, `$effect`)
-- **HTTP Client**: Native Fetch API
-- **Form Handling**: Superforms with Zod validation
+- **Framework**: Next.js (App Router)
+- **UI Components**: ShadCN UI (Radix UI primitives + Tailwind CSS)
+- **Styling**: TailwindCSS
+- **State Management**: Zustand
+- **Data Fetching**: React Query (TanStack Query)
+- **Animation**: Motion (Framer Motion)
+- **Form Handling**: React Hook Form
 - **Validation**: Zod (Schema-first development)
-- **Icons**: lucide-svelte
+- **Icons**: Lucide React
 
-## shadcn-svelte Theme Configuration
+## ShadCN UI Configuration
 
-The theme uses the **Crevasse Color Palette** with full dark mode support.
+> shadcn/ui is a collection of beautifully-designed, accessible components and a code distribution platform. It is built with TypeScript, Tailwind CSS, and Radix UI primitives.
 
-### Crevasse Color Palette
+### Installation & Management
+- CLI: `bunx shadcn@latest add <component>`
+- Configuration: `components.json`
 
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `crevasse-100` / `gray` | `#B4BEC9` | Gray-Blue (Borders, Muted elements) |
-| `crevasse-200` / `teal` | `#159A9C` | Teal (Primary actions, Brand) |
-| `crevasse-300` / `navy` | `#002333` | Dark Navy (Foreground text, Dark backgrounds) |
-| `crevasse-400` / `mint` | `#DEEFE7` | Light Mint (Secondary, Accent, Light backgrounds) |
-| `crevasse-500` / `white` | `#FFFFFF` | Pure White (Backgrounds, Light text) |
+### Theme Configuration
+Using **Crevasse Color Palette** (see Color Palette section below).
 
-### CSS Variable Mapping (shadcn)
+### CSS Variable Mapping
+(Use the same variables as SvelteKit version, adapted for React)
 
-#### Light Mode
-| Token | Value | Color |
-|-------|-------|-------|
-| `--background` | `0 0% 100%` | `#FFFFFF` |
-| `--foreground` | `195 100% 10%` | `#002333` |
-| `--primary` | `181 76% 35%` | `#159A9C` |
-| `--primary-foreground` | `0 0% 100%` | `#FFFFFF` |
-| `--secondary` | `145 47% 90%` | `#DEEFE7` |
-| `--secondary-foreground` | `195 100% 10%` | `#002333` |
-| `--muted` | `210 24% 75%` | `#B4BEC9` |
-| `--muted-foreground` | `210 24% 45%` | Darker gray-blue |
-| `--accent` | `145 47% 90%` | `#DEEFE7` |
-| `--accent-foreground` | `195 100% 10%` | `#002333` |
-| `--border` | `210 24% 75%` | `#B4BEC9` |
-| `--input` | `210 24% 75%` | `#B4BEC9` |
-| `--ring` | `181 76% 35%` | `#159A9C` |
-
-#### Dark Mode
-| Token | Value | Color |
-|-------|-------|-------|
-| `--background` | `195 100% 7%` | `#002333` |
-| `--foreground` | `0 0% 100%` | `#FFFFFF` |
-| `--primary` | `181 76% 40%` | `#159A9C` (brighter) |
-| `--primary-foreground` | `0 0% 100%` | `#FFFFFF` |
-| `--secondary` | `145 47% 20%` | Dark mint |
-| `--secondary-foreground` | `145 47% 90%` | Light mint |
-| `--muted` | `195 15% 20%` | Dark gray-blue |
-| `--muted-foreground` | `210 24% 65%` | Light gray-blue |
-| `--accent` | `145 47% 20%` | Dark mint |
-| `--accent-foreground` | `145 47% 90%` | Light mint |
-| `--border` | `195 15% 25%` | Dark gray-blue |
-| `--input` | `195 15% 25%` | Dark gray-blue |
-| `--ring` | `181 76% 45%` | Brighter teal |
-
-## Component Styling Guidelines
-
-Apply the theme colors consistently across shadcn-svelte components:
-
-### Buttons
-- **Primary**: `bg-primary text-primary-foreground hover:bg-primary/90`
-- **Secondary**: `bg-secondary text-secondary-foreground hover:bg-secondary/80`
-- **Destructive**: `bg-destructive text-destructive-foreground hover:bg-destructive/90`
-- **Outline**: `border border-input bg-background hover:bg-accent hover:text-accent-foreground`
-- **Ghost**: `hover:bg-accent hover:text-accent-foreground`
-- **Link**: `text-primary underline-offset-4 hover:underline`
-
-### Cards
-- Container: `bg-card text-card-foreground rounded-lg border shadow-sm`
-- Header: `border-b px-6 py-4`
-- Title: `text-lg font-semibold text-foreground`
-- Description: `text-sm text-muted-foreground`
-- Content: `px-6 py-4`
-- Footer: `border-t px-6 py-4 flex items-center`
-
-### Forms & Inputs
-- Input: `border border-input bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`
-- Label: `text-sm font-medium text-foreground`
-- Description: `text-sm text-muted-foreground`
-- Error: `text-sm font-medium text-destructive`
-
-### Badges
-- **Default**: `bg-primary text-primary-foreground`
-- **Secondary**: `bg-secondary text-secondary-foreground`
-- **Outline**: `border border-input text-foreground`
-- **Destructive**: `bg-destructive text-destructive-foreground`
-
-### Alerts
-- **Default**: `border-l-4 border-primary bg-background text-foreground`
-- **Destructive**: `border-l-4 border-destructive bg-destructive/10 text-destructive`
-
-### Tables
-- Header: `bg-muted/50 text-muted-foreground`
-- Row: `border-b border-border hover:bg-muted/50`
-- Cell: `p-4 text-foreground`
-
-### Dialogs/Sheets
-- Content: `bg-card border border-border shadow-lg`
-- Header: `border-b border-border pb-3`
-- Title: `text-lg font-semibold text-foreground`
-- Description: `text-sm text-muted-foreground`
-- Footer: `border-t border-border pt-3`
-
-### Navigation
-- Active: `bg-accent text-accent-foreground`
-- Inactive: `text-muted-foreground hover:text-foreground hover:bg-accent`
-
-## Development Standards
-
-- Use Svelte v5 Runes syntax (`$state`, `$derived`, `$effect`) — no legacy stores for new code
-- Strict TypeScript (no `any`)
-- Use shadcn-svelte CLI for component installation: `bunx shadcn-svelte add <component>`
-- All API responses must be validated with Zod schemas
-- Use Bun exclusively for package management (no npm/yarn/pnpm)
-
-## Project Structure
-
+## Project Structure Reference
 ```
 /apps/web/
-  ├── src/
-  │   ├── lib/
-  │   │   ├── components/     # shadcn-svelte components
-  │   │   ├── features/       # Feature-based modules
-  │   │   ├── hooks/          # Composable utilities
-  │   │   └── utils.ts        # Helper functions (cn, etc.)
-  │   ├── routes/             # SvelteKit file-based routing
-  │   ├── app.html
-  │   └── app.css
-  ├── components.json         # shadcn-svelte configuration
-  ├── tailwind.config.js
-  ├── svelte.config.js
-  └── vite.config.ts
+  ├── app/                  # Next.js App Router
+  ├── components/           # React components
+  │   ├── ui/               # ShadCN primitives
+  ├── lib/                  # Utilities
+  ├── public/               # Static assets
+  ├── components.json       # ShadCN config
+  ├── next.config.ts        # Next.js config
+  ├── package.json
+  └── tailwind.config.ts
 ```
 
 ## Quick Commands
-
 - Install: `bun install`
 - Dev: `bun run dev`
 - Build: `bun run build`
-- Add component: `bunx shadcn-svelte add <component>`
+- Add component: `bunx shadcn@latest add <component>`
 
 ---
 
@@ -230,8 +129,8 @@ apps/services/<service-name>/
 # Project Structure Reference
 
 ```
-/apps/web/                  # SvelteKit frontend
-  ├── src/
+/apps/web/                  # Next.js frontend
+  ├── app/
   ├── components.json
   └── ...
 
@@ -243,12 +142,12 @@ apps/services/<service-name>/
 ---
 
 # Critical Development Rules (summary)
-- Frontend (SvelteKit):
-  - Use Svelte v5 Runes syntax (`$state`, `$derived`, `$effect`)
+- Frontend (Next.js):
+  - Use Next.js App Router
   - Strict TypeScript (no `any`)
   - All API data must be validated with Zod schemas
   - Use Bun exclusively for package management
-  - Use shadcn-svelte CLI for component installation
+  - Use ShadCN CLI for component installation
 - For Go services:
   - Keep configuration in env files or external secret stores.
   - Do not hardcode DB credentials or secrets.
@@ -266,11 +165,11 @@ apps/services/<service-name>/
 
 # Quick reference commands
 
-Frontend (SvelteKit)
+Frontend (Next.js)
 - Install: `bun install`
-- Dev: `bun run dev`
+- Dev: `bun dev`
 - Build: `bun run build`
-- Add component: `bunx shadcn-svelte add <component>`
+- Add component: `bunx shadcn@latest add <component>`
 
 IAM-service (Go)
 - Build: `go build ./...` or `go build -o ./bin/auth ./cmd/main.go`
