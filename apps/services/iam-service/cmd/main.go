@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/gradeloop/iam-service/internal/config"
 	"github.com/gradeloop/iam-service/internal/handler"
+	"github.com/gradeloop/iam-service/internal/jwt"
 	"github.com/gradeloop/iam-service/internal/middleware"
 	"github.com/gradeloop/iam-service/internal/repository"
 	"github.com/gradeloop/iam-service/internal/repository/migrations"
@@ -59,10 +60,27 @@ func run() error {
 	baseRepo := repository.NewBaseRepository(db.DB)
 	defer baseRepo.Close()
 
+	authRepo := repository.NewAuthRepository(db.DB)
+
 	baseService := service.NewBaseService(db.DB)
 	defer baseService.Close()
 
+	jwtInstance := jwt.NewJWT(
+		cfg.JWT.SecretKey,
+		cfg.JWT.AccessTokenExpiry,
+		cfg.JWT.RefreshTokenExpiry,
+	)
+
+	authService := service.NewAuthService(
+		db.DB,
+		authRepo,
+		jwtInstance,
+		cfg.JWT.SecretKey,
+		cfg.JWT.RefreshTokenExpiry,
+	)
+
 	healthHandler := handler.NewHealthHandler()
+	authHandler := handler.NewAuthHandler(authService)
 
 	app := fiber.New(fiber.Config{
 		AppName:      "iam-service",
@@ -74,6 +92,7 @@ func run() error {
 
 	router.SetupRoutes(app, router.Config{
 		HealthHandler: healthHandler,
+		AuthHandler:   authHandler,
 	})
 
 	sigChan := make(chan os.Signal, 1)
