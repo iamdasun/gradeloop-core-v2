@@ -61,3 +61,13 @@ type RefreshToken struct {
 	RevokedAt *time.Time `gorm:"index" json:"revoked_at,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
 }
+
+type PasswordResetToken struct {
+	ID        uuid.UUID  `gorm:"type:uuid;primarykey" json:"id"`
+	UserID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"user_id"`
+	User      User       `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"user,omitempty"`
+	TokenHash string     `gorm:"uniqueIndex;not null;size:255" json:"-"`
+	ExpiresAt time.Time  `gorm:"not null;index" json:"expires_at"`
+	UsedAt    *time.Time `gorm:"index" json:"used_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+}

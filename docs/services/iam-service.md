@@ -184,6 +184,10 @@ Created from environment variables at application startup:
 | POST | `/auth/login` | User login with username/password | No |
 | POST | `/auth/refresh` | Refresh access token | No |
 | POST | `/auth/logout` | Revoke refresh token (logout) | No |
+| POST | `/auth/activate` | Activate account with password | No |
+| POST | `/auth/change-password` | Change password (authenticated) | Yes |
+| POST | `/auth/forgot-password` | Request password reset | No |
+| POST | `/auth/reset-password` | Reset password with token | No |
 
 ### User Management
 
@@ -191,6 +195,19 @@ Created from environment variables at application startup:
 |--------|----------|-------------|---------------|
 | POST | `/users` | Create new user (admin only) | Yes (`users:write`) |
 | POST | `/auth/activate` | Activate account with password | No |
+
+### Role & Permission Management
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/roles` | List all roles | Yes |
+| GET | `/roles/:id` | Get role by ID | Yes |
+| POST | `/roles` | Create new role | Yes (`roles:write`) |
+| PUT | `/roles/:id` | Update role | Yes (`roles:write`) |
+| DELETE | `/roles/:id` | Delete role | Yes (`roles:delete`) |
+| POST | `/roles/:id/permissions` | Assign permission to role | Yes (`roles:write`) |
+| GET | `/permissions` | List all permissions | Yes |
+| POST | `/permissions` | Create new permission | Yes (`permissions:write`) |
 
 ### System
 
@@ -373,7 +390,7 @@ Body: { "token": "eyJ...", "password": "SecurePass123!" }
 → is_password_reset_required=true (kept for security)
 ```
 
-### 4. User Logs In
+### 4. User Logs In (First Time)
 ```
 POST /auth/login
 → User logs in with their chosen password
@@ -384,10 +401,30 @@ POST /auth/login
 
 ### 5. User Changes Password (First Login)
 ```
-POST /auth/change-password (future endpoint)
-→ User sets new password
+POST /auth/change-password (with access token)
+Body: { "current_password": "...", "new_password": "..." }
+→ Current password validated
+→ New password validated (strength requirements)
+→ Password hashed and updated
 → is_password_reset_required=false
+→ All refresh tokens invalidated (security)
 → Full system access granted
+```
+
+### 6. Password Reset Flow (Forgot Password)
+```
+POST /auth/forgot-password
+Body: { "email": "user@example.com" }
+→ Reset token generated (1h expiry)
+→ Reset link sent via email
+
+POST /auth/reset-password
+Body: { "token": "...", "new_password": "..." }
+→ Token validated (signature + expiry)
+→ New password validated and hashed
+→ is_password_reset_required=false
+→ All refresh tokens invalidated
+→ User can login with new password
 ```
 
 ---
@@ -434,6 +471,374 @@ Activate a user account using the activation token received after admin creates 
 | 400 | - | Activation token expired |
 | 400 | - | User is already active |
 | 404 | - | User not found |
+
+---
+
+### POST `/auth/change-password`
+
+Change the password for an authenticated user. Requires valid access token.
+
+**Authorization:** Requires `Authorization: Bearer <access_token>` header
+
+**Request:**
+```json
+{
+  "current_password": "OldPassword123!",
+  "new_password": "NewSecurePassword456!"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "message": "Password changed successfully. Please login with your new password."
+}
+```
+
+**Behavior:**
+- Validates current password
+- Validates new password strength (see requirements below)
+- Ensures new password is different from current password
+- Hashes new password with bcrypt
+- Sets `is_password_reset_required = false`
+- **Invalidates all existing refresh tokens** (user must re-login)
+
+**Password Requirements:**
+- Minimum 8 characters
+- At least one uppercase letter (A-Z)
+- At least one lowercase letter (a-z)
+- At least one digit (0-9)
+- At least one special character (@$!%*?&#)
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 400 | - | Invalid request body |
+| 400 | - | New password must be different from current password |
+| 400 | - | Password does not meet security requirements |
+| 401 | - | Unauthorized (missing or invalid token) |
+| 401 | - | Current password is incorrect |
+
+---
+
+### POST `/auth/forgot-password`
+
+Request a password reset link. Sends reset token to user's email.
+
+**Request:**
+```json
+{
+  "email": "user@gradeloop.com"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "message": "If an account exists with this email, a password reset link has been sent."
+}
+```
+
+**Behavior:**
+- Looks up user by email
+- Generates cryptographically secure reset token (256-bit)
+- Stores hashed token in database with 1-hour expiry
+- **Does not reveal if email exists** (security best practice)
+- Reset link should be sent via email (currently logged to console)
+
+**Security Notes:**
+- Response is identical for existing/non-existing emails (prevents enumeration)
+- Reset token is single-use (invalidated after use)
+- Reset token expires after 1 hour
+- All refresh tokens are invalidated on successful password reset
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 400 | - | Invalid request body |
+
+---
+
+### POST `/auth/reset-password`
+
+Reset password using a token received via email.
+
+**Request:**
+```json
+{
+  "token": "dGhpcy1pcy1hLXJhbmRvbS0yNTYtYml0LXRva2Vu",
+  "new_password": "NewSecurePassword456!"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "message": "Password reset successfully. You can now login with your new password."
+}
+```
+
+**Behavior:**
+- Validates reset token (signature and 1-hour expiry)
+- Validates new password strength
+- Hashes new password with bcrypt
+- Sets `is_password_reset_required = false`
+- Marks reset token as used (single-use)
+- **Invalidates all existing refresh tokens**
+
+**Password Requirements:**
+- Minimum 8 characters
+- At least one uppercase letter (A-Z)
+- At least one lowercase letter (a-z)
+- At least one digit (0-9)
+- At least one special character (@$!%*?&#)
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 400 | - | Invalid request body |
+| 400 | - | Invalid password reset token |
+| 400 | - | Password reset token has expired |
+| 400 | - | Password reset token has already been used |
+| 400 | - | Password does not meet security requirements |
+| 404 | - | User not found |
+
+---
+
+## Role & Permission Endpoints
+
+### GET `/roles`
+
+List all roles with their associated permissions.
+
+**Success Response (200 OK):**
+```json
+{
+  "roles": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "admin",
+      "is_system_role": true,
+      "permissions": [
+        {
+          "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+          "name": "users:read",
+          "description": "View user information"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### GET `/roles/:id`
+
+Get a specific role by ID.
+
+**Success Response (200 OK):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "admin",
+  "is_system_role": true,
+  "permissions": [...]
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 404 | - | Role not found |
+
+---
+
+### POST `/roles`
+
+Create a new role. **Requires `roles:write` permission.**
+
+**Request:**
+```json
+{
+  "name": "custom_role",
+  "is_system_role": false,
+  "permission_ids": [
+    "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    "7cb8c820-9dad-11d1-80b4-00c04fd430c9"
+  ]
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "custom_role",
+  "is_system_role": false,
+  "permissions": [...]
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 400 | - | Invalid request body |
+| 401 | - | Unauthorized |
+| 403 | - | Permission denied (requires `roles:write`) |
+| 409 | - | Role already exists |
+
+---
+
+### PUT `/roles/:id`
+
+Update an existing role. **Requires `roles:write` permission.**
+
+**Request:**
+```json
+{
+  "name": "updated_role_name",
+  "permission_ids": [
+    "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+  ]
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "updated_role_name",
+  "is_system_role": false,
+  "permissions": [...]
+}
+```
+
+**Constraints:**
+- **System roles cannot be modified**
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 400 | - | Invalid request body |
+| 401 | - | Unauthorized |
+| 403 | - | Permission denied / System roles cannot be modified |
+| 404 | - | Role not found |
+
+---
+
+### DELETE `/roles/:id`
+
+Delete a role. **Requires `roles:delete` permission.**
+
+**Success Response (200 OK):**
+```json
+{
+  "message": "Role deleted successfully"
+}
+```
+
+**Constraints:**
+- **System roles cannot be deleted**
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 401 | - | Unauthorized |
+| 403 | - | Permission denied / System roles cannot be deleted |
+| 404 | - | Role not found |
+
+---
+
+### POST `/roles/:id/permissions`
+
+Assign a permission to a role. **Requires `roles:write` permission.**
+
+**Request:**
+```json
+{
+  "permission_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "message": "Permission assigned successfully"
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 400 | - | Invalid request body / Permission not found |
+| 401 | - | Unauthorized |
+| 403 | - | Permission denied |
+| 404 | - | Role not found |
+
+---
+
+### GET `/permissions`
+
+List all available permissions.
+
+**Success Response (200 OK):**
+```json
+{
+  "permissions": [
+    {
+      "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "name": "users:read",
+      "description": "View user information"
+    },
+    {
+      "id": "7cb8c820-9dad-11d1-80b4-00c04fd430c9",
+      "name": "users:write",
+      "description": "Create and update users"
+    }
+  ]
+}
+```
+
+---
+
+### POST `/permissions`
+
+Create a new permission. **Requires `permissions:write` permission.**
+
+**Request:**
+```json
+{
+  "name": "custom:permission",
+  "description": "Description of the permission"
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+  "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  "name": "custom:permission",
+  "description": "Description of the permission"
+}
+```
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 400 | - | Invalid request body |
+| 401 | - | Unauthorized |
+| 403 | - | Permission denied (requires `permissions:write`) |
+| 409 | - | Permission already exists |
 
 ## Environment Variables
 
@@ -710,6 +1115,10 @@ type TokenPair struct {
 - **Token Validation**: Verifies signature, expiration, and claims structure
 - **Refresh Token Storage**: Always stored as SHA-256 hash in database
 - **Token Rotation**: New refresh token issued on each refresh request
+- **Password Hashing**: bcrypt with cost factor 10
+- **Password Strength**: Enforced on change/reset (8+ chars, uppercase, lowercase, digit, special char)
+- **Reset Token Security**: Single-use, 1-hour expiry, hashed storage
+- **Session Invalidation**: All refresh tokens revoked on password change/reset
 - **Error Handling**:
   - `ErrInvalidToken` - Token structure or signature invalid
   - `ErrExpiredToken` - Token has expired
@@ -719,6 +1128,12 @@ type TokenPair struct {
   - `ErrRefreshTokenNotFound` - Refresh token not found in database
   - `ErrRefreshTokenExpired` - Refresh token has expired
   - `ErrRefreshTokenRevoked` - Refresh token was revoked (logout)
+  - `ErrCurrentPasswordInvalid` - Current password is incorrect
+  - `ErrNewPasswordSameAsOld` - New password same as current password
+  - `ErrPasswordTooWeak` - Password does not meet strength requirements
+  - `ErrPasswordResetTokenInvalid` - Reset token is invalid
+  - `ErrPasswordResetTokenExpired` - Reset token has expired
+  - `ErrPasswordResetTokenUsed` - Reset token already used
 
 ### Authentication Service
 
@@ -765,17 +1180,57 @@ func (s *userService) ActivateUser(
 ) (*dto.ActivateUserResponse, error)
 ```
 
-### User DTOs
+### Password Service
+
+Located in `internal/service/password.go`:
+
+```go
+// Change password for authenticated user
+// Validates current password, enforces strength requirements,
+// invalidates all refresh tokens
+func (s *passwordService) ChangePassword(
+    ctx context.Context,
+    userID uuid.UUID,
+    currentPassword, newPassword string,
+) (*dto.ChangePasswordResponse, error)
+
+// Request password reset (forgot password)
+// Generates reset token, sends email (simulated)
+func (s *passwordService) ForgotPassword(
+    ctx context.Context,
+    email string,
+) (*dto.ForgotPasswordResponse, error)
+
+// Reset password with token
+// Validates token, enforces strength, invalidates refresh tokens
+func (s *passwordService) ResetPassword(
+    ctx context.Context,
+    token, newPassword string,
+) (*dto.ResetPasswordResponse, error)
+```
+
+### Password DTOs
 
 Located in `internal/dto/auth.go`:
 
 ```go
-// Create user request (admin only)
-type CreateUserRequest struct {
-    Username string `json:"username"`
-    Email    string `json:"email"`
-    RoleID   string `json:"role_id"`
+// Change password request (authenticated)
+type ChangePasswordRequest struct {
+    CurrentPassword string `json:"current_password"`
+    NewPassword     string `json:"new_password"`  // min 8 chars, strength required
 }
+
+// Forgot password request
+type ForgotPasswordRequest struct {
+    Email string `json:"email"`
+}
+
+// Reset password request
+type ResetPasswordRequest struct {
+    Token       string `json:"token"`
+    NewPassword string `json:"new_password"`  // min 8 chars, strength required
+}
+```
 
 // Create user response
 type CreateUserResponse struct {

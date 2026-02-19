@@ -2,19 +2,26 @@ package handler
 
 import (
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 	"github.com/gradeloop/iam-service/internal/dto"
 	"github.com/gradeloop/iam-service/internal/service"
 )
 
 type AuthHandler struct {
-	authService service.AuthService
-	userService service.UserService
+	authService     service.AuthService
+	userService     service.UserService
+	passwordService service.PasswordService
 }
 
-func NewAuthHandler(authService service.AuthService, userService service.UserService) *AuthHandler {
+func NewAuthHandler(
+	authService service.AuthService,
+	userService service.UserService,
+	passwordService service.PasswordService,
+) *AuthHandler {
 	return &AuthHandler{
-		authService: authService,
-		userService: userService,
+		authService:     authService,
+		userService:     userService,
+		passwordService: passwordService,
 	}
 }
 
@@ -25,6 +32,9 @@ func (h *AuthHandler) RegisterRoutes(app *fiber.App) {
 	auth.Post("/refresh", h.RefreshToken)
 	auth.Post("/logout", h.Logout)
 	auth.Post("/activate", h.Activate)
+	auth.Post("/forgot-password", h.ForgotPassword)
+	auth.Post("/reset-password", h.ResetPassword)
+	auth.Post("/change-password", h.ChangePassword)
 }
 
 func (h *AuthHandler) Login(c fiber.Ctx) error {
@@ -104,6 +114,62 @@ func (h *AuthHandler) Activate(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+func (h *AuthHandler) ChangePassword(c fiber.Ctx) error {
+	var req dto.ChangePasswordRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	// Get user ID from context (set by AuthMiddleware)
+	userIDStr, ok := c.Locals("user_id").(string)
+	if !ok || userIDStr == "" {
+		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
+	}
+
+	response, err := h.passwordService.ChangePassword(c.RequestCtx(), userID, req.CurrentPassword, req.NewPassword)
+	if err != nil {
+		return handleAuthError(err)
+	}
+
+	return c.JSON(response)
+}
+
+func (h *AuthHandler) ForgotPassword(c fiber.Ctx) error {
+	var req dto.ForgotPasswordRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	response, err := h.passwordService.ForgotPassword(c.RequestCtx(), req.Email)
+	if err != nil {
+		return handleAuthError(err)
+	}
+
+	return c.JSON(response)
+}
+
+func (h *AuthHandler) ResetPassword(c fiber.Ctx) error {
+	var req dto.ResetPasswordRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	response, err := h.passwordService.ResetPassword(c.RequestCtx(), req.Token, req.NewPassword)
+	if err != nil {
+		return handleAuthError(err)
+	}
+
+	return c.JSON(response)
+}
+
 func handleAuthError(err error) error {
 	switch err {
 	case service.ErrInvalidCredentials:
@@ -122,6 +188,18 @@ func handleAuthError(err error) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Activation token expired")
 	case service.ErrUserAlreadyActive:
 		return fiber.NewError(fiber.StatusBadRequest, "User is already active")
+	case service.ErrCurrentPasswordInvalid:
+		return fiber.NewError(fiber.StatusUnauthorized, "Current password is incorrect")
+	case service.ErrNewPasswordSameAsOld:
+		return fiber.NewError(fiber.StatusBadRequest, "New password must be different from current password")
+	case service.ErrPasswordTooWeak:
+		return fiber.NewError(fiber.StatusBadRequest, "Password does not meet security requirements. Must be at least 8 characters with uppercase, lowercase, number, and special character.")
+	case service.ErrPasswordResetTokenInvalid:
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid password reset token")
+	case service.ErrPasswordResetTokenExpired:
+		return fiber.NewError(fiber.StatusBadRequest, "Password reset token has expired")
+	case service.ErrPasswordResetTokenUsed:
+		return fiber.NewError(fiber.StatusBadRequest, "Password reset token has already been used")
 	default:
 		return err
 	}

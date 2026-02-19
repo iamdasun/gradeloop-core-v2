@@ -62,3 +62,31 @@ type ActivateUserResponse struct {
 	Message  string `json:"message"`
 	Username string `json:"username"`
 }
+
+// Password Management DTOs
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required,min=8"`
+}
+
+type ChangePasswordResponse struct {
+	Message string `json:"message"`
+}
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+type ForgotPasswordResponse struct {
+	Message string `json:"message"`
+}
+
+type ResetPasswordRequest struct {
+	Token       string `json:"token" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=8"`
+}
+
+type ResetPasswordResponse struct {
+	Message string `json:"message"`
+}

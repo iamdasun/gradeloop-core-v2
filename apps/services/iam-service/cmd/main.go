@@ -62,6 +62,8 @@ func run() error {
 
 	authRepo := repository.NewAuthRepository(db.DB)
 	userRepo := repository.NewUserRepository(db.DB)
+	roleRepo := repository.NewRoleRepository(db.DB)
+	permissionRepo := repository.NewPermissionRepository(db.DB)
 
 	baseService := service.NewBaseService(db.DB)
 	defer baseService.Close()
@@ -87,9 +89,30 @@ func run() error {
 		24, // Activation token expiry: 24 hours
 	)
 
+	passwordService := service.NewPasswordService(
+		db.DB,
+		authRepo,
+		userRepo,
+		cfg.JWT.SecretKey,
+		1, // Password reset token expiry: 1 hour
+	)
+
+	roleService := service.NewRoleService(
+		db.DB,
+		roleRepo,
+		permissionRepo,
+	)
+
+	permissionService := service.NewPermissionService(
+		db.DB,
+		permissionRepo,
+	)
+
 	healthHandler := handler.NewHealthHandler()
-	authHandler := handler.NewAuthHandler(authService, userService)
+	authHandler := handler.NewAuthHandler(authService, userService, passwordService)
 	userHandler := handler.NewUserHandler(userService)
+	roleHandler := handler.NewRoleHandler(roleService)
+	permissionHandler := handler.NewPermissionHandler(permissionService)
 
 	app := fiber.New(fiber.Config{
 		AppName:      "iam-service",
@@ -100,10 +123,12 @@ func run() error {
 	app.Use(middleware.Logger())
 
 	router.SetupRoutes(app, router.Config{
-		HealthHandler: healthHandler,
-		AuthHandler:   authHandler,
-		UserHandler:   userHandler,
-		JWTSecretKey:  []byte(cfg.JWT.SecretKey),
+		HealthHandler:     healthHandler,
+		AuthHandler:       authHandler,
+		UserHandler:       userHandler,
+		RoleHandler:       roleHandler,
+		PermissionHandler: permissionHandler,
+		JWTSecretKey:      []byte(cfg.JWT.SecretKey),
 	})
 
 	sigChan := make(chan os.Signal, 1)

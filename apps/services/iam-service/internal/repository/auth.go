@@ -16,6 +16,10 @@ type AuthRepository interface {
 	GetRefreshToken(ctx context.Context, tokenHash string) (*domain.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, tokenID uuid.UUID) error
 	DeleteExpiredRefreshTokens(ctx context.Context, userID uuid.UUID) error
+	InvalidateAllRefreshTokens(ctx context.Context, userID uuid.UUID) error
+	CreatePasswordResetToken(ctx context.Context, token *domain.PasswordResetToken) error
+	GetPasswordResetToken(ctx context.Context, tokenHash string) (*domain.PasswordResetToken, error)
+	UsePasswordResetToken(ctx context.Context, tokenID uuid.UUID) error
 }
 
 type authRepository struct {
@@ -108,4 +112,41 @@ func (r *authRepository) DeleteExpiredRefreshTokens(ctx context.Context, userID 
 	return r.db.WithContext(ctx).
 		Where("user_id = ? AND expires_at < NOW()", userID).
 		Delete(&domain.RefreshToken{}).Error
+}
+
+func (r *authRepository) InvalidateAllRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+	now := time.Now()
+	return r.db.WithContext(ctx).
+		Model(&domain.RefreshToken{}).
+		Where("user_id = ? AND revoked_at IS NULL", userID).
+		Update("revoked_at", now).Error
+}
+
+func (r *authRepository) CreatePasswordResetToken(ctx context.Context, token *domain.PasswordResetToken) error {
+	return r.db.WithContext(ctx).Create(token).Error
+}
+
+func (r *authRepository) GetPasswordResetToken(ctx context.Context, tokenHash string) (*domain.PasswordResetToken, error) {
+	var token domain.PasswordResetToken
+
+	query := r.db.WithContext(ctx).
+		Where("token_hash = ? AND used_at IS NULL", tokenHash).
+		First(&token)
+
+	if query.Error != nil {
+		if query.Error == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, query.Error
+	}
+
+	return &token, nil
+}
+
+func (r *authRepository) UsePasswordResetToken(ctx context.Context, tokenID uuid.UUID) error {
+	now := time.Now()
+	return r.db.WithContext(ctx).
+		Model(&domain.PasswordResetToken{}).
+		Where("id = ?", tokenID).
+		Update("used_at", now).Error
 }
