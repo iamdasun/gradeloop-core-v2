@@ -60,19 +60,6 @@ services:
     networks:
       - gradeloop-network
 
-  api-gateway:
-    image: krakend:latest
-    container_name: api-gateway
-    volumes:
-      - ./apps/gateway/krakend.json:/etc/krakend/krakend.json
-    ports:
-      - "8080:8080"
-    command: ["run", "-c", "/etc/krakend/krakend.json"]
-    depends_on:
-      - iam-service
-    networks:
-      - gradeloop-network
-
 networks:
   gradeloop-network:
     driver: bridge

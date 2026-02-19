@@ -8,11 +8,13 @@ import (
 
 type AuthHandler struct {
 	authService service.AuthService
+	userService service.UserService
 }
 
-func NewAuthHandler(authService service.AuthService) *AuthHandler {
+func NewAuthHandler(authService service.AuthService, userService service.UserService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
+		userService: userService,
 	}
 }
 
@@ -22,6 +24,7 @@ func (h *AuthHandler) RegisterRoutes(app *fiber.App) {
 	auth.Post("/login", h.Login)
 	auth.Post("/refresh", h.RefreshToken)
 	auth.Post("/logout", h.Logout)
+	auth.Post("/activate", h.Activate)
 }
 
 func (h *AuthHandler) Login(c fiber.Ctx) error {
@@ -82,6 +85,25 @@ func (h *AuthHandler) Logout(c fiber.Ctx) error {
 	})
 }
 
+func (h *AuthHandler) Activate(c fiber.Ctx) error {
+	var req dto.ActivateUserRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	if req.Token == "" || req.Password == "" {
+		return fiber.ErrBadRequest
+	}
+
+	response, err := h.userService.ActivateUser(c.RequestCtx(), req.Token, req.Password)
+	if err != nil {
+		return handleAuthError(err)
+	}
+
+	return c.JSON(response)
+}
+
 func handleAuthError(err error) error {
 	switch err {
 	case service.ErrInvalidCredentials:
@@ -94,6 +116,12 @@ func handleAuthError(err error) error {
 		return fiber.NewError(fiber.StatusNotFound, "User not found")
 	case service.ErrRefreshTokenNotFound, service.ErrRefreshTokenExpired, service.ErrRefreshTokenRevoked:
 		return fiber.NewError(fiber.StatusUnauthorized, "Invalid or expired refresh token")
+	case service.ErrInvalidActivationToken:
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid activation token")
+	case service.ErrActivationTokenExpired:
+		return fiber.NewError(fiber.StatusBadRequest, "Activation token expired")
+	case service.ErrUserAlreadyActive:
+		return fiber.NewError(fiber.StatusBadRequest, "User is already active")
 	default:
 		return err
 	}

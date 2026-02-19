@@ -61,6 +61,7 @@ func run() error {
 	defer baseRepo.Close()
 
 	authRepo := repository.NewAuthRepository(db.DB)
+	userRepo := repository.NewUserRepository(db.DB)
 
 	baseService := service.NewBaseService(db.DB)
 	defer baseService.Close()
@@ -79,8 +80,16 @@ func run() error {
 		cfg.JWT.RefreshTokenExpiry,
 	)
 
+	userService := service.NewUserService(
+		db.DB,
+		userRepo,
+		cfg.JWT.SecretKey,
+		24, // Activation token expiry: 24 hours
+	)
+
 	healthHandler := handler.NewHealthHandler()
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, userService)
+	userHandler := handler.NewUserHandler(userService)
 
 	app := fiber.New(fiber.Config{
 		AppName:      "iam-service",
@@ -93,6 +102,8 @@ func run() error {
 	router.SetupRoutes(app, router.Config{
 		HealthHandler: healthHandler,
 		AuthHandler:   authHandler,
+		UserHandler:   userHandler,
+		JWTSecretKey:  []byte(cfg.JWT.SecretKey),
 	})
 
 	sigChan := make(chan os.Signal, 1)

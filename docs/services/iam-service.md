@@ -185,6 +185,13 @@ Created from environment variables at application startup:
 | POST | `/auth/refresh` | Refresh access token | No |
 | POST | `/auth/logout` | Revoke refresh token (logout) | No |
 
+### User Management
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| POST | `/users` | Create new user (admin only) | Yes (`users:write`) |
+| POST | `/auth/activate` | Activate account with password | No |
+
 ### System
 
 | Method | Endpoint | Description | Auth Required |
@@ -289,6 +296,144 @@ Revoke a refresh token, effectively logging out the user.
 - Idempotent: calling with already-revoked token returns success
 - Only invalidates the specified refresh token
 - Access tokens remain valid until expiration
+
+---
+
+### POST `/users`
+
+Create a new user account. **Requires authentication** and `users:write` permission (ADMIN or SUPER_ADMIN roles).
+
+**Request:**
+```json
+{
+  "username": "newuser@gradeloop.com",
+  "email": "newuser@gradeloop.com",
+  "role_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+  "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+  "username": "newuser@gradeloop.com",
+  "email": "newuser@gradeloop.com",
+  "role_id": "550e8400-e29b-41d4-a716-446655440000",
+  "is_active": false,
+  "activation_link": "/auth/activate?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "message": "User created. Activation link expires at 2026-02-20T10:00:00Z"
+}
+```
+
+**Behavior:**
+- Creates user with inactive status (`is_active = false`)
+- Sets `is_password_reset_required = true` (user must change password on first login)
+- Generates a signed JWT activation token (24-hour expiry)
+- Returns activation link (to be sent via email by the admin)
+- User must call `/auth/activate` with their chosen password to activate the account
+
+**Authorization:**
+- Requires valid JWT access token in `Authorization: Bearer <token>` header
+- Actor must have `users:write` permission (ADMIN or SUPER_ADMIN roles)
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 400 | - | Invalid request body / Role not found |
+| 401 | - | Missing or invalid authorization |
+| 403 | - | Permission denied (insufficient privileges) |
+| 409 | - | Username already exists / Email already exists |
+
+---
+
+## User Lifecycle Flow
+
+### 1. Admin Creates User
+```
+POST /users (with admin auth token)
+→ User created: is_active=false, is_password_reset_required=true
+→ Activation token generated (24h expiry)
+→ Activation link returned to admin
+```
+
+### 2. Admin Sends Activation Link
+```
+Admin sends email to user with activation link:
+https://app.gradeloop.com/auth/activate?token=eyJ...
+```
+
+### 3. User Activates Account
+```
+POST /auth/activate
+Body: { "token": "eyJ...", "password": "SecurePass123!" }
+→ Token validated (signature + expiry)
+→ Password hashed with bcrypt
+→ User activated: is_active=true
+→ is_password_reset_required=true (kept for security)
+```
+
+### 4. User Logs In
+```
+POST /auth/login
+→ User logs in with their chosen password
+→ System detects is_password_reset_required=true
+→ Returns 403 "Password reset required"
+→ User must change password before accessing system
+```
+
+### 5. User Changes Password (First Login)
+```
+POST /auth/change-password (future endpoint)
+→ User sets new password
+→ is_password_reset_required=false
+→ Full system access granted
+```
+
+---
+
+### POST `/auth/activate`
+
+Activate a user account using the activation token received after admin creates the account. User must set their password during activation.
+
+**Request:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "password": "MySecurePassword123!"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "message": "Account activated successfully. You can now login.",
+  "username": "newuser@gradeloop.com"
+}
+```
+
+**Behavior:**
+- Validates the activation token (signature and expiry - 24 hours)
+- Validates password (minimum 8 characters)
+- Hashes password with bcrypt before storage
+- Sets `is_active = true`
+- Sets `is_password_reset_required = true` (user marked for password reset on first login)
+- Token is single-use (subsequent attempts will fail with "User is already active")
+
+**Password Requirements:**
+- Minimum 8 characters
+- Will be hashed with bcrypt (cost factor 10) before storage
+- User will be prompted to change password on first login (due to `is_password_reset_required = true`)
+
+**Error Responses:**
+
+| Status | Code | Message |
+|--------|------|---------|
+| 400 | - | Invalid request body |
+| 400 | - | Invalid activation token |
+| 400 | - | Activation token expired |
+| 400 | - | User is already active |
+| 404 | - | User not found |
 
 ## Environment Variables
 
@@ -403,6 +548,36 @@ Logs all HTTP requests with:
 ### Recovery
 Recovers from panics and returns 500 error response.
 
+### AuthMiddleware
+Validates JWT access tokens and stores user claims in context locals.
+
+**Usage:**
+```go
+app.Use(middleware.AuthMiddleware([]byte(cfg.JWT.SecretKey)))
+```
+
+**Context Locals:**
+- `user_id` - User UUID as string
+- `username` - Username string
+- `role_name` - Role name string
+- `permissions` - Slice of permission strings
+
+### RequirePermission
+Checks if the authenticated user has a specific permission.
+
+**Usage:**
+```go
+app.Get("/admin", middleware.RequirePermission("users:write"), handler.AdminHandler)
+```
+
+### RequireRole
+Checks if the authenticated user has one of the allowed roles.
+
+**Usage:**
+```go
+app.Get("/admin", middleware.RequireRole("admin", "super_admin"), handler.AdminHandler)
+```
+
 ## Error Handling
 
 Centralized error handling with `AppError`:
@@ -472,6 +647,36 @@ func ValidateAccessToken(
 func HashToken(token string) string
 ```
 
+### Activation Token
+
+For user account activation, a separate JWT token type is used:
+
+```go
+// Generate activation token (24-hour expiry)
+func GenerateActivationToken(
+    userID uuid.UUID,
+    username, email string,
+    secretKey []byte,
+    expiry time.Duration,
+) (string, time.Time, error)
+
+// Validate activation token
+func ValidateActivationToken(
+    tokenString string,
+    secretKey []byte,
+) (*ActivationClaims, error)
+```
+
+**Activation Claims:**
+- `user_id` (UUID)
+- `username` (string)
+- `email` (string)
+- `exp` (expiration time - 24 hours from issuance)
+- `iat` (issued at)
+- `iss` (issuer: "iam-service")
+- `sub` (subject: user ID)
+- `jti` (JWT ID: unique identifier)
+
 ### JWT Manager
 
 ```go
@@ -539,17 +744,64 @@ func (s *authService) Logout(
 ) error
 ```
 
-### DTOs
+### User Service
+
+Located in `internal/service/user.go`:
+
+```go
+// Create user (admin only, requires users:write permission)
+// Creates inactive user with activation token
+func (s *userService) CreateUser(
+    ctx context.Context,
+    req *dto.CreateUserRequest,
+    actorPermissions []string,
+) (*dto.CreateUserResponse, error)
+
+// Activate user account with token and password
+// Validates token, hashes password, activates user
+func (s *userService) ActivateUser(
+    ctx context.Context,
+    token, password string,
+) (*dto.ActivateUserResponse, error)
+```
+
+### User DTOs
 
 Located in `internal/dto/auth.go`:
 
 ```go
-// Login request
-type LoginRequest struct {
+// Create user request (admin only)
+type CreateUserRequest struct {
     Username string `json:"username"`
-    Password string `json:"password"`
+    Email    string `json:"email"`
+    RoleID   string `json:"role_id"`
 }
 
+// Create user response
+type CreateUserResponse struct {
+    ID             uuid.UUID `json:"id"`
+    Username       string    `json:"username"`
+    Email          string    `json:"email"`
+    RoleID         uuid.UUID `json:"role_id"`
+    IsActive       bool      `json:"is_active"`
+    ActivationLink string    `json:"activation_link"`
+    Message        string    `json:"message"`
+}
+
+// Activate user request
+type ActivateUserRequest struct {
+    Token    string `json:"token"`
+    Password string `json:"password"`  // min 8 characters
+}
+
+// Activate user response
+type ActivateUserResponse struct {
+    Message  string `json:"message"`
+    Username string `json:"username"`
+}
+```
+
+```go
 // Login response
 type LoginResponse struct {
     AccessToken  string `json:"access_token"`

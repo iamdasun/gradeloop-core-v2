@@ -369,7 +369,6 @@ Use the service or component name:
 - `assignments`
 - `academics`
 - `cipas`
-- `gateway`
 - `web`
 - `repo` (for monorepo-wide changes)
 

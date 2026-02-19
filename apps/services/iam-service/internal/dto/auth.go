@@ -34,3 +34,31 @@ type UserWithRole struct {
 	IsActive                bool
 	IsPasswordResetRequired bool
 }
+
+// User DTOs
+
+type CreateUserRequest struct {
+	Username string `json:"username" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	RoleID   string `json:"role_id" validate:"required"`
+}
+
+type CreateUserResponse struct {
+	ID             uuid.UUID `json:"id"`
+	Username       string    `json:"username"`
+	Email          string    `json:"email"`
+	RoleID         uuid.UUID `json:"role_id"`
+	IsActive       bool      `json:"is_active"`
+	ActivationLink string    `json:"activation_link"`
+	Message        string    `json:"message"`
+}
+
+type ActivateUserRequest struct {
+	Token    string `json:"token" validate:"required"`
+	Password string `json:"password" validate:"required,min=8"`
+}
+
+type ActivateUserResponse struct {
+	Message  string `json:"message"`
+	Username string `json:"username"`
+}

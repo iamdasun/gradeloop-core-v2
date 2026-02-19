@@ -23,6 +23,7 @@ var (
 	ErrRefreshTokenNotFound  = errors.New("refresh token not found")
 	ErrRefreshTokenExpired   = errors.New("refresh token expired")
 	ErrRefreshTokenRevoked   = errors.New("refresh token revoked")
+	ErrUnauthorized          = errors.New("unauthorized")
 )
 
 type AuthService interface {
