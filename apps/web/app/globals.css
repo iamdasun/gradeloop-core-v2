@@ -48,80 +48,136 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
+  /* 12px from HTML */
+
+  /* Background: #ffffff */
   --background: 0 0% 100%;
-  --foreground: 195 100% 10%;
+  /* Foreground: #0f172a (Slate 900) */
+  --foreground: 222 47% 11%;
+
+  /* Card: #ffffff */
   --card: 0 0% 100%;
-  --card-foreground: 195 100% 10%;
+  --card-foreground: 222 47% 11%;
+
+  /* Popover: #ffffff */
   --popover: 0 0% 100%;
-  --popover-foreground: 195 100% 10%;
-  --primary: 181 76% 35%;
+  --popover-foreground: 222 47% 11%;
+
+  /* Primary: #3b82f6 (Blue 500) */
+  --primary: 217 91% 60%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 145 47% 90%;
-  --secondary-foreground: 195 100% 10%;
-  --muted: 210 24% 75%;
-  --muted-foreground: 210 24% 45%;
-  --accent: 145 47% 90%;
-  --accent-foreground: 195 100% 10%;
+
+  /* Secondary: #e4e4e7 (Zinc 200 - used for subtle backgrounds) */
+  --secondary: 240 5.9% 90%;
+  --secondary-foreground: 240 5.9% 10%;
+
+  /* Muted: #f4f4f5 (Zinc 100) */
+  --muted: 240 4.8% 95.9%;
+  --muted-foreground: 240 3.8% 46.1%;
+
+  /* Accent: #f4f4f5 (Zinc 100) */
+  --accent: 240 4.8% 95.9%;
+  --accent-foreground: 240 5.9% 10%;
+
+  /* Destructive: Red 500 */
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
-  --border: 210 24% 75%;
-  --input: 210 24% 75%;
-  --ring: 181 76% 35%;
-  --chart-1: 181 76% 35%;
-  --chart-2: 145 47% 50%;
-  --chart-3: 195 100% 10%;
-  --chart-4: 210 24% 75%;
-  --chart-5: 210 24% 45%;
+
+  /* Border: #e4e4e7 (Zinc 200) */
+  --border: 240 5.9% 90%;
+  /* Input: #e4e4e7 (Zinc 200) */
+  --input: 240 5.9% 90%;
+  /* Ring: #3b82f6 (Blue 500) */
+  --ring: 217 91% 60%;
+
+  /* Brand Colors */
+  --brand-green: 142 76% 58%;
+  /* #4ade80 */
+  --brand-blue: 199 89% 48%;
+  /* #0ea5e9 */
+
+  --chart-1: 217 91% 60%;
+  --chart-2: 142 76% 58%;
+  --chart-3: 199 89% 48%;
+  --chart-4: 240 5.9% 90%;
+  --chart-5: 240 3.8% 46.1%;
+
   --sidebar: 0 0% 100%;
-  --sidebar-foreground: 195 100% 10%;
-  --sidebar-primary: 181 76% 35%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-primary: 217 91% 60%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 145 47% 90%;
-  --sidebar-accent-foreground: 195 100% 10%;
-  --sidebar-border: 210 24% 75%;
-  --sidebar-ring: 181 76% 35%;
+  --sidebar-accent: 240 4.8% 95.9%;
+  --sidebar-accent-foreground: 240 5.9% 10%;
+  --sidebar-border: 240 5.9% 90%;
+  --sidebar-ring: 217 91% 60%;
 }
 
 .dark {
-  --background: 195 100% 7%;
-  --foreground: 0 0% 100%;
-  --card: 195 100% 7%;
-  --card-foreground: 0 0% 100%;
-  --popover: 195 100% 7%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 181 76% 40%;
+  /* Background: #09090b (Zinc 950) */
+  --background: 240 10% 3.9%;
+  /* Foreground: #f8fafc (Slate 50) */
+  --foreground: 210 40% 98%;
+
+  /* Card: #18181b (Zinc 900) */
+  --card: 240 5.9% 10%;
+  --card-foreground: 210 40% 98%;
+
+  /* Popover: #18181b (Zinc 900) */
+  --popover: 240 5.9% 10%;
+  --popover-foreground: 210 40% 98%;
+
+  /* Primary: #3b82f6 (Blue 500) */
+  --primary: 217 91% 60%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 145 47% 20%;
-  --secondary-foreground: 145 47% 90%;
-  --muted: 195 15% 20%;
-  --muted-foreground: 210 24% 65%;
-  --accent: 145 47% 20%;
-  --accent-foreground: 145 47% 90%;
+
+  /* Secondary: #27272a (Zinc 800) */
+  --secondary: 240 3.7% 15.9%;
+  --secondary-foreground: 0 0% 98%;
+
+  /* Muted: #27272a (Zinc 800) */
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+
+  /* Accent: #27272a (Zinc 800) */
+  --accent: 240 3.7% 15.9%;
+  --accent-foreground: 0 0% 98%;
+
+  /* Destructive: Red 900 */
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
-  --border: 195 15% 25%;
-  --input: 195 15% 25%;
-  --ring: 181 76% 45%;
-  --chart-1: 181 76% 40%;
-  --chart-2: 145 47% 40%;
-  --chart-3: 195 100% 7%;
-  --chart-4: 195 15% 25%;
-  --chart-5: 210 24% 65%;
-  --sidebar: 195 100% 7%;
-  --sidebar-foreground: 0 0% 100%;
-  --sidebar-primary: 181 76% 40%;
+
+  /* Border: #27272a (Zinc 800) */
+  --border: 240 3.7% 15.9%;
+  /* Input: #27272a (Zinc 800) */
+  --input: 240 3.7% 15.9%;
+  /* Ring: #3b82f6 (Blue 500) */
+  --ring: 217 91% 60%;
+
+  --brand-green: 142 76% 58%;
+  --brand-blue: 199 89% 48%;
+
+  --chart-1: 217 91% 60%;
+  --chart-2: 142 76% 58%;
+  --chart-3: 199 89% 48%;
+  --chart-4: 240 3.7% 15.9%;
+  --chart-5: 240 5% 64.9%;
+
+  --sidebar: 240 5.9% 10%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-primary: 217 91% 60%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 145 47% 20%;
-  --sidebar-accent-foreground: 145 47% 90%;
-  --sidebar-border: 195 15% 25%;
-  --sidebar-ring: 181 76% 45%;
+  --sidebar-accent: 240 3.7% 15.9%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 240 3.7% 15.9%;
+  --sidebar-ring: 217 91% 60%;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
