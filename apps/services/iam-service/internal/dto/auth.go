@@ -30,7 +30,7 @@ type UserWithRole struct {
 	PasswordHash            string
 	RoleID                  *uuid.UUID
 	RoleName                string
-	Permissions             []string
+	Permissions             []string `gorm:"-"`
 	IsActive                bool
 	IsPasswordResetRequired bool
 }

@@ -9,9 +9,10 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	JWT      JWTConfig
+	Server      ServerConfig
+	Database    DatabaseConfig
+	JWT         JWTConfig
+	FrontendURL string
 }
 
 type ServerConfig struct {
@@ -62,6 +63,7 @@ func Load() (*Config, error) {
 			AccessTokenExpiry:  getEnvAsInt64("JWT_ACCESS_TOKEN_EXPIRY", 15), // 15 minutes
 			RefreshTokenExpiry: getEnvAsInt64("JWT_REFRESH_TOKEN_EXPIRY", 7), // 7 days
 		},
+		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:3000"),
 	}, nil
 }
 

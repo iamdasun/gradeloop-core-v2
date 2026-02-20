@@ -4,11 +4,13 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { DASHBOARD_NAV_ITEMS } from "@/lib/nav-config";
 import { filterNavByPermissions } from "@/lib/permission-utils";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
-import { Link as UserIcon, GraduationCap } from "lucide-react"; // Renamed to avoid strict mode conflict if any
+import { Link as UserIcon, GraduationCap, LogOut } from "lucide-react"; // Renamed to avoid strict mode conflict if any
 import Link from "next/link";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth-store";
+import { useRouter } from "next/navigation";
 
 export function DashboardSidebar() {
     const { permissions, user } = usePermissions();
@@ -19,6 +21,13 @@ export function DashboardSidebar() {
         [permissions]);
 
     const [open, setOpen] = useState(false);
+    const { logout } = useAuthStore();
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        await logout();
+        router.push("/login");
+    };
 
     return (
         <Sidebar open={open} setOpen={setOpen}>
@@ -35,18 +44,43 @@ export function DashboardSidebar() {
                         ))}
                     </div>
                 </div>
-                <div>
+                <div className="flex flex-col gap-2">
                     <SidebarLink
                         link={{
-                            label: user?.name || "User",
+                            label: "",
                             href: "#",
                             icon: (
-                                <div className="h-7 w-7 flex-shrink-0 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-xs font-bold">
-                                    {user?.name?.[0] || "U"}
+                                <div className="flex items-center gap-2">
+                                    <div className="h-7 w-7 flex-shrink-0 rounded-full bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-xs font-bold">
+                                        {user?.name?.[0] || "U"}
+                                    </div>
+                                    <div className="flex flex-col overflow-hidden">
+                                        <span className="text-sm font-medium text-black dark:text-white truncate">
+                                            {user?.name || "User"}
+                                        </span>
+                                        <span className="text-xs text-neutral-500 dark:text-neutral-400 capitalize truncate">
+                                            {user?.role?.replace("_", " ") || "Guest"}
+                                        </span>
+                                    </div>
                                 </div>
                             ),
                         }}
                     />
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center justify-start gap-2 group/sidebar py-2 px-0 translate-x-1"
+                    >
+                        <LogOut className="h-5 w-5 flex-shrink-0 text-neutral-700 dark:text-neutral-200" />
+                        <motion.span
+                            animate={{
+                                display: open ? "inline-block" : "none",
+                                opacity: open ? 1 : 0,
+                            }}
+                            className="text-neutral-700 dark:text-neutral-200 text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre"
+                        >
+                            Logout
+                        </motion.span>
+                    </button>
                 </div>
             </SidebarBody>
         </Sidebar>

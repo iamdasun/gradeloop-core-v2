@@ -1,68 +1,30 @@
 services:
   # =============================================================================
-  # Kong API Gateway (DB-less mode)
+  # Traefik API Gateway
   # =============================================================================
-  kong:
-    image: kong:3.9
-    container_name: kong-gateway
+  traefik:
+    image: traefik:v3
+    container_name: traefik
     restart: unless-stopped
-
-    # Run Kong in DB-less mode using declarative configuration
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:8000"
     environment:
-      - KONG_DATABASE=off
-      - KONG_DECLARATIVE_CONFIG=/usr/local/kong/declarative/kong.yml
-      - KONG_PROXY_ACCESS_LOG=/dev/stdout
-      - KONG_ADMIN_ACCESS_LOG=/dev/stdout
-      - KONG_PROXY_ERROR_LOG=/dev/stderr
-      - KONG_ADMIN_ERROR_LOG=/dev/stderr
-      - KONG_LOG_LEVEL=info
-      - KONG_ADMIN_LISTEN=0.0.0.0:8001
-      - KONG_PROXY_LISTEN=0.0.0.0:8000
-      - KONG_ADMIN_GUI=off
-      # JWT Plugin Configuration
-      - KONG_PLUGINS=bundled,jwt,key-auth,rate-limiting,cors,request-size-limiting,request-transformer
-      - KONG_JWT_SECRET=${JWT_SECRET_KEY}
-      # Rate Limiting Configuration
-      - KONG_RATE_LIMITING_DICT_SIZE=10000
-      # Security Settings
-      - KONG_STATUS_LISTEN=0.0.0.0:8100
-      # Timeout settings for production
-      - KONG_PROXY_READ_TIMEOUT=60000
-      - KONG_PROXY_WRITE_TIMEOUT=60000
-      - KONG_PROXY_CONNECT_TIMEOUT=10000
-
+      - DOCKER_API_VERSION=1.44
     ports:
-      # Public Proxy Port
       - "8000:8000"
-      # Admin API (internal only - see networks configuration)
-      - "127.0.0.1:8001:8001"
-      # Status endpoint for health checks
-      - "8100:8100"
-
+      - "8080:8080"
     volumes:
-      # Mount declarative configuration
-      - ./kong.yml:/usr/local/kong/declarative/kong.yml:ro
-
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - gradeloop-network
-
     healthcheck:
-      test: ["CMD", "kong", "health"]
+      test: [ "CMD", "traefik", "healthcheck" ]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 30s
-
-    depends_on:
-      iam-service:
-        condition: service_healthy
-
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-        compress: "true"
+      retries: 3
 
   # =============================================================================
   # IAM Service (Go Fiber)
@@ -73,6 +35,27 @@ services:
       dockerfile: Dockerfile
     container_name: iam-service
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.iam.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.iam.entrypoints=web"
+      - "traefik.http.services.iam-service.loadbalancer.server.port=8081"
+      # Request Size Limiting (1MB)
+      - "traefik.http.middlewares.limit.buffering.maxRequestBodyBytes=1048576"
+      # Global Rate Limiting
+      - "traefik.http.middlewares.global-ratelimit.ratelimit.average=1000"
+      - "traefik.http.middlewares.global-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.global-ratelimit.ratelimit.burst=100"
+      # Login Rate Limiting (5 requests per minute)
+      - "traefik.http.routers.iam-login.rule=Path(`/api/v1/auth/login`)"
+      - "traefik.http.routers.iam-login.entrypoints=web"
+      - "traefik.http.routers.iam-login.priority=100"
+      - "traefik.http.middlewares.login-ratelimit.ratelimit.average=20"
+      - "traefik.http.middlewares.login-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.login-ratelimit.ratelimit.burst=10"
+      # Apply middlewares
+      - "traefik.http.routers.iam.middlewares=limit,global-ratelimit"
+      - "traefik.http.routers.iam-login.middlewares=limit,login-ratelimit"
 
     env_file:
       - .env
@@ -101,7 +84,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -175,7 +158,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 5

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gradeloop/iam-service/internal/config"
 	"github.com/gradeloop/iam-service/internal/handler"
 	"github.com/gradeloop/iam-service/internal/jwt"
@@ -50,11 +51,6 @@ func run() error {
 	migrator := migrations.NewMigrator(db.DB, logger)
 	if err := migrator.Run(); err != nil {
 		return fmt.Errorf("running migrations: %w", err)
-	}
-
-	seeder := migrations.NewSeeder(db.DB, logger)
-	if err := seeder.Seed(); err != nil {
-		return fmt.Errorf("seeding database: %w", err)
 	}
 
 	baseRepo := repository.NewBaseRepository(db.DB)
@@ -121,6 +117,12 @@ func run() error {
 
 	app.Use(middleware.Recovery())
 	app.Use(middleware.Logger())
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{cfg.FrontendURL, "http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
+		AllowCredentials: true,
+	}))
 
 	router.SetupRoutes(app, router.Config{
 		HealthHandler:     healthHandler,

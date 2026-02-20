@@ -17,15 +17,9 @@ export function middleware(request: NextRequest) {
 
     // Protect /dashboard/* routes
     if (pathname.startsWith("/dashboard")) {
-        const refreshToken = request.cookies.get("refreshToken")?.value;
+        const refreshToken = request.cookies.get("refresh_token")?.value;
 
         if (!refreshToken) {
-            return NextResponse.redirect(new URL("/login", request.url));
-        }
-
-        // Optional: Check expiration without signature verification
-        const decoded = decodeJwt(refreshToken);
-        if (!decoded || !decoded.exp || decoded.exp * 1000 < Date.now()) {
             return NextResponse.redirect(new URL("/login", request.url));
         }
     }

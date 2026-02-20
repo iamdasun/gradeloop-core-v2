@@ -60,10 +60,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (decoded) {
             set({
                 user: {
-                    userId: decoded.userId || decoded.sub,
-                    role: decoded.role,
+                    userId: decoded.user_id || decoded.sub,
+                    role: decoded.role_name,
                     permissions: decoded.permissions || [],
-                    name: decoded.name || decoded.preferred_username || decoded.sub,
+                    name: decoded.name || decoded.preferred_username || decoded.username || decoded.sub,
                     email: decoded.email,
                     requiresPasswordReset: decoded.requires_password_reset === true || decoded.reset === true,
                 },
@@ -91,7 +91,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             // No body needed, refresh token is in cookie
             const response = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
-            const { accessToken: newToken } = response.data;
+            const { access_token: newToken } = response.data;
             if (newToken) {
                 get().setUserFromToken(newToken);
                 return newToken;
@@ -107,7 +107,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     login: async (username, password) => {
         try {
             const response = await apiClient.post("/auth/login", { username, password });
-            const { accessToken: token } = response.data;
+            const { access_token: token } = response.data;
             if (token) {
                 get().setUserFromToken(token);
             }
@@ -123,7 +123,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 newPassword,
             });
 
-            const { accessToken: token } = response.data;
+            const { access_token: token } = response.data;
             if (token) {
                 get().setUserFromToken(token);
             } else {
