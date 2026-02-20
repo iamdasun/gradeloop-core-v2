@@ -86,6 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     refresh: async () => {
         try {
+            // No body needed, refresh token is in cookie
             const response = await axios.post("/api/v1/auth/refresh", {}, { withCredentials: true });
             const { accessToken: newToken } = response.data;
             if (newToken) {

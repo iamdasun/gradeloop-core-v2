@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/gradeloop/iam-service/internal/dto"
@@ -58,42 +60,71 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 		return handleAuthError(err)
 	}
 
+	// Set refresh token in httpOnly cookie
+	cookie := new(fiber.Cookie)
+	cookie.Name = "refresh_token"
+	cookie.Value = response.RefreshToken
+	cookie.Expires = time.Now().Add(7 * 24 * time.Hour) // 7 days (should match service config)
+	cookie.HTTPOnly = true
+	cookie.Secure = true // Enable in production
+	cookie.SameSite = "Strict"
+
+	c.Cookie(cookie)
+
+	// Remove refresh token from response body
+	response.RefreshToken = ""
+
 	return c.JSON(response)
 }
 
 func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
-	var req dto.RefreshTokenRequest
-
-	if err := c.Bind().Body(&req); err != nil {
-		return fiber.ErrBadRequest
+	// Get refresh token from cookie
+	refreshToken := c.Cookies("refresh_token")
+	if refreshToken == "" {
+		return fiber.NewError(fiber.StatusUnauthorized, "No refresh token provided")
 	}
 
-	if req.RefreshToken == "" {
-		return fiber.ErrBadRequest
-	}
-
-	response, err := h.authService.RefreshToken(c.RequestCtx(), req.RefreshToken)
+	response, err := h.authService.RefreshToken(c.RequestCtx(), refreshToken)
 	if err != nil {
 		return handleAuthError(err)
 	}
+
+	// Set new refresh token in httpOnly cookie
+	cookie := new(fiber.Cookie)
+	cookie.Name = "refresh_token"
+	cookie.Value = response.RefreshToken
+	cookie.Expires = time.Now().Add(7 * 24 * time.Hour)
+	cookie.HTTPOnly = true
+	cookie.Secure = true
+	cookie.SameSite = "Strict"
+
+	c.Cookie(cookie)
+
+	// Remove refresh token from response body
+	response.RefreshToken = ""
 
 	return c.JSON(response)
 }
 
 func (h *AuthHandler) Logout(c fiber.Ctx) error {
-	var req dto.RefreshTokenRequest
-
-	if err := c.Bind().Body(&req); err != nil {
+	refreshToken := c.Cookies("refresh_token")
+	if refreshToken == "" {
 		return fiber.ErrBadRequest
 	}
 
-	if req.RefreshToken == "" {
-		return fiber.ErrBadRequest
-	}
-
-	if err := h.authService.Logout(c.RequestCtx(), req.RefreshToken); err != nil {
+	if err := h.authService.Logout(c.RequestCtx(), refreshToken); err != nil {
 		return handleAuthError(err)
 	}
+
+	// Clear refresh token cookie
+	cookie := new(fiber.Cookie)
+	cookie.Name = "refresh_token"
+	cookie.Expires = time.Now().Add(-1 * time.Hour)
+	cookie.HTTPOnly = true
+	cookie.Secure = true
+	cookie.SameSite = "Strict"
+
+	c.Cookie(cookie)
 
 	return c.JSON(fiber.Map{
 		"message": "logged out successfully",
