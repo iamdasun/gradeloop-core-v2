@@ -34,6 +34,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useQueryClient } from "@tanstack/react-query";
+import { RolesTableSkeleton } from "./roles-table-skeleton";
 
 interface RolesTableProps {
     roles: Role[];
@@ -79,8 +80,9 @@ export function RolesTable({ roles, permissions, isLoading }: RolesTableProps) {
         queryClient.invalidateQueries({ queryKey: ["roles"] });
     };
 
+
     if (isLoading) {
-        return <div className="p-8 text-center text-muted-foreground">Loading roles...</div>;
+        return <RolesTableSkeleton />;
     }
 
     return (
