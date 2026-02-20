@@ -14,9 +14,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { PasswordIndicator } from "@/components/password-indicator";
+import { useAuthStore } from "@/store/auth-store";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 const resetPasswordSchema = z
     .object({
+        currentPassword: z.string().min(1, { message: "Current password is required" }),
         password: z
             .string()
             .min(8, { message: "Password must be at least 8 characters" })
@@ -34,9 +38,14 @@ const resetPasswordSchema = z
 type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPasswordPage() {
+    const { changePassword } = useAuthStore();
+    const router = useRouter();
+    const [error, setError] = useState<string | null>(null);
+
     const form = useForm<ResetPasswordValues>({
         resolver: zodResolver(resetPasswordSchema),
         defaultValues: {
+            currentPassword: "",
             password: "",
             confirmPassword: "",
         },
@@ -45,8 +54,13 @@ export default function ResetPasswordPage() {
     const password = form.watch("password");
 
     async function onSubmit(values: ResetPasswordValues) {
-        console.log(values);
-        // TODO: Implement reset password logic
+        setError(null);
+        try {
+            await changePassword(values.currentPassword, values.password);
+            router.push("/dashboard");
+        } catch (err: any) {
+            setError(err.response?.data?.message || "Failed to reset password. Please check your current password.");
+        }
     }
 
     return (
@@ -54,12 +68,30 @@ export default function ResetPasswordPage() {
             <div className="space-y-2">
                 <h1 className="text-2xl font-semibold tracking-tight">Reset password</h1>
                 <p className="text-sm text-muted-foreground">
-                    Enter your new password below.
+                    Enter your current and new password below.
                 </p>
             </div>
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    {error && (
+                        <div className="p-3 text-sm font-medium text-destructive bg-destructive/10 rounded-md">
+                            {error}
+                        </div>
+                    )}
+                    <FormField
+                        control={form.control}
+                        name="currentPassword"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Current Password</FormLabel>
+                                <FormControl>
+                                    <Input type="password" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
                     <FormField
                         control={form.control}
                         name="password"

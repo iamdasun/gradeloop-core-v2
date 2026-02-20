@@ -26,6 +26,7 @@ export interface User {
     permissions: string[];
     name?: string;
     email?: string;
+    requiresPasswordReset?: boolean;
 }
 
 interface AuthState {
@@ -40,6 +41,7 @@ interface AuthState {
     refresh: () => Promise<string | null>;
     setUserFromToken: (token: string) => void;
     setLoading: (loading: boolean) => void;
+    changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -60,6 +62,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     permissions: decoded.permissions || [],
                     name: decoded.name || decoded.preferred_username || decoded.sub,
                     email: decoded.email,
+                    requiresPasswordReset: decoded.requires_password_reset === true || decoded.reset === true,
                 },
                 accessToken: token,
                 isAuthenticated: true,
@@ -103,6 +106,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const { accessToken: token } = response.data;
             if (token) {
                 get().setUserFromToken(token);
+            }
+        } catch (error) {
+            throw error;
+        }
+    },
+
+    changePassword: async (currentPassword, newPassword) => {
+        try {
+            const response = await axios.post("/api/v1/auth/change-password", {
+                currentPassword,
+                newPassword,
+            }, { withCredentials: true });
+
+            const { accessToken: token } = response.data;
+            if (token) {
+                get().setUserFromToken(token);
+            } else {
+                // If backend doesn't return a new token, at least clear the reset flag locally
+                const currentUser = get().user;
+                if (currentUser) {
+                    set({
+                        user: { ...currentUser, requiresPasswordReset: false }
+                    });
+                }
             }
         } catch (error) {
             throw error;
