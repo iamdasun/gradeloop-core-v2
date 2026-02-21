@@ -62,13 +62,13 @@ export default function LoginPage() {
           <CardDescription>
             Enter your email below to login to your account
           </CardDescription>
-          <CardAction>
+          {/*<CardAction>
             <Link href="/signup">
               <Button variant="link" className="px-0">
                 Sign Up
               </Button>
             </Link>
-          </CardAction>
+          </CardAction>*/}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} id="login-form">
