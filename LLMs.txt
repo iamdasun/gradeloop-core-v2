@@ -1,35 +1,88 @@
-# GradeLoop Core V2 - Web Client Context
+# GradeLoop Core V2
 
-This project is a high-performance web client built with **Bun**, **Next.js (App Router)**, and a strictly typed ecosystem for an AI-integrated Learning Management System (LMS).
+This project is an AI-integrated Learning Management System (LMS) built with a microservices architecture.
 
 ---
 
-# Primary Tech Stack
+# Frontend (Next.js)
+
+This project uses **Next.js** with the **Bun** runtime. The UI is built with **ShadCN**, **React Hook Forms**, **Zustand**, **React Query**, and **Motion**.
+
+## Primary Tech Stack
 
 - **Runtime**: Bun (Strictly use `bun` for scripts and package management)
-- **Framework**: Next.js 16+ (App Router)
-- **UI Architecture**: shadcn/ui (Radix UI + TailwindCSS v4)
-- **Animation**: Motion (`motion` package only — never `framer-motion`)
-- **State Management**: Zustand v5 (Store-based, immutable state)
-- **Data Layer**: TanStack Query v5
-- **HTTP Client**: Axios (Instance-based)
-- **Form Handling**: React Hook Form v7 with Hookform Resolvers
-- **Validation**: Zod v4 (Schema-first development)
-- **Styling**: TailwindCSS v4 with PostCSS
-- **Utilities**: clsx (or `cn` utility), date-fns
-- **Icons**: lucide-react
+- **Framework**: Next.js (App Router)
+- **UI Components**:
+  - **Aceternity UI**: [ui.aceternity.com](https://ui.aceternity.com/) (For complex/advanced UI components)
+  - **ShadCN UI**: [ui.shadcn.com](https://ui.shadcn.com/) (For core primitives and layout components)
+- **Icons**:
+  - **Animate UI**: [animate-ui.com](https://animate-ui.com/) (For animated icons)
+  - **Lucide React**: (For standard icons)
+- **Styling**: TailwindCSS
+- **State Management**: Zustand
+- **Data Fetching**: React Query (TanStack Query)
+- **Animation**: Motion (motion not framer-motion)
+- **Form Handling**: React Hook Form
+- **Validation**: Zod (Schema-first development)
 
----
+## UI Guidelines
 
-# Development Standards & Patterns
+> Follow clean, modern, and accessible design principles. Use standard Tailwind CSS utility classes and ShadCN/Aceternity primitives without hardcoding restrictive color palettes.
 
-(keep the same expectations as before for the web client; see sections below for specific rules)
+### Installation & Management
+- CLI: `bunx shadcn@latest add <component>`
+- Configuration: `components.json`
+
+## Project Structure Reference
+```
+/apps/web/
+  ├── app/                  # Next.js App Router
+  ├── components/           # React components
+  │   ├── ui/               # ShadCN primitives
+  ├── lib/                  # Utilities
+  ├── public/               # Static assets
+  ├── components.json       # ShadCN config
+  ├── next.config.ts        # Next.js config
+  ├── package.json
+  └── tailwind.config.ts
+```
+
+## Quick Commands
+- Install: `bun install`
+- Dev: `bun run dev`
+- Build: `bun run build`
+- Add component: `bunx shadcn@latest add <component>`
 
 ---
 
 # Go Backend Development (Fiber)
 
-This project uses **Go** with **Fiber v3** for high-performance microservices (e.g., `apps/services/iam-service`).
+This project uses **Go** with **Fiber v3** for high-performance microservices (e.g., `apps/services/iam-service`). The IAM service uses GORM with PostgreSQL and follows the standard internal package layout described below.
+
+Use go version 1.25.6
+
+## IAM Service — current state summary (concise)
+
+- Framework: Go (Fiber v3)
+- ORM / Database: GORM with PostgreSQL
+- Security: JWT-based authentication (access_token = JWT in response body). Refresh tokens use secure, HttpOnly cookies and are persisted server-side (hashed) for rotation and revocation.
+- Base API path: `/api/v1`
+- Public auth endpoints:
+  - `POST /api/v1/auth/login`
+  - `POST /api/v1/auth/refresh`
+  - `POST /api/v1/auth/logout`
+  - `POST /api/v1/auth/activate`
+  - `POST /api/v1/auth/forgot-password`
+  - `POST /api/v1/auth/reset-password`
+- Protected auth endpoint (requires valid access token):
+  - `POST /api/v1/auth/change-password`
+- Session model: Refresh tokens are stored in the `refresh_tokens` table (hashed token, user_id, expiry, revoked_at) enabling token rotation and revocation.
+- Cookie & CORS behavior: service sets refresh token cookie with `HttpOnly`, `Secure` (configurable), `SameSite` (configurable). CORS allows frontend origin(s) and sets `AllowCredentials: true` so browsers send cookies with cross-origin calls.
+- Frontend integration expectations:
+  - Clients call `POST /api/v1/auth/login` (username/password). Server returns an `access_token` in response JSON and sets a secure, HttpOnly `refresh_token` cookie.
+  - Clients should store the access token in-memory (not localStorage) and attach it to `Authorization: Bearer <access_token>` for protected requests.
+  - For automatic session renewal, clients call `POST /api/v1/auth/refresh` (no body required — cookie is sent automatically if `withCredentials: true`) to obtain a new access token and rotate the refresh token cookie.
+  - Logout calls `POST /api/v1/auth/logout` to revoke the refresh token and clear the cookie.
 
 ## Standard Directory Structure
 All Go services MUST follow this internal package layout:
@@ -65,26 +118,45 @@ apps/services/<service-name>/
 ### 2. Router (`internal/router`)
 - Define a `Config` struct to hold Handler dependencies.
 - Use `func SetupRoutes(app *fiber.App, config Config)` to register endpoints.
-- Group routes logically (e.g., `auth := app.Group("/auth")`).
-- Apply middleware at the group or route level.
+- Group routes logically (e.g., `api := app.Group("/api/v1")`, then `auth := api.Group("/auth")`).
+- Apply `middleware.AuthMiddleware(cfg.JWTSecretKey)` for protected groups and `middleware.RequirePermission("scope")` for RBAC.
 
 ### 3. Handlers (`internal/handler`)
 - Handlers should be structs containing Service dependencies.
 - Methods signature: `func (h *Handler) Action(c fiber.Ctx) error`.
 - Use `c.Bind().Body(&req)` for parsing request bodies.
-- Use `c.Locals("user_id")` to access authenticated user data.
-- Return errors using the standardized path or `c.Status(code).JSON()`.
+- Use `c.Locals("user_id")` and `c.Locals("permissions")` populated by `AuthMiddleware` to access authenticated user info.
+- For auth endpoints:
+  - `Login`: return `access_token` in response JSON and set `refresh_token` cookie (HttpOnly, Secure).
+  - `RefreshToken`: read refresh token cookie, validate/rotate server-side, return new `access_token`, set rotated `refresh_token` cookie.
+  - `Logout`: read and revoke refresh token, clear cookie.
 
 ### 4. Database & Models (`internal/domain` & `internal/repository`)
 - Use **GORM** for ORM patterns.
 - Models struct tags: `` `gorm:"..." json:"..."` ``.
-- Repositories should encapsulate all DB queries.
-- Use dependency injection to pass `gorm.DB` instances.
+- `refresh_tokens` model should include token hash, user_id, expires_at, revoked_at to support rotation and revocation.
+- Repositories must encapsulate all DB queries and token lifecycle logic.
 
 ### 5. Configuration (`internal/config` & `.env`)
 - Use `github.com/joho/godotenv` to load `.env`.
-- Access config via helper functions (e.g., `config.Config("KEY")`).
-- **Never hardcode secrets**.
+- JWT config should include:
+  - `JWT_SECRET_KEY`
+  - `JWT_ACCESS_TOKEN_EXPIRY` (minutes)
+  - `JWT_REFRESH_TOKEN_EXPIRY` (days)
+  - `JWT_COOKIE_SECURE` (bool)
+  - `JWT_COOKIE_SAMESITE` (Lax/Strict/None)
+- `FRONTEND_URL` should be provided for CORS `AllowOrigins`.
+
+## Frontend / API Integration Notes (recommended)
+- Axios / fetch clients must use `withCredentials: true` so the browser sends the `refresh_token` cookie to `/auth/refresh` and `/auth/logout`.
+- Access tokens should live in-memory (e.g., a React/Zustand store) and never be persisted to localStorage/cookies.
+- Implement an interceptor that:
+  1. Attaches current access token to `Authorization: Bearer <token>` header.
+  2. On 401, calls `POST /api/v1/auth/refresh` (cookie-driven) to obtain a new access token, updates in-memory token, retries original request once.
+  3. If refresh fails, clear client auth state and redirect to login.
+- For developers testing locally:
+  - Ensure frontend and backend CORS and origins are aligned (e.g., `http://localhost:3000` for frontend and `http://localhost:8000` for backend).
+  - Use `AllowCredentials: true` in Fiber CORS config and set cookie `Secure` flag appropriately when not using HTTPS (or disable Secure locally only).
 
 ## Critical Rules for Go Services
 - **Fiber v3**: Use the `v3` branch of Fiber.
@@ -92,29 +164,31 @@ apps/services/<service-name>/
 - **Error Handling**: Use a centralized error handling mechanism or custom AppError types.
 - **Strict Typing**: Use DTOs for all API requests and responses. Do not use `map[string]interface{}` unless absolutely necessary.
 
+
 ---
 
-# Project Structure Reference (web + selected services)
+# Project Structure Reference
 
 ```
-/apps/web/                # frontend (Next.js + Bun)
+/apps/web/                  # Next.js frontend
   ├── app/
-  ├── components/
-  ├── features/
-  ├── lib/
+  ├── components.json
   └── ...
 
-/apps/services/           # microservices
-  ├── iam-service/       # Go service (see structure above)
-  ├── (other services...) # Java services removed from LLMs context unless present locally
+/apps/services/             # microservices
+  ├── iam-service/          # Go service (see structure above)
+  ├── (other services...)   # Additional services
 ```
 
 ---
 
 # Critical Development Rules (summary)
-- Strict TypeScript in the web client (no `any`).
-- No raw API data without Zod parsing on the frontend.
-- No NPM/Yarn for the web client: use Bun exclusively.
+- Frontend (Next.js):
+  - Use Next.js App Router
+  - Strict TypeScript (no `any`)
+  - All API data must be validated with Zod schemas
+  - Use Bun exclusively for package management
+  - Use ShadCN CLI for component installation
 - For Go services:
   - Keep configuration in env files or external secret stores.
   - Do not hardcode DB credentials or secrets.
@@ -132,10 +206,11 @@ apps/services/<service-name>/
 
 # Quick reference commands
 
-Frontend
+Frontend (Next.js)
 - Install: `bun install`
-- Dev: `bun run dev`
+- Dev: `bun dev`
 - Build: `bun run build`
+- Add component: `bunx shadcn@latest add <component>`
 
 IAM-service (Go)
 - Build: `go build ./...` or `go build -o ./bin/auth ./cmd/main.go`
@@ -151,40 +226,3 @@ Docker Compose (infra/compose)
 ---
 
 If you need additional detail for any other service folder structures or want the Go iam-service README expanded with exact commands and examples, let me know and I will add the expanded how-to and examples (DB migration commands, sample `.env`, sample requests, etc.).
-
-
-# API Gateway (KrakenD)
-
-The project uses **KrakenD** as the high-performance API Gateway. It aggregates and routes requests to microservices (like `iam-service`).
-
-## Configuration
-- **Config File**: `apps/gateway/krakend.json`
-- **Docker Compose**: The gateway runs as the `api-gateway` service, mounting the local config file.
-
-## Standard Endpoint Definition
-When adding new routes (e.g., for a new service), add an entry to the `endpoints` array in `krakend.json`:
-
-```json
-{
-  "endpoint": "/api/v1/resource",
-  "method": "POST",
-  "output_encoding": "json",
-  "backend": [
-    {
-      "url_pattern": "/resource",
-      "method": "POST",
-      "host": ["http://service-name:8081"],
-      "disable_host_sanitize": true
-    }
-  ]
-}
-```
-
-### Key Fields
-- `endpoint`: The external path exposed to the frontend (e.g., `/api/v1/auth/login`).
-- `backend.url_pattern`: The internal path on the microservice (e.g., `/auth/login`).
-- `backend.host`: The internal Docker DNS name of the service (e.g., `http://iam-service:8081`).
-- `extra_config`: Use `github_com/devopsfaith/krakend/proxy` to allow specific status codes (like 400/401) to pass through without error wrapping.
-
-## Service Discovery
-KrakenD communicates with services via Docker internal networking. Ensure your backend service is on the same network (e.g., `gradeloop-network`) and referenced by its container name (e.g., `iam-service`).

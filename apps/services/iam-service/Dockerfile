@@ -1,20 +1,24 @@
-FROM golang:latest
+FROM golang:1.25.6-alpine AS builder
 
-# Enviroment variable
-WORKDIR /usr/src/some-api
+WORKDIR /app
 
-RUN go install github.com/air-verse/air@latest
+RUN apk add --no-cache git
 
-#Copying files to work directory
-COPY go.mod ./
-RUN go mod download && go mod verify
+COPY go.mod go.sum ./
+RUN go mod download
+
 COPY . .
 
-# Build the binary for production
-RUN CGO_ENABLED=0 GOOS=linux go build -o /usr/local/bin/auth ./cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/main.go
 
-# Expose default container port 3000
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates tzdata curl
+
+WORKDIR /root/
+
+COPY --from=builder /app/main .
+
 EXPOSE 8081
 
-# Default command: if DEV_MODE=1 use air for dev hot reload, otherwise run the compiled binary
-CMD ["sh", "-c", "if [ \"$DEV_MODE\" = \"1\" ]; then air cmd/main.go -b 0.0.0.0; else /usr/local/bin/auth; fi"]
+CMD ["./main"]

@@ -1,11 +1,65 @@
 services:
+  # =============================================================================
+  # Traefik API Gateway
+  # =============================================================================
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:8000"
+    environment:
+      - DOCKER_API_VERSION=1.44
+    ports:
+      - "8000:8000"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - gradeloop-network
+    healthcheck:
+      test: [ "CMD", "traefik", "healthcheck" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # =============================================================================
+  # IAM Service (Go Fiber)
+  # =============================================================================
   iam-service:
     build:
       context: ./apps/services/iam-service
       dockerfile: Dockerfile
     container_name: iam-service
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.iam.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.iam.entrypoints=web"
+      - "traefik.http.services.iam-service.loadbalancer.server.port=8081"
+      # Request Size Limiting (1MB)
+      - "traefik.http.middlewares.limit.buffering.maxRequestBodyBytes=1048576"
+      # Global Rate Limiting
+      - "traefik.http.middlewares.global-ratelimit.ratelimit.average=1000"
+      - "traefik.http.middlewares.global-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.global-ratelimit.ratelimit.burst=100"
+      # Login Rate Limiting (5 requests per minute)
+      - "traefik.http.routers.iam-login.rule=Path(`/api/v1/auth/login`)"
+      - "traefik.http.routers.iam-login.entrypoints=web"
+      - "traefik.http.routers.iam-login.priority=100"
+      - "traefik.http.middlewares.login-ratelimit.ratelimit.average=20"
+      - "traefik.http.middlewares.login-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.login-ratelimit.ratelimit.burst=10"
+      # Apply middlewares
+      - "traefik.http.routers.iam.middlewares=limit,global-ratelimit"
+      - "traefik.http.routers.iam-login.middlewares=limit,login-ratelimit"
+
     env_file:
       - .env
+
     environment:
       - SERVER_PORT=${IAM_SVC_PORT}
       - ENABLE_PREFORK=${IAM_SVC_ENABLE_PREFORK}
@@ -17,20 +71,47 @@ services:
       - DB_SSLMODE=${GRA_DB_SSLMODE}
       - EMAIL_SERVICE_URL=http://email-service:8082
       - FRONTEND_URL=${FRONTEND_URL}
-    ports:
-      - "8081:8081"
+      - SUPER_ADMIN_USERNAME=${SUPER_ADMIN_USERNAME}
+      - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ACCESS_TOKEN_EXPIRY=${JWT_ACCESS_TOKEN_EXPIRY}
+      - JWT_REFRESH_TOKEN_EXPIRY=${JWT_REFRESH_TOKEN_EXPIRY}
+
+    expose:
+      - "8081"
+
     networks:
       - gradeloop-network
 
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # =============================================================================
+  # Email Service (dependency for IAM)
+  # =============================================================================
   email-service:
     build:
       context: ./apps/services/email-service
       dockerfile: Dockerfile
     container_name: email-service
+    restart: unless-stopped
+
     env_file:
       - .env
+
     environment:
-      - APP_PORT=8082
+      - APP_PORT=${EMAIL_SVC_PORT}
       - DB_HOST=${GRA_DB_HOST}
       - DB_PORT=${GRA_DB_PORT}
       - DB_USER=${GRA_DB_USER}
@@ -39,35 +120,60 @@ services:
       - DB_SSLMODE=${GRA_DB_SSLMODE}
       - SMTP_PASSWORD=${SMTP_PASS}
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
-    ports:
-      - "8082:8082"
+
+    expose:
+      - "8082"
+
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+
     networks:
       - gradeloop-network
 
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # =============================================================================
+  # RabbitMQ (Message Broker)
+  # =============================================================================
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq
+    restart: unless-stopped
+
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
     ports:
       - "5672:5672"
       - "15672:15672"
+
     networks:
       - gradeloop-network
 
-  api-gateway:
-    image: krakend:latest
-    container_name: api-gateway
-    volumes:
-      - ./apps/gateway/krakend.json:/etc/krakend/krakend.json
-    ports:
-      - "8080:8080"
-    command: [ "run", "-c", "/etc/krakend/krakend.json" ]
-    depends_on:
-      - iam-service
-    networks:
-      - gradeloop-network
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+# =============================================================================
+# Networks Configuration
+# =============================================================================
 networks:
   gradeloop-network:
     driver: bridge

@@ -1,60 +1,80 @@
 package middleware
 
 import (
-	"errors"
-	"os"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/gradeloop/iam-service/internal/jwt"
 )
 
-// AuthMiddleware validates the JWT token and sets the user context.
-func AuthMiddleware() fiber.Handler {
+// AuthMiddleware creates a middleware that validates JWT access tokens
+// and stores user claims in context locals
+func AuthMiddleware(secretKey []byte) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Missing authorization header"})
+			return fiber.NewError(fiber.StatusUnauthorized, "Missing authorization header")
 		}
 
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenString == authHeader {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token format"})
+		// Extract token from "Bearer <token>"
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+			return fiber.NewError(fiber.StatusUnauthorized, "Invalid authorization format")
 		}
 
-		secret := os.Getenv("SECRET")
-		if secret == "" {
-			// Fallback or error? detailed log
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Server configuration error"})
-		}
+		tokenString := parts[1]
 
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, errors.New("unexpected signing method")
+		// Validate token
+		claims, err := jwt.ValidateAccessToken(tokenString, secretKey)
+		if err != nil {
+			if err == jwt.ErrExpiredToken {
+				return fiber.NewError(fiber.StatusUnauthorized, "Token expired")
 			}
-			return []byte(secret), nil
-		})
-
-		if err != nil || !token.Valid {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid or expired token"})
+			return fiber.NewError(fiber.StatusUnauthorized, "Invalid token")
 		}
 
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid token claims"})
-		}
-
-		// Set user ID and claims in context
-		// Assuming user_id is in claims as "user_id"
-		if userID, ok := claims["user_id"]; ok {
-			c.Locals("user_id", userID)
-		} else {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Token missing user_id"})
-		}
-
-		// Keep raw claims if needed
-		c.Locals("claims", claims)
+		// Store claims in context for handlers to access
+		c.Locals("user_id", claims.UserID.String())
+		c.Locals("username", claims.Username)
+		c.Locals("role_name", claims.RoleName)
+		c.Locals("permissions", claims.Permissions)
 
 		return c.Next()
+	}
+}
+
+// RequirePermission creates a middleware that checks if the user has a specific permission
+func RequirePermission(requiredPermission string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		permissions, ok := c.Locals("permissions").([]string)
+		if !ok || permissions == nil {
+			return fiber.NewError(fiber.StatusForbidden, "Permission denied")
+		}
+
+		for _, perm := range permissions {
+			if perm == requiredPermission {
+				return c.Next()
+			}
+		}
+
+		return fiber.NewError(fiber.StatusForbidden, "Permission denied")
+	}
+}
+
+// RequireRole creates a middleware that checks if the user has a specific role
+func RequireRole(allowedRoles ...string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		roleName, ok := c.Locals("role_name").(string)
+		if !ok || roleName == "" {
+			return fiber.NewError(fiber.StatusForbidden, "Role required")
+		}
+
+		for _, allowedRole := range allowedRoles {
+			if roleName == allowedRole {
+				return c.Next()
+			}
+		}
+
+		return fiber.NewError(fiber.StatusForbidden, "Insufficient role")
 	}
 }

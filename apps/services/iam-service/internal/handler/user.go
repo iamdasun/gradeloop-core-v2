@@ -3,10 +3,10 @@ package handler
 import (
 	"strconv"
 
-	"github.com/4yrg/gradeloop-core-v2/apps/services/iam-service/internal/dto"
-	"github.com/4yrg/gradeloop-core-v2/apps/services/iam-service/internal/errors"
-	"github.com/4yrg/gradeloop-core-v2/apps/services/iam-service/internal/service"
 	"github.com/gofiber/fiber/v3"
+
+	"github.com/gradeloop/iam-service/internal/dto"
+	"github.com/gradeloop/iam-service/internal/service"
 )
 
 type UserHandler struct {
@@ -14,86 +14,113 @@ type UserHandler struct {
 }
 
 func NewUserHandler(userService service.UserService) *UserHandler {
-	return &UserHandler{userService: userService}
+	return &UserHandler{
+		userService: userService,
+	}
 }
 
+// CreateUser creates a new user with a temporary password and activation token
 func (h *UserHandler) CreateUser(c fiber.Ctx) error {
 	var req dto.CreateUserRequest
+
 	if err := c.Bind().Body(&req); err != nil {
-		return errors.New(400, "Invalid request body", err)
+		return fiber.ErrBadRequest
 	}
 
-	user, err := h.userService.CreateUser(c.Context(), req)
+	// Get actor permissions from context (set by AuthMiddleware)
+	permissions, ok := c.Locals("permissions").([]string)
+	if !ok || permissions == nil {
+		return fiber.NewError(fiber.StatusForbidden, "Permission denied")
+	}
+
+	response, err := h.userService.CreateUser(c.RequestCtx(), &req, permissions)
 	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			return c.Status(appErr.Code).JSON(fiber.Map{"error": appErr.Message})
-		}
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return handleUserError(err)
 	}
 
-	return c.Status(201).JSON(fiber.Map{
-		"user":    user,
-		"message": "User created successfully. Verification email sent.",
-	})
+	return c.Status(fiber.StatusCreated).JSON(response)
 }
 
-func (h *UserHandler) GetUser(c fiber.Ctx) error {
-	id := c.Params("id")
-	user, err := h.userService.GetUser(c.Context(), id)
+// GetUsers returns a paginated list of users
+func (h *UserHandler) GetUsers(c fiber.Ctx) error {
+	page, err := strconv.Atoi(c.Query("page", "1"))
 	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			return c.Status(appErr.Code).JSON(fiber.Map{"error": appErr.Message})
-		}
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		page = 1
 	}
-	return c.JSON(user)
+
+	limit, err := strconv.Atoi(c.Query("limit", "10"))
+	if err != nil {
+		limit = 10
+	}
+
+	userType := c.Query("user_type", "all")
+
+	response, err := h.userService.GetUsers(c.RequestCtx(), page, limit, userType)
+	if err != nil {
+		return handleUserError(err)
+	}
+
+	return c.JSON(response)
 }
 
-func (h *UserHandler) ListUsers(c fiber.Ctx) error {
-	skip, _ := strconv.Atoi(c.Query("skip", "0"))
-	limit, _ := strconv.Atoi(c.Query("limit", "10"))
-
-	users, err := h.userService.ListUsers(c.Context(), skip, limit)
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-	}
-	return c.JSON(users)
-}
-
+// UpdateUser updates an existing user
 func (h *UserHandler) UpdateUser(c fiber.Ctx) error {
 	id := c.Params("id")
 	var req dto.UpdateUserRequest
+
 	if err := c.Bind().Body(&req); err != nil {
-		return errors.New(400, "Invalid request body", err)
+		return fiber.ErrBadRequest
 	}
 
-	user, err := h.userService.UpdateUser(c.Context(), id, req)
+	response, err := h.userService.UpdateUser(c.RequestCtx(), id, &req)
 	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			return c.Status(appErr.Code).JSON(fiber.Map{"error": appErr.Message})
-		}
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return handleUserError(err)
 	}
-	return c.JSON(user)
+
+	return c.JSON(response)
 }
 
+// DeleteUser soft deletes a user
 func (h *UserHandler) DeleteUser(c fiber.Ctx) error {
 	id := c.Params("id")
-	if err := h.userService.DeleteUser(c.Context(), id); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+
+	if err := h.userService.DeleteUser(c.RequestCtx(), id); err != nil {
+		return handleUserError(err)
 	}
-	return c.SendStatus(204)
+
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
-func (h *UserHandler) AssignRole(c fiber.Ctx) error {
+// RestoreUser restores a soft deleted user
+func (h *UserHandler) RestoreUser(c fiber.Ctx) error {
 	id := c.Params("id")
-	var req dto.AssignRoleRequest
-	if err := c.Bind().Body(&req); err != nil {
-		return errors.New(400, "Invalid request body", err)
+
+	if err := h.userService.RestoreUser(c.RequestCtx(), id); err != nil {
+		return handleUserError(err)
 	}
 
-	if err := h.userService.AssignRole(c.Context(), id, req.RoleID); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func handleUserError(err error) error {
+	switch err {
+	case service.ErrUnauthorized:
+		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
+	case service.ErrUsernameTaken:
+		return fiber.NewError(fiber.StatusConflict, "Username already exists")
+	case service.ErrEmailTaken:
+		return fiber.NewError(fiber.StatusConflict, "Email already exists")
+	case service.ErrRoleNotFound:
+		return fiber.NewError(fiber.StatusBadRequest, "Role not found")
+	case service.ErrInvalidActivationToken:
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid activation token")
+	case service.ErrActivationTokenExpired:
+		return fiber.NewError(fiber.StatusBadRequest, "Activation token expired")
+	case service.ErrUserAlreadyActive:
+		return fiber.NewError(fiber.StatusBadRequest, "User is already active")
+	case service.ErrUserNotFound:
+		return fiber.NewError(fiber.StatusNotFound, "User not found")
+	default:
+		return err
 	}
-	return c.SendStatus(200)
 }

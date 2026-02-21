@@ -1,38 +1,38 @@
 package dto
 
-import "time"
-
-type CreateUserRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	FullName string `json:"full_name" validate:"required"`
-	UserType string `json:"user_type" validate:"required,oneof=STUDENT EMPLOYEE"`
-
-	// Student Fields
-	EnrollmentDate *string `json:"enrollment_date,omitempty"` // YYYY-MM-DD
-	StudentID      *string `json:"student_id,omitempty"`
-
-	// Employee Fields
-	EmployeeID   *string `json:"employee_id,omitempty"`
-	Designation  *string `json:"designation,omitempty"`
-	EmployeeType *string `json:"employee_type,omitempty"`
-}
+import "github.com/google/uuid"
 
 type UserResponse struct {
-	ID             string     `json:"id"`
-	Email          string     `json:"email"`
-	FullName       string     `json:"full_name"`
-	IsActive       bool       `json:"is_active"`
-	UserType       string     `json:"user_type"`
-	EnrollmentDate *time.Time `json:"enrollment_date,omitempty"`
-	StudentID      *string    `json:"student_id,omitempty"`
-	EmployeeID     *string    `json:"employee_id,omitempty"`
-	Designation    *string    `json:"designation,omitempty"`
-	EmployeeType   *string    `json:"employee_type,omitempty"`
-	Roles          []string   `json:"roles,omitempty"` // Just role names
-	CreatedAt      time.Time  `json:"created_at"`
+	ID          uuid.UUID `json:"id"`
+	Username    string    `json:"username"`
+	Email       string    `json:"email"`
+	RoleID      uuid.UUID `json:"role_id"`
+	RoleName    string    `json:"role_name"`
+	UserType    string    `json:"user_type"`
+	StudentID   string    `json:"student_id,omitempty"`
+	Designation string    `json:"designation,omitempty"`
+	IsActive    bool      `json:"is_active"`
+	LastLoginAt *string   `json:"last_login_at"`
+	CreatedAt   string    `json:"created_at"`
+}
+
+type GetUsersResponse struct {
+	Users      []UserResponse `json:"users"`
+	TotalCount int64          `json:"total_count"`
+	Page       int            `json:"page"`
+	Limit      int            `json:"limit"`
 }
 
 type UpdateUserRequest struct {
-	FullName *string `json:"full_name,omitempty"`
-	IsActive *bool   `json:"is_active,omitempty"`
+	RoleID   *string `json:"role_id"`
+	IsActive *bool   `json:"is_active"`
+}
+
+type UpdateUserResponse struct {
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
+	Email    string    `json:"email"`
+	RoleID   uuid.UUID `json:"role_id"`
+	IsActive bool      `json:"is_active"`
+	Message  string    `json:"message"`
 }

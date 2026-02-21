@@ -14,9 +14,8 @@ auth:bearer {
   token: {{access_token}}
 }
 
-body:json {
-  {
-    "name": "NEW_ROLE",
-    "description": "Description of the new role"
-  }
+{
+  "name": "NEW_ROLE",
+  "is_system_role": false,
+  "permission_ids": []
 }

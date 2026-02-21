@@ -35,8 +35,6 @@ func main() {
 
 	// 4. Setup Components
 	// Run Seeder
-	repository.SeedTemplates(db)
-
 	emailRepo := repository.NewPostgresRepository(db)
 	emailService := service.NewEmailService(emailRepo, producer)
 	emailHandler := http.NewHandler(emailService)

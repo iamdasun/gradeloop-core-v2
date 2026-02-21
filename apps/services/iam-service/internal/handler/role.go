@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"github.com/4yrg/gradeloop-core-v2/apps/services/iam-service/internal/dto"
-	"github.com/4yrg/gradeloop-core-v2/apps/services/iam-service/internal/errors"
-	"github.com/4yrg/gradeloop-core-v2/apps/services/iam-service/internal/service"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
+	"github.com/gradeloop/iam-service/internal/dto"
+	"github.com/gradeloop/iam-service/internal/service"
 )
 
 type RoleHandler struct {
@@ -12,48 +12,148 @@ type RoleHandler struct {
 }
 
 func NewRoleHandler(roleService service.RoleService) *RoleHandler {
-	return &RoleHandler{roleService: roleService}
+	return &RoleHandler{
+		roleService: roleService,
+	}
 }
 
 func (h *RoleHandler) CreateRole(c fiber.Ctx) error {
 	var req dto.CreateRoleRequest
+
 	if err := c.Bind().Body(&req); err != nil {
-		return errors.New(400, "Invalid request body", err)
+		return fiber.ErrBadRequest
 	}
 
-	role, err := h.roleService.CreateRole(c.Context(), req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			return c.Status(appErr.Code).JSON(fiber.Map{"error": appErr.Message})
-		}
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	// Get actor permissions from context
+	permissions, ok := c.Locals("permissions").([]string)
+	if !ok || permissions == nil {
+		return fiber.NewError(fiber.StatusForbidden, "Permission denied")
 	}
-	return c.Status(201).JSON(role)
+
+	response, err := h.roleService.CreateRole(c.RequestCtx(), &req, permissions)
+	if err != nil {
+		return handleRoleError(err)
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(response)
 }
 
-func (h *RoleHandler) ListRoles(c fiber.Ctx) error {
-	roles, err := h.roleService.ListRoles(c.Context())
+func (h *RoleHandler) GetRoleByID(c fiber.Ctx) error {
+	roleID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return fiber.ErrBadRequest
 	}
-	return c.JSON(roles)
+
+	response, err := h.roleService.GetRoleByID(c.RequestCtx(), roleID)
+	if err != nil {
+		return handleRoleError(err)
+	}
+
+	return c.JSON(response)
+}
+
+func (h *RoleHandler) GetAllRoles(c fiber.Ctx) error {
+	response, err := h.roleService.GetAllRoles(c.RequestCtx())
+	if err != nil {
+		return handleRoleError(err)
+	}
+
+	return c.JSON(response)
+}
+
+func (h *RoleHandler) UpdateRole(c fiber.Ctx) error {
+	roleID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	var req dto.UpdateRoleRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	// Get actor permissions from context
+	permissions, ok := c.Locals("permissions").([]string)
+	if !ok || permissions == nil {
+		return fiber.NewError(fiber.StatusForbidden, "Permission denied")
+	}
+
+	response, err := h.roleService.UpdateRole(c.RequestCtx(), roleID, &req, permissions)
+	if err != nil {
+		return handleRoleError(err)
+	}
+
+	return c.JSON(response)
+}
+
+func (h *RoleHandler) DeleteRole(c fiber.Ctx) error {
+	roleID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	// Get actor permissions from context
+	permissions, ok := c.Locals("permissions").([]string)
+	if !ok || permissions == nil {
+		return fiber.NewError(fiber.StatusForbidden, "Permission denied")
+	}
+
+	if err := h.roleService.DeleteRole(c.RequestCtx(), roleID, permissions); err != nil {
+		return handleRoleError(err)
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Role deleted successfully",
+	})
 }
 
 func (h *RoleHandler) AssignPermission(c fiber.Ctx) error {
-	roleID := c.Params("id")
-	type Request struct {
-		PermissionID string `json:"permission_id" validate:"required"`
-	}
-	var req Request
-	if err := c.Bind().Body(&req); err != nil {
-		return errors.New(400, "Invalid request body", err)
+	roleID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return fiber.ErrBadRequest
 	}
 
-	if err := h.roleService.AssignPermission(c.Context(), roleID, req.PermissionID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			return c.Status(appErr.Code).JSON(fiber.Map{"error": appErr.Message})
-		}
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	var req dto.AssignPermissionRequest
+
+	if err := c.Bind().Body(&req); err != nil {
+		return fiber.ErrBadRequest
 	}
-	return c.SendStatus(200)
+
+	permissionID, err := uuid.Parse(req.PermissionID)
+	if err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	// Get actor permissions from context
+	permissions, ok := c.Locals("permissions").([]string)
+	if !ok || permissions == nil {
+		return fiber.NewError(fiber.StatusForbidden, "Permission denied")
+	}
+
+	response, err := h.roleService.AssignPermission(c.RequestCtx(), roleID, permissionID, permissions)
+	if err != nil {
+		return handleRoleError(err)
+	}
+
+	return c.JSON(response)
+}
+
+func handleRoleError(err error) error {
+	switch err {
+	case service.ErrUnauthorized:
+		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
+	case service.ErrRoleAlreadyExists:
+		return fiber.NewError(fiber.StatusConflict, "Role already exists")
+	case service.ErrSystemRoleCannotBeModified:
+		return fiber.NewError(fiber.StatusForbidden, "System roles cannot be modified")
+	case service.ErrSystemRoleCannotBeDeleted:
+		return fiber.NewError(fiber.StatusForbidden, "System roles cannot be deleted")
+	case service.ErrPermissionNotFound:
+		return fiber.NewError(fiber.StatusBadRequest, "Permission not found")
+	case service.ErrUserNotFound:
+		return fiber.NewError(fiber.StatusNotFound, "Role not found")
+	default:
+		return err
+	}
 }
