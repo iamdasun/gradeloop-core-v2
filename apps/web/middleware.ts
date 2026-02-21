@@ -9,10 +9,10 @@ export function middleware(request: NextRequest) {
 
   // Public paths that don't require authentication
   const publicPaths = [
-    "/auth/login",
-    "/auth/forgot-password",
-    "/auth/reset-password",
-    "/auth/reset-required",
+    "/login",
+    "/forgot-password",
+    "/reset-password",
+    "/reset-required",
     "/unauthorized",
   ];
 
@@ -26,7 +26,7 @@ export function middleware(request: NextRequest) {
 
   // Redirect to login if accessing protected path without refresh token
   if (isProtectedPath && !hasRefreshToken) {
-    return NextResponse.redirect(new URL("/auth/login", request.url));
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   // Allow all other requests

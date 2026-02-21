@@ -12,28 +12,28 @@ export default function HomePage() {
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        router.push("/auth/login");
+        router.push("/login");
         return;
       }
 
       // Redirect based on role
       if (user?.role === "admin" || user?.role === "super_admin") {
-        router.push("/admin/dashboard");
+        router.push("/admin/");
         return;
       }
 
       if (user?.role === "instructor") {
-        router.push("/instructor/dashboard");
+        router.push("/instructor/");
         return;
       }
 
       if (user?.role === "student") {
-        router.push("/student/dashboard");
+        router.push("/student/");
         return;
       }
 
       // Fallback - should not happen
-      router.push("/auth/login");
+      router.push("/login");
     }
   }, [isAuthenticated, user, isLoading, router]);
 

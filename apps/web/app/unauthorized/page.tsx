@@ -11,7 +11,7 @@ export default function UnauthorizedPage() {
 
   const handleGoBack = () => {
     if (!isAuthenticated) {
-      router.push("/auth/login");
+      router.push("/login");
       return;
     }
 
@@ -24,7 +24,7 @@ export default function UnauthorizedPage() {
     } else if (role === "student") {
       router.push("/student/dashboard");
     } else {
-      router.push("/auth/login");
+      router.push("/login");
     }
   };
 

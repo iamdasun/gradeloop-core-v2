@@ -95,7 +95,7 @@ function ResetPasswordForm() {
       });
 
       setSuccess(true);
-      setTimeout(() => router.push("/auth/login"), 2000);
+      setTimeout(() => router.push("/login"), 2000);
     } catch (err: unknown) {
       const status = (
         err as { response?: { status?: number; data?: { message?: string } } }
@@ -139,7 +139,7 @@ function ResetPasswordForm() {
           </p>
         </div>
         <Link
-          href="/auth/login"
+          href="/login"
           className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors group"
         >
           <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
@@ -266,7 +266,7 @@ function ResetPasswordForm() {
       {/* Back link */}
       <div className="border-t pt-6">
         <Link
-          href="/auth/login"
+          href="/login"
           className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors group"
         >
           <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />

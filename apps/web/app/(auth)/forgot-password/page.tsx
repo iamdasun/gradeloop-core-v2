@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
       setStatus("success");
 
       // Redirect back to login after a short delay so the user sees the confirmation
-      setTimeout(() => router.push("/auth/login"), 3000);
+      setTimeout(() => router.push("/login"), 3000);
     } catch (err: unknown) {
       const status = (
         err as { response?: { status?: number; data?: { message?: string } } }
@@ -99,7 +99,7 @@ export default function ForgotPasswordPage() {
           Redirecting you back to login…
         </p>
         <Link
-          href="/auth/login"
+          href="/login"
           className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors group"
         >
           <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
@@ -185,7 +185,7 @@ export default function ForgotPasswordPage() {
       {/* Back to login */}
       <div className="border-t pt-6">
         <Link
-          href="/auth/login"
+          href="/login"
           className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors group"
         >
           <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
