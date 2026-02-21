@@ -45,19 +45,42 @@ func (s *Seeder) Seed() error {
 }
 
 func (s *Seeder) seedRoles() error {
-	roles := []domain.Role{
-		{Name: "super_admin", IsSystemRole: true},
-		{Name: "admin", IsSystemRole: true},
-		{Name: "employee", IsSystemRole: true},
-		{Name: "student", IsSystemRole: true},
+	roles := []struct {
+		Name         string
+		UserType     string
+		IsSystemRole bool
+	}{
+		{Name: "super_admin", UserType: "all", IsSystemRole: true},
+		{Name: "admin", UserType: "all", IsSystemRole: true},
+		{Name: "employee", UserType: "employee", IsSystemRole: true},
+		{Name: "student", UserType: "student", IsSystemRole: true},
 	}
 
 	for _, roleData := range roles {
 		var role domain.Role
-		if err := s.db.Where(domain.Role{Name: roleData.Name}).
-			Attrs(domain.Role{ID: uuid.New(), IsSystemRole: roleData.IsSystemRole}).
-			FirstOrCreate(&role).Error; err != nil {
-			return err
+		result := s.db.Where(domain.Role{Name: roleData.Name}).
+			Attrs(domain.Role{
+				ID:           uuid.New(),
+				UserType:     roleData.UserType,
+				IsSystemRole: roleData.IsSystemRole,
+			}).
+			FirstOrCreate(&role)
+
+		if result.Error != nil {
+			return result.Error
+		}
+
+		// If role already exists but doesn't have user_type set, update it
+		if result.RowsAffected == 0 && (role.UserType == "" || role.UserType != roleData.UserType) {
+			if err := s.db.Model(&role).Update("user_type", roleData.UserType).Error; err != nil {
+				s.logger.Error("failed to update role user_type",
+					zap.String("role", roleData.Name),
+					zap.Error(err))
+				return err
+			}
+			s.logger.Info("updated existing role with user_type",
+				zap.String("role", roleData.Name),
+				zap.String("user_type", roleData.UserType))
 		}
 	}
 

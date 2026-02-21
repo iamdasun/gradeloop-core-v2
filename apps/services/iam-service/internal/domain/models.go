@@ -10,6 +10,7 @@ import (
 type Role struct {
 	ID           uuid.UUID      `gorm:"type:uuid;primarykey" json:"id"`
 	Name         string         `gorm:"uniqueIndex;not null;size:100" json:"name"`
+	UserType     string         `gorm:"not null;default:'all';size:10" json:"user_type"`
 	IsSystemRole bool           `gorm:"not null;default:false" json:"is_system_role"`
 	Permissions  []Permission   `gorm:"many2many:role_permissions;" json:"permissions,omitempty"`
 	CreatedAt    time.Time      `json:"created_at"`
