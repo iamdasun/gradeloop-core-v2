@@ -17,8 +17,8 @@ import {
   BarChart3,
   Code,
 } from "lucide-react";
-import { useState } from "react";
 import { useAuthStore } from "@/store/auth-store";
+import { useSidebarStore } from "@/store/sidebar-store";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -143,7 +143,9 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const [collapsed, setCollapsed] = useState(false);
+
+  // Use Zustand store instead of local state
+  const { collapsed, setCollapsed } = useSidebarStore();
 
   // Determine role from user or pathname
   const role: Role =
