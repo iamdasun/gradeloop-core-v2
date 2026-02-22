@@ -12,7 +12,10 @@ import {
   GraduationCap,
   BarChart3,
   Calendar,
+  LogOut,
 } from "lucide-react";
+import { useAuthStore } from "@/lib/stores/authStore";
+import { useLogoutMutation } from "@/lib/hooks/useAuthMutation";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -90,6 +93,14 @@ interface MobileSidebarProps {
 
 export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
   const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+  const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
+
+  const displayName = user?.username ?? '—';
+  const displayEmail = user?.role_name ?? '';
+  const initials = user
+    ? user.username.slice(0, 2).toUpperCase()
+    : '??';
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -158,16 +169,12 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
                   className="w-full justify-start gap-3 px-3"
                 >
                   <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarImage
-                      src="https://github.com/shadcn.png"
-                      alt="User"
-                    />
-                    <AvatarFallback>AD</AvatarFallback>
+                    <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <div className="flex flex-1 flex-col items-start text-left text-sm">
-                    <span className="font-medium">Admin User</span>
+                    <span className="font-medium">{displayName}</span>
                     <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      admin@gradeloop.com
+                      {displayEmail}
                     </span>
                   </div>
                 </Button>
@@ -177,9 +184,15 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem>Team</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Log out</DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => { logout(); onOpenChange(false); }}
+                  disabled={isLoggingOut}
+                  className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400 gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {isLoggingOut ? "Logging out…" : "Log out"}
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
