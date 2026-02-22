@@ -25,7 +25,7 @@ type Config struct {
 	JWTSecretKey            []byte
 }
 
-// requireAdminRole is a custom middleware that checks for super_admin OR faculty_admin
+// requireAdminRole is a custom middleware that checks for super_admin OR admin
 func requireAdminRole() fiber.Handler {
 	return func(c fiber.Ctx) error {
 		roleName, ok := c.Locals("role_name").(string)
@@ -37,12 +37,12 @@ func requireAdminRole() fiber.Handler {
 		normalized := strings.ToLower(strings.TrimSpace(roleName))
 		normalized = strings.ReplaceAll(normalized, " ", "_")
 
-		// Check if user has super_admin or faculty_admin role
-		if normalized == "super_admin" || normalized == "faculty_admin" {
+		// Check if user has super_admin or admin role
+		if normalized == "super_admin" || normalized == "admin" {
 			return c.Next()
 		}
 
-		return utils.ErrForbidden("Requires super_admin or faculty_admin role")
+		return utils.ErrForbidden("Requires super_admin or admin role")
 	}
 }
 
@@ -67,7 +67,7 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	faculties.Patch("/:id/deactivate", cfg.FacultyHandler.DeactivateFaculty)
 	faculties.Get("/:id/leaders", cfg.FacultyHandler.GetFacultyLeaders)
 
-	// Department routes - Super Admin OR Faculty Admin
+	// Department routes - Super Admin OR Admin
 	departments := protected.Group("/departments", requireAdminRole())
 	departments.Post("/", cfg.DepartmentHandler.CreateDepartment)
 	departments.Get("/", cfg.DepartmentHandler.ListDepartments)
@@ -77,11 +77,11 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	departments.Put("/:id", cfg.DepartmentHandler.UpdateDepartment)
 	departments.Patch("/:id/deactivate", cfg.DepartmentHandler.DeactivateDepartment)
 
-	// Faculty departments endpoint - Super Admin OR Faculty Admin
+	// Faculty departments endpoint - Super Admin OR Admin
 	facultiesAdmin := protected.Group("/faculties", requireAdminRole())
 	facultiesAdmin.Get("/:id/departments", cfg.DepartmentHandler.ListDepartmentsByFaculty)
 
-	// Degree routes - Super Admin OR Faculty Admin
+	// Degree routes - Super Admin OR Admin
 	degrees := protected.Group("/degrees", requireAdminRole())
 	degrees.Post("/", cfg.DegreeHandler.CreateDegree)
 	degrees.Get("/", cfg.DegreeHandler.ListDegrees)
@@ -91,7 +91,7 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	// List specializations for a degree
 	degrees.Get("/:id/specializations", cfg.SpecializationHandler.ListSpecializationsByDegree)
 
-	// Specialization routes - Super Admin OR Faculty Admin
+	// Specialization routes - Super Admin OR Admin
 	specializations := protected.Group("/specializations", requireAdminRole())
 	specializations.Post("/", cfg.SpecializationHandler.CreateSpecialization)
 	specializations.Get("/:id", cfg.SpecializationHandler.GetSpecialization)
@@ -99,7 +99,7 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	specializations.Patch("/:id/deactivate", cfg.SpecializationHandler.DeactivateSpecialization)
 
 	// ─────────────────────────────────────────────────────────────────────────
-	// Batch / Group routes - Super Admin OR Faculty Admin
+	// Batch / Group routes - Super Admin OR Admin
 	// NOTE: /batches/tree must be registered BEFORE /batches/:id to avoid
 	// Fiber treating "tree" as a UUID parameter.
 	// ─────────────────────────────────────────────────────────────────────────
