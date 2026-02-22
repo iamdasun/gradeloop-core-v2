@@ -1,0 +1,51 @@
+meta {
+  name: Create Role
+  type: http
+  seq: 3
+}
+
+docs {
+  # Create Role
+
+  Creates a new role with specified permissions.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `roles:write` permission
+
+  ## Request Body
+  - `name`: Role name (required, string)
+  - `user_type`: Type of user - "student", "employee", or "all" (required)
+  - `is_system_role`: Whether this is a system role (default: false)
+  - `permission_ids`: Array of permission UUIDs to assign to the role
+
+  ## Response
+  Returns the created role with its assigned permissions.
+}
+
+post {
+  url: {{ROLES_URL_V1}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "name": "Custom Role",
+    "user_type": "employee",
+    "is_system_role": false,
+    "permission_ids": [
+      "REPLACE_WITH_PERMISSION_ID_1",
+      "REPLACE_WITH_PERMISSION_ID_2"
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

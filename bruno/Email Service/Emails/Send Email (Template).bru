@@ -1,0 +1,51 @@
+meta {
+  name: Send Email (Template)
+  type: http
+  seq: 1
+}
+
+docs {
+  # Send Email (Using Template)
+
+  Sends an email using a predefined template with variable substitution.
+
+  ## Prerequisites
+  - None (internal service endpoint)
+
+  ## Request Body
+  - `template_name`: Name of the template to use (optional)
+  - `recipients`: Array of email addresses (required)
+  - `variables`: Object containing template variables (optional)
+
+  ## Alternative Format
+  You can also use flexible keys:
+  - `template` instead of `template_name`
+  - `to` instead of `recipients`
+  - Variables can be at root level or in `variables` object
+
+  ## Response
+  Returns 202 Accepted with the queued email ID and status.
+}
+
+post {
+  url: {{EMAIL_URL_V1}}/send
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "template_name": "welcome_email",
+    "recipients": ["user@example.com"],
+    "variables": {
+      "name": "John Doe",
+      "link": "https://gradeloop.com/activate/token123",
+      "custom_var": "value"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

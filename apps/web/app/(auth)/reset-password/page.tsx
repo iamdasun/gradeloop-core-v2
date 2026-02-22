@@ -1,298 +1,234 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
+import { useState } from "react";
 import Link from "next/link";
-import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, ArrowLeft, ShieldCheck } from "lucide-react";
-
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { PasswordIndicator } from "@/components/password-indicator";
-import apiClient from "@/lib/api/client";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { authApi } from "@/lib/api/auth";
+import { handleApiError } from "@/lib/api/axios";
 
-// ── Validation ──────────────────────────────────────────────────────────────
-
-const resetSchema = z
-  .object({
-    password: z
-      .string()
-      .min(8, "Password must be at least 8 characters")
-      .refine((v) => /[A-Z]/.test(v), {
-        message: "Must contain at least one uppercase letter",
-      })
-      .refine((v) => /[a-z]/.test(v), {
-        message: "Must contain at least one lowercase letter",
-      })
-      .refine((v) => /[0-9]/.test(v), {
-        message: "Must contain at least one digit",
-      })
-      .refine((v) => /[^A-Za-z0-9]/.test(v), {
-        message: "Must contain at least one special character",
-      }),
-    confirmPassword: z.string(),
-  })
-  .refine((d) => d.password === d.confirmPassword, {
-    path: ["confirmPassword"],
-    message: "Passwords do not match",
-  });
-
-type ResetValues = z.infer<typeof resetSchema>;
-
-// ── Inner component (uses useSearchParams – needs Suspense wrapper) ──────────
-
-function ResetPasswordForm() {
-  const router = useRouter();
+export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
-  const token = searchParams?.get("token") ?? "";
+  const router = useRouter();
+  const token = searchParams.get("token");
 
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
-  const form = useForm<ResetValues>({
-    resolver: zodResolver(resetSchema),
-    defaultValues: { password: "", confirmPassword: "" },
-    mode: "onChange",
-  });
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    setValidationError(null);
 
-  const watchedPassword = form.watch("password");
+    const formData = new FormData(e.currentTarget);
+    const password = formData.get("password") as string;
+    const confirmPassword = formData.get("confirmPassword") as string;
 
-  useEffect(() => {
-    if (!token) {
-      setErrorMessage(
-        "Reset token is missing. Please use the link from your email.",
-      );
-    }
-  }, [token]);
-
-  async function onSubmit(values: ResetValues) {
-    setErrorMessage(null);
-
-    if (!token) {
-      setErrorMessage(
-        "Reset token is missing. Please use the link from your email.",
-      );
+    // Client-side validation
+    if (password !== confirmPassword) {
+      setValidationError("Passwords do not match");
       return;
     }
 
+    if (password.length < 8) {
+      setValidationError("Password must be at least 8 characters long");
+      return;
+    }
+
+    if (!token) {
+      setError("Invalid or missing reset token");
+      return;
+    }
+
+    setIsLoading(true);
+
     try {
-      // Backend expects: POST /auth/reset-password { token, new_password }
-      await apiClient.post("/auth/reset-password", {
+      await authApi.resetPassword({
         token,
-        new_password: values.password,
+        new_password: password,
       });
 
-      setSuccess(true);
-      setTimeout(() => router.push("/login"), 2000);
-    } catch (err: unknown) {
-      const status = (
-        err as { response?: { status?: number; data?: { message?: string } } }
-      )?.response?.status;
-      const message = (err as { response?: { data?: { message?: string } } })
-        ?.response?.data?.message;
-
-      if (status === 400 && message) {
-        setErrorMessage(message);
-      } else if (status === 401) {
-        setErrorMessage(
-          "Invalid or expired reset token. Please request a new reset link.",
-        );
-      } else if (status === 429) {
-        setErrorMessage(
-          "Too many requests. Please wait a few minutes and try again.",
-        );
-      } else {
-        setErrorMessage(
-          message ?? "Unable to reset password. Please try again.",
-        );
-      }
+      setIsSuccess(true);
+    } catch (err) {
+      const errorMessage = handleApiError(err);
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
-  // ── Success state ──────────────────────────────────────────────────────────
+  const handleBackToLogin = () => {
+    router.push("/login");
+  };
 
-  if (success) {
+  // Invalid or missing token
+  if (!token) {
     return (
-      <div className="space-y-6 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-500/10">
-          <ShieldCheck className="h-7 w-7 text-emerald-500" />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight">
-            Password updated!
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Your password has been reset successfully. Redirecting you to
-            login&hellip;
-          </p>
-        </div>
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors group"
-        >
-          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
-          Back to Login
-        </Link>
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-zinc-900">
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle className="text-2xl">Invalid Link</CardTitle>
+            <CardDescription>
+              This password reset link is invalid or has expired. Please request
+              a new password reset link.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="flex-col gap-2">
+            <Link href="/forgot-password" className="w-full">
+              <Button className="w-full">Request New Link</Button>
+            </Link>
+            <Link href="/login" className="w-full">
+              <Button variant="ghost" className="w-full text-sm">
+                Back to Login
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
 
-  // ── Form state ─────────────────────────────────────────────────────────────
-
-  return (
-    <div className="space-y-8">
-      {/* Heading */}
-      <div className="space-y-1.5">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Reset Your Password
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Choose a new secure password. This link expires after one hour.
-        </p>
+  // Success state
+  if (isSuccess) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-zinc-900">
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle className="text-2xl">
+              Password Reset Successful
+            </CardTitle>
+            <CardDescription>
+              Your password has been successfully reset. You can now login with
+              your new password.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <Button onClick={handleBackToLogin} className="w-full">
+              Back to Login
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
+    );
+  }
 
-      {/* Error banner */}
-      {errorMessage && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm font-medium text-destructive">
-          {errorMessage}
-        </div>
-      )}
+  // Reset password form
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-zinc-900">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-2xl">Reset your password</CardTitle>
+          <CardDescription>
+            Enter your new password below. Make sure it&apos;s at least 8
+            characters long.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} id="reset-password-form">
+            <div className="flex flex-col gap-6">
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    {error}
+                  </p>
+                </div>
+              )}
 
-      {/* Form */}
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-          {/* New password */}
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-semibold">
-                  New Password
-                </FormLabel>
+              {validationError && (
+                <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-900 dark:bg-orange-950">
+                  <p className="text-sm text-orange-800 dark:text-orange-200">
+                    {validationError}
+                  </p>
+                </div>
+              )}
+
+              <div className="grid gap-2">
+                <Label htmlFor="password">New Password</Label>
                 <div className="relative">
-                  <FormControl>
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Create a new password"
-                      className="pr-11 h-11"
-                      autoComplete="new-password"
-                      {...field}
-                    />
-                  </FormControl>
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter new password"
+                    required
+                    minLength={8}
+                    disabled={isLoading}
+                    autoComplete="new-password"
+                  />
                   <button
                     type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label={
-                      showPassword ? "Hide password" : "Show password"
-                    }
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 text-sm dark:text-zinc-400 dark:hover:text-zinc-300"
+                    disabled={isLoading}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Password must be at least 8 characters
+                </p>
+              </div>
 
-          {/* Confirm password */}
-          <FormField
-            control={form.control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-semibold">
-                  Confirm New Password
-                </FormLabel>
+              <div className="grid gap-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <div className="relative">
-                  <FormControl>
-                    <Input
-                      type={showConfirm ? "text" : "password"}
-                      placeholder="Re-enter your password"
-                      className="pr-11 h-11"
-                      autoComplete="new-password"
-                      {...field}
-                    />
-                  </FormControl>
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm new password"
+                    required
+                    minLength={8}
+                    disabled={isLoading}
+                    autoComplete="new-password"
+                  />
                   <button
                     type="button"
-                    onClick={() => setShowConfirm((s) => !s)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label={showConfirm ? "Hide password" : "Show password"}
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 text-sm dark:text-zinc-400 dark:hover:text-zinc-300"
+                    disabled={isLoading}
                   >
-                    {showConfirm ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showConfirmPassword ? "Hide" : "Show"}
                   </button>
                 </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Live strength checklist */}
-          <PasswordIndicator password={watchedPassword} />
-
+              </div>
+            </div>
+          </form>
+        </CardContent>
+        <CardFooter className="flex-col gap-2">
           <Button
             type="submit"
-            size="lg"
-            className="w-full font-bold shadow-lg shadow-primary/25 active:scale-[0.98] transition-transform"
-            disabled={form.formState.isSubmitting || !token}
+            form="reset-password-form"
+            className="w-full"
+            disabled={isLoading}
           >
-            {form.formState.isSubmitting ? "Updating…" : "Update Password"}
+            {isLoading ? "Resetting Password..." : "Reset Password"}
           </Button>
-        </form>
-      </Form>
-
-      {/* Back link */}
-      <div className="border-t pt-6">
-        <Link
-          href="/login"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:text-primary/80 transition-colors group"
-        >
-          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
-          Back to Login
-        </Link>
-      </div>
+          <Link href="/login" className="w-full">
+            <Button
+              variant="ghost"
+              className="w-full text-sm"
+              disabled={isLoading}
+            >
+              Back to Login
+            </Button>
+          </Link>
+        </CardFooter>
+      </Card>
     </div>
-  );
-}
-
-// ── Page export (Suspense boundary required by Next.js for useSearchParams) ──
-
-export default function ResetPasswordPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="space-y-4 animate-pulse">
-          <div className="h-8 w-48 rounded-md bg-muted" />
-          <div className="h-4 w-64 rounded-md bg-muted" />
-          <div className="h-11 w-full rounded-md bg-muted" />
-          <div className="h-11 w-full rounded-md bg-muted" />
-          <div className="h-11 w-full rounded-md bg-muted" />
-        </div>
-      }
-    >
-      <ResetPasswordForm />
-    </Suspense>
   );
 }

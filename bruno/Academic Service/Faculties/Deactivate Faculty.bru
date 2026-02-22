@@ -1,0 +1,45 @@
+meta {
+  name: Deactivate Faculty
+  type: http
+  seq: 5
+}
+
+docs {
+  # Deactivate Faculty
+
+  Deactivates a faculty, making it inactive in the system.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `super_admin` role required
+
+  ## URL Parameters
+  - `id`: Faculty UUID (required)
+
+  ## Request Body
+  - `is_active`: Set to false to deactivate (required)
+
+  ## Response
+  Returns 204 No Content on success.
+}
+
+patch {
+  url: {{FACULTIES_URL_V1}}/REPLACE_WITH_FACULTY_ID/deactivate
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "is_active": false
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

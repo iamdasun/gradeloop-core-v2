@@ -1,0 +1,50 @@
+meta {
+  name: Send Email (Custom)
+  type: http
+  seq: 1
+}
+
+docs {
+  # Send Email (Custom)
+
+  Sends a custom email without using a template.
+
+  ## Prerequisites
+  - None (internal service endpoint)
+
+  ## Request Body
+  - `subject`: Email subject line (required)
+  - `body_html`: HTML content of the email (optional)
+  - `body_text`: Plain text content of the email (optional)
+  - `recipients`: Array of recipient email addresses (required)
+  - `variables`: Optional key-value pairs for variable substitution
+
+  ## Response
+  Returns 202 Accepted with a message ID for tracking.
+}
+
+post {
+  url: {{EMAIL_URL_V1}}/send
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "subject": "Custom Email Subject",
+    "body_html": "<h1>Hello!</h1><p>This is a custom email with <strong>HTML</strong> content.</p>",
+    "body_text": "Hello! This is a custom email with plain text content.",
+    "recipients": [
+      "recipient@example.com"
+    ],
+    "variables": {
+      "name": "John Doe",
+      "custom_var": "Custom Value"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

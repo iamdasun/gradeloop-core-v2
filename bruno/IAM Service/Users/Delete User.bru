@@ -1,0 +1,36 @@
+meta {
+  name: Delete User
+  type: http
+  seq: 4
+}
+
+docs {
+  # Delete User (Soft Delete)
+
+  Soft deletes a user account. The user can be restored later using the Restore User endpoint.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `users:delete` permission
+
+  ## URL Parameters
+  - `id`: User UUID (required)
+
+  ## Response
+  Returns 204 No Content on success.
+}
+
+delete {
+  url: {{USERS_URL_V1}}/REPLACE_WITH_USER_ID
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

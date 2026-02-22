@@ -1,0 +1,35 @@
+meta {
+  name: Get Role by ID
+  type: http
+  seq: 2
+}
+
+docs {
+  # Get Role by ID
+
+  Retrieves detailed information about a specific role including its permissions.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+
+  ## URL Parameters
+  - `id`: Role UUID (required)
+
+  ## Response
+  Returns the role details with all associated permissions.
+}
+
+get {
+  url: {{ROLES_URL_V1}}/REPLACE_WITH_ROLE_ID
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

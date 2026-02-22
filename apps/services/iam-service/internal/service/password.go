@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/google/uuid"
+	"github.com/gradeloop/iam-service/internal/client"
 	"github.com/gradeloop/iam-service/internal/domain"
 	"github.com/gradeloop/iam-service/internal/dto"
 	"github.com/gradeloop/iam-service/internal/jwt"
@@ -46,6 +47,8 @@ type passwordService struct {
 	userRepo         repository.UserRepository
 	secretKey        []byte
 	resetTokenExpiry time.Duration
+	emailClient      *client.EmailClient
+	frontendURL      string
 }
 
 func NewPasswordService(
@@ -54,6 +57,8 @@ func NewPasswordService(
 	userRepo repository.UserRepository,
 	secretKey string,
 	resetTokenExpiryHours int64,
+	emailClient *client.EmailClient,
+	frontendURL string,
 ) PasswordService {
 	return &passwordService{
 		db:               db,
@@ -61,6 +66,8 @@ func NewPasswordService(
 		userRepo:         userRepo,
 		secretKey:        []byte(secretKey),
 		resetTokenExpiry: time.Duration(resetTokenExpiryHours) * time.Hour,
+		emailClient:      emailClient,
+		frontendURL:      frontendURL,
 	}
 }
 
@@ -160,12 +167,17 @@ func (s *passwordService) ForgotPassword(ctx context.Context, email string) (*dt
 		return nil, fmt.Errorf("storing reset token: %w", err)
 	}
 
-	// Generate reset link (in production, send via email)
-	resetLink := fmt.Sprintf("/auth/reset-password?token=%s", resetToken)
+	// Generate reset link
+	resetLink := fmt.Sprintf("%s/auth/reset-password?token=%s", s.frontendURL, resetToken)
 
-	// TODO: Send email with reset link
-	// For now, log the reset link (remove in production)
-	fmt.Printf("Password reset link for %s: %s\n", email, resetLink)
+	// Send password reset email
+	if s.emailClient != nil {
+		if err := s.emailClient.SendPasswordResetEmail(ctx, email, user.Username, resetLink); err != nil {
+			// Log the error but don't fail the request (for security, we don't reveal if email exists)
+			// In production, you might want to queue this for retry
+			fmt.Printf("Warning: Failed to send password reset email to %s: %v\n", email, err)
+		}
+	}
 
 	return &dto.ForgotPasswordResponse{
 		Message: "If an account exists with this email, a password reset link has been sent.",

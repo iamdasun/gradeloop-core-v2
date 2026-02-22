@@ -1,0 +1,31 @@
+meta {
+  name: Create User
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{USERS_URL_V1}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMjJhNTg4YjQtNjU5ZC00YzUxLTgxOGQtYTkxMDEzODJhYzA0IiwidXNlcm5hbWUiOiJzdXBlcmFkbWluQGdyYWRlbG9vcC5jb20iLCJyb2xlX25hbWUiOiJzdXBlcl9hZG1pbiIsInBlcm1pc3Npb25zIjpbInVzZXJzOnJlYWQiLCJ1c2Vyczp3cml0ZSIsInVzZXJzOmRlbGV0ZSIsInJvbGVzOnJlYWQiLCJyb2xlczp3cml0ZSIsInJvbGVzOmRlbGV0ZSIsInBlcm1pc3Npb25zOnJlYWQiLCJwZXJtaXNzaW9uczp3cml0ZSIsInN0dWRlbnRzOnJlYWQiLCJzdHVkZW50czp3cml0ZSIsImVtcGxveWVlczpyZWFkIiwiZW1wbG95ZWVzOndyaXRlIl0sImlzcyI6ImlhbS1zZXJ2aWNlIiwic3ViIjoiMjJhNTg4YjQtNjU5ZC00YzUxLTgxOGQtYTkxMDEzODJhYzA0IiwiZXhwIjoxNzcxNzQ1NTExLCJuYmYiOjE3NzE3NDQ2MTEsImlhdCI6MTc3MTc0NDYxMSwianRpIjoiYjc3ODAzMjItNzMyZS00NzdhLTk3YzMtYmE3ZGNhZjBlM2E0In0.0ngsboewEJuQNUxZVqB3CfnNEX0oAkYhgIqDY8ca0zI
+}
+
+body:json {
+  {
+    "permission":"users:write",
+    "username": "dasun.wickr@gmail.com",
+    "email": "dasun.wickr@gmail.com",
+    "role_id": "test_role_is",
+    "user_type": "employee",
+    "student_id": "IT22204202"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

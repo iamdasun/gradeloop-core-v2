@@ -1,0 +1,28 @@
+meta {
+  name: Service Info
+  type: http
+  seq: 1
+}
+
+docs {
+  # Service Info
+
+  Returns basic information about the Academic service including version and status.
+
+  ## Prerequisites
+  - None (public endpoint)
+
+  ## Response
+  Returns service name, version, and current status.
+}
+
+get {
+  url: {{ACADEMIC_BASE_URL}}/
+  body: none
+  auth: none
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

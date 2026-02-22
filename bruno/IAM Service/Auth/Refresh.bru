@@ -1,0 +1,27 @@
+meta {
+  name: Refresh
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{AUTH_URL_V1}}/refresh
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  if (res.status === 200) {
+    if (res.body.access_token) {
+      bru.setEnvVar("ACCESS_TOKEN", res.body.access_token);
+    }
+    if (res.body.refresh_token) {
+      bru.setEnvVar("REFRESH_TOKEN", res.body.refresh_token);
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

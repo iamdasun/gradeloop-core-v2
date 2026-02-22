@@ -1,0 +1,45 @@
+meta {
+  name: Activate
+  type: http
+  seq: 4
+}
+
+docs {
+  # Activate User Account
+
+  Activates a user account using the activation token received via email.
+
+  ## Prerequisites
+  - None (public endpoint)
+  - Activation token from user creation email
+
+  ## Request Body
+  - `token`: Activation token from email (required)
+  - `password`: New password for the account (required, min 8 characters)
+
+  ## Response
+  Returns a success message with the username.
+
+  ## Flow
+  1. Admin creates user → User receives activation email with token
+  2. User uses this endpoint with token to set password and activate account
+  3. User can now login with their credentials
+}
+
+post {
+  url: {{AUTH_URL_V1}}/activate
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "token": "REPLACE_WITH_ACTIVATION_TOKEN_FROM_EMAIL",
+    "password": "NewSecurePassword123!"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

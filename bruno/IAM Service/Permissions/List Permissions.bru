@@ -1,0 +1,32 @@
+meta {
+  name: List Permissions
+  type: http
+  seq: 1
+}
+
+docs {
+  # List Permissions
+
+  Retrieves a list of all available permissions in the system.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+
+  ## Response
+  Returns an array of all permissions with their IDs, names, and descriptions.
+}
+
+get {
+  url: {{PERMISSIONS_URL_V1}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

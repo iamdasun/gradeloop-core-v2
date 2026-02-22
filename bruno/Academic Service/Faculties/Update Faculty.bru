@@ -1,0 +1,60 @@
+meta {
+  name: Update Faculty
+  type: http
+  seq: 4
+}
+
+docs {
+  # Update Faculty
+
+  Updates an existing faculty's information including name, description, leaders, and active status.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `super_admin` role
+
+  ## URL Parameters
+  - `id`: Faculty UUID (required)
+
+  ## Request Body (all fields optional)
+  - `name`: Faculty name (min 3, max 255 characters)
+  - `description`: Faculty description
+  - `leaders`: Array of leader objects with user_id and role
+  - `is_active`: Boolean to activate/deactivate the faculty
+
+  ## Response
+  Returns the updated faculty details with all leaders.
+}
+
+put {
+  url: {{FACULTIES_URL_V1}}/REPLACE_WITH_FACULTY_ID
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "name": "Updated Faculty Name",
+    "description": "Updated description of the faculty",
+    "leaders": [
+      {
+        "user_id": "REPLACE_WITH_USER_ID",
+        "role": "Dean"
+      },
+      {
+        "user_id": "REPLACE_WITH_USER_ID_2",
+        "role": "Vice Dean"
+      }
+    ],
+    "is_active": true
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

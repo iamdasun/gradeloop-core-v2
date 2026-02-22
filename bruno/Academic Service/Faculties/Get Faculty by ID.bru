@@ -1,0 +1,36 @@
+meta {
+  name: Get Faculty by ID
+  type: http
+  seq: 2
+}
+
+docs {
+  # Get Faculty by ID
+
+  Retrieves detailed information about a specific faculty including its leaders.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `super_admin` role required
+
+  ## URL Parameters
+  - `id`: Faculty UUID (required)
+
+  ## Response
+  Returns the faculty details with all associated leaders.
+}
+
+get {
+  url: {{FACULTIES_URL_V1}}/REPLACE_WITH_FACULTY_ID
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

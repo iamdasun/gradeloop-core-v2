@@ -1,0 +1,45 @@
+meta {
+  name: Assign Permission
+  type: http
+  seq: 6
+}
+
+docs {
+  # Assign Permission to Role
+
+  Assigns a specific permission to an existing role.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `roles:write` permission
+
+  ## URL Parameters
+  - `id`: Role UUID (required)
+
+  ## Request Body
+  - `permission_id`: UUID of the permission to assign (required)
+
+  ## Response
+  Returns a success message confirming the permission was assigned.
+}
+
+post {
+  url: {{ROLES_URL_V1}}/REPLACE_WITH_ROLE_ID/permissions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "permission_id": "REPLACE_WITH_PERMISSION_ID"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

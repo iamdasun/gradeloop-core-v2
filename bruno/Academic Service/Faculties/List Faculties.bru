@@ -1,0 +1,33 @@
+meta {
+  name: List Faculties
+  type: http
+  seq: 1
+}
+
+docs {
+  # List Faculties
+
+  Retrieves a list of all faculties with their leaders.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `super_admin` role required
+
+  ## Response
+  Returns an array of all faculties with their details and associated leaders.
+}
+
+get {
+  url: {{FACULTIES_URL_V1}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

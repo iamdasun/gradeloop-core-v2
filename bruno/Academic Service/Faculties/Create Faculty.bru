@@ -1,0 +1,55 @@
+meta {
+  name: Create Faculty
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{FACULTIES_URL_V1}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "name": "Faculty of Computing",
+    "code": "FOC",
+    "description": "Faculty of Computing and Information Technology",
+    "leaders": [
+      {
+        "user_id": "b2a03077-32b7-4f52-b51b-d7fd47edc57d",
+        "role": "Dean"
+      }
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Create Faculty
+  
+  Creates a new faculty with optional leadership assignments.
+  
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `super_admin` role required
+  
+  ## Request Body
+  - `name`: Faculty name (required, min 3, max 255 characters)
+  - `code`: Faculty code (required, min 2, max 50 characters)
+  - `description`: Description of the faculty (optional)
+  - `leaders`: Array of leadership objects (optional)
+    - `user_id`: UUID of the user (required)
+    - `role`: Leadership role/position (required, min 3, max 100 characters)
+  
+  ## Response
+  Returns the created faculty with its ID, leaders, and timestamps.
+}

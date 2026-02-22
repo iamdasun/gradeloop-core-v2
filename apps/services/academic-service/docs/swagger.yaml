@@ -1,0 +1,359 @@
+basePath: /api/v1
+definitions:
+  github_com_gradeloop_academic-service_internal_dto.CreateFacultyRequest:
+    properties:
+      code:
+        maxLength: 50
+        minLength: 2
+        type: string
+      description:
+        type: string
+      leaders:
+        items:
+          $ref: '#/definitions/github_com_gradeloop_academic-service_internal_dto.CreateLeadershipRequest'
+        minItems: 1
+        type: array
+      name:
+        maxLength: 255
+        minLength: 3
+        type: string
+    required:
+    - code
+    - leaders
+    - name
+    type: object
+  github_com_gradeloop_academic-service_internal_dto.CreateLeadershipRequest:
+    properties:
+      role:
+        maxLength: 100
+        minLength: 3
+        type: string
+      user_id:
+        type: string
+    required:
+    - role
+    - user_id
+    type: object
+  github_com_gradeloop_academic-service_internal_dto.FacultyLeadershipResponse:
+    properties:
+      created_at:
+        type: string
+      faculty_id:
+        type: string
+      is_active:
+        type: boolean
+      role:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  github_com_gradeloop_academic-service_internal_dto.FacultyResponse:
+    properties:
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      leaders:
+        items:
+          $ref: '#/definitions/github_com_gradeloop_academic-service_internal_dto.FacultyLeadershipResponse'
+        type: array
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_gradeloop_academic-service_internal_dto.UpdateFacultyRequest:
+    properties:
+      description:
+        type: string
+      is_active:
+        type: boolean
+      leaders:
+        items:
+          $ref: '#/definitions/github_com_gradeloop_academic-service_internal_dto.CreateLeadershipRequest'
+        type: array
+      name:
+        maxLength: 255
+        minLength: 3
+        type: string
+    type: object
+host: localhost:8000
+info:
+  contact:
+    email: support@gradeloop.com
+    name: GradeLoop API Support
+  description: Academic Service for managing faculties and academic structures in
+    GradeLoop platform
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: GradeLoop Academic Service API
+  version: "1.0"
+paths:
+  /faculties:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all faculties
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Faculties retrieved successfully
+          schema:
+            items:
+              $ref: '#/definitions/github_com_gradeloop_academic-service_internal_dto.FacultyResponse'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all faculties
+      tags:
+      - Faculties
+    post:
+      consumes:
+      - application/json
+      description: Create a new faculty (super admin only)
+      parameters:
+      - description: Faculty creation details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_gradeloop_academic-service_internal_dto.CreateFacultyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Faculty created successfully
+          schema:
+            $ref: '#/definitions/github_com_gradeloop_academic-service_internal_dto.FacultyResponse'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create faculty
+      tags:
+      - Faculties
+  /faculties/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific faculty
+      parameters:
+      - description: Faculty ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Faculty retrieved successfully
+          schema:
+            $ref: '#/definitions/github_com_gradeloop_academic-service_internal_dto.FacultyResponse'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Faculty not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get faculty by ID
+      tags:
+      - Faculties
+    put:
+      consumes:
+      - application/json
+      description: Update an existing faculty (super admin only)
+      parameters:
+      - description: Faculty ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Faculty update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_gradeloop_academic-service_internal_dto.UpdateFacultyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Faculty updated successfully
+          schema:
+            $ref: '#/definitions/github_com_gradeloop_academic-service_internal_dto.FacultyResponse'
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Faculty not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update faculty
+      tags:
+      - Faculties
+  /faculties/{id}/deactivate:
+    patch:
+      consumes:
+      - application/json
+      description: Deactivate a faculty (super admin only)
+      parameters:
+      - description: Faculty ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Faculty deactivated successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Faculty not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Deactivate faculty
+      tags:
+      - Faculties
+  /faculties/{id}/leaders:
+    get:
+      consumes:
+      - application/json
+      description: Get all leadership positions for a specific faculty
+      parameters:
+      - description: Faculty ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Faculty leaders retrieved successfully
+          schema:
+            items:
+              $ref: '#/definitions/github_com_gradeloop_academic-service_internal_dto.FacultyLeadershipResponse'
+            type: array
+        "400":
+          description: Invalid request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Faculty not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get faculty leaders
+      tags:
+      - Faculties
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

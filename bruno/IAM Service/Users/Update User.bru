@@ -1,0 +1,47 @@
+meta {
+  name: Update User
+  type: http
+  seq: 3
+}
+
+docs {
+  # Update User
+
+  Updates an existing user's role or active status.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `users:write` permission
+
+  ## URL Parameters
+  - `id`: User UUID (required)
+
+  ## Request Body (all fields optional)
+  - `role_id`: UUID of the new role
+  - `is_active`: Boolean to activate/deactivate the user
+
+  ## Response
+  Returns the updated user details.
+}
+
+put {
+  url: {{USERS_URL_V1}}/REPLACE_WITH_USER_ID
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "role_id": "REPLACE_WITH_VALID_ROLE_ID",
+    "is_active": true
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

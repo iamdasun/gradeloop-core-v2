@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gradeloop/iam-service/internal/client"
 	"github.com/gradeloop/iam-service/internal/domain"
 	"github.com/gradeloop/iam-service/internal/dto"
 	"github.com/gradeloop/iam-service/internal/jwt"
@@ -40,6 +41,8 @@ type userService struct {
 	userRepo              repository.UserRepository
 	secretKey             []byte
 	activationTokenExpiry time.Duration
+	emailClient           *client.EmailClient
+	frontendURL           string
 }
 
 func NewUserService(
@@ -47,12 +50,16 @@ func NewUserService(
 	userRepo repository.UserRepository,
 	secretKey string,
 	activationTokenExpiryHours int64,
+	emailClient *client.EmailClient,
+	frontendURL string,
 ) UserService {
 	return &userService{
 		db:                    db,
 		userRepo:              userRepo,
 		secretKey:             []byte(secretKey),
 		activationTokenExpiry: time.Duration(activationTokenExpiryHours) * time.Hour,
+		emailClient:           emailClient,
+		frontendURL:           frontendURL,
 	}
 }
 
@@ -182,8 +189,17 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 		return nil, fmt.Errorf("generating activation token: %w", err)
 	}
 
-	// Create activation link (simulate email)
-	activationLink := fmt.Sprintf("/auth/activate?token=%s", activationToken)
+	// Create activation link
+	activationLink := fmt.Sprintf("%s/auth/activate?token=%s", s.frontendURL, activationToken)
+
+	// Send activation email
+	if s.emailClient != nil {
+		if err := s.emailClient.SendActivationEmail(ctx, user.Email, user.Username, activationLink); err != nil {
+			// Log the error but don't fail the user creation
+			// In production, you might want to queue this for retry
+			fmt.Printf("Warning: Failed to send activation email to %s: %v\n", user.Email, err)
+		}
+	}
 
 	return &dto.CreateUserResponse{
 		ID:             user.ID,
@@ -192,7 +208,7 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 		RoleID:         roleID,
 		IsActive:       user.IsActive,
 		ActivationLink: activationLink,
-		Message:        fmt.Sprintf("User created. Activation link expires at %s", expiresAt.Format(time.RFC3339)),
+		Message:        fmt.Sprintf("User created successfully. An activation email has been sent to %s. The link expires at %s", user.Email, expiresAt.Format(time.RFC3339)),
 	}, nil
 }
 

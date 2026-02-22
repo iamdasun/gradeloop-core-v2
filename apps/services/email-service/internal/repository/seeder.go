@@ -10,6 +10,61 @@ import (
 func SeedTemplates(db *gorm.DB) {
 	templates := []domain.EmailTemplate{
 		{
+			Name:    "user_activation",
+			Subject: "Activate Your GradeLoop Account",
+			BodyHTML: `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .header { background-color: #2196F3; color: white; padding: 10px; text-align: center; border-radius: 5px 5px 0 0; }
+        .content { padding: 20px; }
+        .button { display: inline-block; padding: 10px 20px; color: white; background-color: #2196F3; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+        .footer { margin-top: 20px; font-size: 0.8em; color: #777; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Welcome to GradeLoop</h2>
+        </div>
+        <div class="content">
+            <p>Hello {{username}},</p>
+            <p>Your GradeLoop account has been created successfully by an administrator.</p>
+            <p>To activate your account and set your password, please click the button below:</p>
+            <p style="text-align:center;">
+                <a href="{{activation_link}}" class="button">Activate Account</a>
+            </p>
+            <p>If the button doesn't work, copy and paste the following link into your browser:</p>
+            <p>{{activation_link}}</p>
+            <p><strong>Note:</strong> This activation link will expire in 24 hours.</p>
+            <p>If you did not expect this email, please contact support.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 GradeLoop. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>`,
+			BodyText: `Hello {{username}},
+
+Your GradeLoop account has been created successfully by an administrator.
+
+To activate your account and set your password, please visit the following link:
+{{activation_link}}
+
+Note: This activation link will expire in 24 hours.
+
+If you did not expect this email, please contact support.
+
+Best regards,
+The GradeLoop Team`,
+			IsActive: true,
+			Version:  1,
+		},
+		{
 			Name:    "welcome_email",
 			Subject: "Welcome to GradeLoop - Your Account Details",
 			BodyHTML: `

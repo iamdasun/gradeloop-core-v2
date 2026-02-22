@@ -1,0 +1,36 @@
+meta {
+  name: Delete Role
+  type: http
+  seq: 5
+}
+
+docs {
+  # Delete Role
+
+  Deletes a role from the system. System roles cannot be deleted.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `roles:delete` permission
+
+  ## URL Parameters
+  - `id`: Role UUID (required)
+
+  ## Response
+  Returns 204 No Content on success.
+}
+
+delete {
+  url: {{ROLES_URL_V1}}/REPLACE_WITH_ROLE_ID
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -21,7 +21,7 @@ services:
     networks:
       - gradeloop-network
     healthcheck:
-      test: [ "CMD", "traefik", "healthcheck" ]
+      test: ["CMD", "traefik", "healthcheck"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -84,7 +84,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081/health" ]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -106,6 +106,13 @@ services:
       dockerfile: Dockerfile
     container_name: email-service
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.email.rule=PathPrefix(`/api/v1/emails`)"
+      - "traefik.http.routers.email.entrypoints=web"
+      - "traefik.http.services.email-service.loadbalancer.server.port=8082"
+      # Apply middlewares (sharing the same limits as others if desired, or none)
+      - "traefik.http.routers.email.middlewares=limit"
 
     env_file:
       - .env
@@ -139,6 +146,70 @@ services:
         compress: "true"
 
   # =============================================================================
+  # Academic Service (Go Fiber)
+  # =============================================================================
+  academic-service:
+    build:
+      context: ./apps/services/academic-service
+      dockerfile: Dockerfile
+    container_name: academic-service
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/faculties`)"
+      - "traefik.http.routers.academic.entrypoints=web"
+      - "traefik.http.services.academic-service.loadbalancer.server.port=8083"
+      # Request Size Limiting (1MB)
+      - "traefik.http.middlewares.academic-limit.buffering.maxRequestBodyBytes=1048576"
+      # Rate Limiting
+      - "traefik.http.middlewares.academic-ratelimit.ratelimit.average=500"
+      - "traefik.http.middlewares.academic-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.academic-ratelimit.ratelimit.burst=50"
+      # Apply middlewares
+      - "traefik.http.routers.academic.middlewares=academic-limit,academic-ratelimit"
+
+    env_file:
+      - .env
+
+    environment:
+      - SERVER_PORT=${ACADEMIC_SVC_PORT}
+      - ENABLE_PREFORK=${ACADEMIC_SVC_ENABLE_PREFORK}
+      - DB_HOST=${GRA_DB_HOST}
+      - DB_PORT=${GRA_DB_PORT}
+      - DB_USER=${GRA_DB_USER}
+      - DB_PASSWORD=${GRA_DB_PASSWORD}
+      - DB_NAME=${ACADEMIC_SVC_DB_NAME}
+      - DB_SSLMODE=${GRA_DB_SSLMODE}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - EMAIL_SERVICE_URL=http://email-service:8082
+      - IAM_SERVICE_URL=http://iam-service:8081
+
+    expose:
+      - "8083"
+
+    depends_on:
+      iam-service:
+        condition: service_healthy
+
+    networks:
+      - gradeloop-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # =============================================================================
   # RabbitMQ (Message Broker)
   # =============================================================================
   rabbitmq:
@@ -158,7 +229,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 30s
       timeout: 10s
       retries: 5

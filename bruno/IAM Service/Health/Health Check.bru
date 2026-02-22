@@ -1,0 +1,28 @@
+meta {
+  name: Health Check
+  type: http
+  seq: 2
+}
+
+docs {
+  # Health Check
+
+  Check if the IAM service is healthy and responding.
+
+  ## Prerequisites
+  - None (public endpoint)
+
+  ## Response
+  Returns the health status of the service.
+}
+
+get {
+  url: {{IAM_BASE_URL}}/health
+  body: none
+  auth: none
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -1,0 +1,35 @@
+meta {
+  name: Get Email Status
+  type: http
+  seq: 1
+}
+
+docs {
+  # Get Email Status
+
+  Retrieves the status and tracking information for a specific email message.
+
+  ## Prerequisites
+  - None (internal service endpoint)
+
+  ## URL Parameters
+  - `id`: Message UUID (required)
+
+  ## Response
+  Returns detailed information about the email including:
+  - Current status (queued, sent, failed)
+  - Subject and template information
+  - Retry count
+  - Recipient details with open and click tracking
+}
+
+get {
+  url: {{EMAIL_URL_V1}}/status/REPLACE_WITH_MESSAGE_ID
+  body: none
+  auth: none
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

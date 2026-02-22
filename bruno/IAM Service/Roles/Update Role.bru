@@ -1,0 +1,52 @@
+meta {
+  name: Update Role
+  type: http
+  seq: 4
+}
+
+docs {
+  # Update Role
+
+  Updates an existing role's name, user type, and permissions.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `roles:write` permission
+
+  ## URL Parameters
+  - `id`: Role UUID (required)
+
+  ## Request Body
+  - `name`: New role name (required, string)
+  - `user_type`: Type of user - "student", "employee", or "all" (required)
+  - `permission_ids`: Array of permission UUIDs to assign to the role
+
+  ## Response
+  Returns the updated role with its assigned permissions.
+}
+
+put {
+  url: {{ROLES_URL_V1}}/REPLACE_WITH_ROLE_ID
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "name": "Updated Role Name",
+    "user_type": "employee",
+    "permission_ids": [
+      "REPLACE_WITH_PERMISSION_ID_1",
+      "REPLACE_WITH_PERMISSION_ID_2"
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

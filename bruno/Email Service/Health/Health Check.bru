@@ -1,0 +1,28 @@
+meta {
+  name: Health Check
+  type: http
+  seq: 1
+}
+
+docs {
+  # Health Check
+
+  Check if the Email service is healthy and responding.
+
+  ## Prerequisites
+  - None (internal service endpoint)
+
+  ## Response
+  Returns the health status and service name.
+}
+
+get {
+  url: {{EMAIL_BASE_URL}}/health
+  body: none
+  auth: none
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

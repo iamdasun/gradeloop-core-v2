@@ -1,0 +1,31 @@
+meta {
+  name: Get Template
+  type: http
+  seq: 2
+}
+
+docs {
+  # Get Template
+
+  Retrieves a specific email template by its ID.
+
+  ## Prerequisites
+  - None (internal service endpoint)
+
+  ## URL Parameters
+  - `id`: Template UUID (required)
+
+  ## Response
+  Returns the template details including subject, HTML body, and text body.
+}
+
+get {
+  url: {{EMAIL_URL_V1}}/templates/REPLACE_WITH_TEMPLATE_ID
+  body: none
+  auth: none
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

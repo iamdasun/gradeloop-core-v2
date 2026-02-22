@@ -1,0 +1,34 @@
+meta {
+  name: Academic Service
+}
+
+docs {
+  ✅ ISSUE RESOLVED: Academic Service now works with IAM tokens!
+  
+  WHAT WAS FIXED:
+  - Updated Academic Service middleware to accept IAM Service JWT format
+  - Added role name normalization (handles "Super Admin" vs "super_admin")
+  - Changed Claims struct to match IAM token structure (user_id as UUID string, role_name instead of roles array)
+  
+  STATUS: All endpoints fully functional
+  
+  AVAILABLE ENDPOINTS: 8 requests
+  - List Faculties
+  - Create Faculty
+  - Get Faculty by ID
+  - Update Faculty
+  - Deactivate Faculty
+  - Get Faculty Leaders
+  
+  REQUIREMENTS:
+  - Valid access token from IAM Service (run Login first)
+  - super_admin role required for all endpoints
+  
+  USAGE:
+  1. Run: IAM Service > Auth > Login
+  2. Tokens automatically saved
+  3. Access any Academic Service endpoint
+  4. All requests work seamlessly!
+  
+  See: BUG_REPORT_JWT_INCOMPATIBILITY.md for details on the fix applied.
+}

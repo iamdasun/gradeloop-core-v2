@@ -1,0 +1,46 @@
+meta {
+  name: Create Template
+  type: http
+  seq: 1
+}
+
+docs {
+  # Create Template
+
+  Creates a new email template in the system.
+
+  ## Prerequisites
+  - None (internal service endpoint)
+
+  ## Request Body
+  - `name`: Unique template name (required)
+  - `subject`: Email subject line (required)
+  - `body_html`: HTML content of the template (required)
+  - `body_text`: Plain text version of the template (optional)
+
+  ## Template Variables
+  Templates can include variables using double curly braces: {{variable_name}}
+
+  ## Response
+  Returns the created template with its UUID and timestamps.
+}
+
+post {
+  url: {{EMAIL_URL_V1}}/templates
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "custom_template",
+    "subject": "Welcome to {{app_name}}",
+    "body_html": "<html><body><h1>Hello {{name}}</h1><p>Welcome to our platform! Click <a href='{{link}}'>here</a> to get started.</p></body></html>",
+    "body_text": "Hello {{name}}, Welcome to our platform! Visit {{link}} to get started."
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

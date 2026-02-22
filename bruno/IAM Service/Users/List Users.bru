@@ -1,0 +1,44 @@
+meta {
+  name: List Users
+  type: http
+  seq: 1
+}
+
+docs {
+  # List Users
+
+  Retrieves a paginated list of users with optional filtering.
+
+  ## Prerequisites
+  - Valid access token (run Login request first)
+  - `users:read` permission
+
+  ## Query Parameters
+  - `page`: Page number (default: 1)
+  - `limit`: Number of users per page (default: 10)
+  - `user_type`: Filter by user type - "student", "employee", or "all" (default: "all")
+
+  ## Response
+  Returns a paginated list of users with their details including role information.
+}
+
+get {
+  url: {{USERS_URL_V1}}?page=1&limit=10&user_type=all
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 10
+  user_type: all
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
