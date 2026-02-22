@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -100,6 +101,35 @@ func RequireRole(role string) fiber.Handler {
 			return c.Next()
 		}
 
+		return utils.ErrForbidden("Insufficient role")
+	}
+}
+
+// RequireAnyRole checks if the user has any of the required roles
+// Supports both formats: "Super Admin" and "super_admin"
+func RequireAnyRole(roles ...string) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		roleName, ok := c.Locals("role_name").(string)
+		if !ok || roleName == "" {
+			fmt.Printf("[DEBUG RequireAnyRole] No role found in locals\n")
+			return utils.ErrForbidden("No role found")
+		}
+
+		// Normalize user's role
+		normalizedUserRole := normalizeRole(roleName)
+		fmt.Printf("[DEBUG RequireAnyRole] User role: '%s' -> normalized: '%s'\n", roleName, normalizedUserRole)
+
+		// Check if user has any of the required roles
+		for _, role := range roles {
+			normalizedRequiredRole := normalizeRole(role)
+			fmt.Printf("[DEBUG RequireAnyRole] Checking against: '%s' -> normalized: '%s'\n", role, normalizedRequiredRole)
+			if normalizedUserRole == normalizedRequiredRole {
+				fmt.Printf("[DEBUG RequireAnyRole] ✓ MATCH! Allowing access\n")
+				return c.Next()
+			}
+		}
+
+		fmt.Printf("[DEBUG RequireAnyRole] ✗ NO MATCH! User role '%s' not in %v\n", normalizedUserRole, roles)
 		return utils.ErrForbidden("Insufficient role")
 	}
 }

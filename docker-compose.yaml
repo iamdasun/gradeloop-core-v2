@@ -37,7 +37,7 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.iam.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.iam.rule=PathPrefix(`/api/v1/auth`) || PathPrefix(`/api/v1/users`) || PathPrefix(`/api/v1/tokens`)"
       - "traefik.http.routers.iam.entrypoints=web"
       - "traefik.http.services.iam-service.loadbalancer.server.port=8081"
       # Request Size Limiting (1MB)
@@ -156,7 +156,8 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/faculties`)"
+      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/departments`) || PathPrefix(`/api/v1/faculties`) || PathPrefix(`/api/v1/debug`)"
+      - "traefik.http.routers.academic.priority=100"
       - "traefik.http.routers.academic.entrypoints=web"
       - "traefik.http.services.academic-service.loadbalancer.server.port=8083"
       # Request Size Limiting (1MB)

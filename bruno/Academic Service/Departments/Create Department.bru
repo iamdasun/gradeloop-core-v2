@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{DEPARTMENTS_URL_V1}}
+  url: {{DEPARTMENTS_URL_V1}}/
   body: json
   auth: bearer
 }
@@ -16,7 +16,7 @@ auth:bearer {
 
 body:json {
   {
-    "faculty_id": "REPLACE_WITH_FACULTY_ID",
+    "faculty_id": "d261ab7b-7224-4357-8a18-aebc459881e6",
     "name": "Department of Artificial Intelligence",
     "code": "AI",
     "description": "Department focusing on AI and Machine Learning"
@@ -30,26 +30,26 @@ settings {
 
 docs {
   # Create Department
-
+  
   Creates a new department under a specific faculty.
-
+  
   ## Prerequisites
   - Valid access token (run Login request first)
   - `super_admin` or `faculty_admin` role required
   - Faculty must exist and not be deleted
-
+  
   ## Request Body
   - `faculty_id`: UUID of the parent faculty (required)
   - `name`: Department name (required, min 3, max 255 characters)
   - `code`: Department code (required, min 2, max 50 characters, unique per faculty)
   - `description`: Description of the department (optional)
-
+  
   ## Business Rules
   - Department code must be unique within the faculty
   - Department cannot exist without a valid faculty
   - Faculty must exist and not be soft-deleted
   - Department is created with `is_active = true` by default
-
+  
   ## Response
   Returns 201 Created with the created department including:
   - Department ID

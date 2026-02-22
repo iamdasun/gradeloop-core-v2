@@ -5,7 +5,7 @@ meta {
 }
 
 get {
-  url: {{FACULTIES_URL_V1}}/REPLACE_WITH_FACULTY_ID/departments?include_inactive=false
+  url: {{FACULTIES_URL_V1}}/d261ab7b-7224-4357-8a18-aebc459881e6/departments?include_inactive=false
   body: none
   auth: bearer
 }
@@ -25,22 +25,22 @@ settings {
 
 docs {
   # List Departments by Faculty
-
+  
   Retrieves all departments under a specific faculty.
-
+  
   ## Prerequisites
   - Valid access token (run Login request first)
   - `super_admin` or `faculty_admin` role required
   - Faculty must exist
-
+  
   ## URL Parameters
   - `id`: UUID of the faculty (required)
-
+  
   ## Query Parameters
   - `include_inactive`: Boolean (default: false)
     - `false`: Returns only active departments (is_active = true)
     - `true`: Returns both active and inactive departments
-
+  
   ## Response
   Returns 200 OK with a list of departments:
   ```json
@@ -60,24 +60,24 @@ docs {
     "count": 1
   }
   ```
-
+  
   ## Business Rules
   - Only non-deleted departments are returned (deleted_at IS NULL)
   - By default, only active departments are included
   - Departments are ordered by creation date (newest first)
   - Includes faculty relationship data for each department
-
+  
   ## Faculty Ownership Enforcement
   - If faculty is inactive and `include_inactive=false`, returns all departments with is_active=false (Option B)
   - This implements cascade soft delete: when faculty is deactivated, all its departments are automatically deactivated
   - No orphan departments are possible - faculty must exist
-
+  
   ## Error Responses
   - 400 Bad Request: Invalid faculty ID format
   - 404 Not Found: Faculty does not exist
   - 401 Unauthorized: Missing or invalid access token
   - 403 Forbidden: Insufficient permissions
-
+  
   ## Use Cases
   - View all departments under a specific faculty
   - Faculty administration
