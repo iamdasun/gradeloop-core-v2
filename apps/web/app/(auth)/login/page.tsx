@@ -43,12 +43,12 @@ export default function LoginPage() {
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
+    const username = formData.get("username") as string;
     const password = formData.get("password") as string;
 
     try {
       const response = await authApi.login({
-        username: email, // IAM expects `username` field
+        username,
         password,
       });
 
@@ -72,7 +72,7 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Login to your account</CardTitle>
           <CardDescription>
-            Enter your email below to login to your account
+            Enter your username or email below to login to your account
           </CardDescription>
           {/*<CardAction>
             <Link href="/signup">
@@ -94,15 +94,15 @@ export default function LoginPage() {
               )}
 
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="username">Username or Email</Label>
                 <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="m@example.com"
+                  id="username"
+                  name="username"
+                  type="text"
+                  placeholder="superadmin@gradeloop.com"
                   required
                   disabled={isLoading}
-                  autoComplete="email"
+                  autoComplete="username"
                 />
               </div>
 

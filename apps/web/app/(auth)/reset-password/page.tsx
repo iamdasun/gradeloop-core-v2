@@ -17,6 +17,16 @@ import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api/auth";
 import { handleApiError } from "@/lib/api/axios";
 
+function isStrongPassword(password: string): boolean {
+  return (
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-z0-9]/.test(password)
+  );
+}
+
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -44,8 +54,10 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (password.length < 8) {
-      setValidationError("Password must be at least 8 characters long");
+    if (!isStrongPassword(password)) {
+      setValidationError(
+        "Password must be at least 8 characters and include uppercase, lowercase, number, and special character",
+      );
       return;
     }
 
@@ -179,7 +191,7 @@ export default function ResetPasswordPage() {
                   </button>
                 </div>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Password must be at least 8 characters
+                  Must include uppercase, lowercase, number, and special character
                 </p>
               </div>
 

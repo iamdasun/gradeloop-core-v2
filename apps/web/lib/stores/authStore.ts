@@ -7,9 +7,11 @@ import { decodeJwtPayload } from '@/lib/auth/jwt-decode';
 // Role → dashboard path map
 // ---------------------------------------------------------------------------
 const ROLE_DASHBOARD_MAP: Record<string, string> = {
+  super_admin: '/admin',
   admin: '/admin',
   administrator: '/admin',
   superadmin: '/admin',
+  employee: '/admin',
   instructor: '/instructor',
   teacher: '/instructor',
   student: '/student',
@@ -149,7 +151,10 @@ export const useAuthStore = create<AuthState>()(
           set({ accessToken: newToken, user, isAuthenticated: true });
         } catch {
           // No cookie / expired — user must log in. This is expected on first load.
-          set({ accessToken: null, isAuthenticated: false });
+          // Guard against races where a real login finished while hydration was in-flight.
+          if (!get().isAuthenticated) {
+            set({ accessToken: null, isAuthenticated: false });
+          }
         } finally {
           set({ isLoading: false, isHydrated: true });
         }

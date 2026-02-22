@@ -31,7 +31,9 @@ export function decodeJwtPayload(token: string): IamTokenClaims | null {
     if (parts.length !== 3) return null;
 
     // base64url → base64 → JSON
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const base64Url = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
+    const base64 = base64Url + padding;
     const json = atob(base64);
     return JSON.parse(json) as IamTokenClaims;
   } catch {

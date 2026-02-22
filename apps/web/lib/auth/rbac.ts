@@ -9,9 +9,11 @@
 // Role → dashboard route mapping
 // ---------------------------------------------------------------------------
 export const ROLE_DASHBOARD_MAP: Record<string, string> = {
+  super_admin: '/admin',
   admin: '/admin',
   administrator: '/admin',
   superadmin: '/admin',
+  employee: '/admin',
   instructor: '/instructor',
   teacher: '/instructor',
   student: '/student',
