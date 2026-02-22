@@ -52,7 +52,8 @@ export default function LoginPage() {
         password,
       });
 
-      // Decode JWT claims and populate the store (no user object in response)
+      // Decode JWT claims and populate the store.
+      // The refresh token is set as an HttpOnly cookie by the server automatically.
       setSession(response.access_token);
 
       // Read the redirect path after setSession so role is already resolved
