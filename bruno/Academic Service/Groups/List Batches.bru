@@ -14,6 +14,10 @@ auth:bearer {
   token: {{ACCESS_TOKEN}}
 }
 
+vars:pre-request {
+  INCLUDE_INACTIVE: true
+}
+
 script:post-response {
   if (res.status === 200) {
     const batches = res.body.batches;
@@ -38,21 +42,21 @@ settings {
 
 docs {
   # List Batches
-
+  
   Returns a flat list of all batches (active by default).
-
+  
   ## Endpoint
   GET /api/v1/batches
-
+  
   ## Authentication
   - Requires a valid bearer access token (run the IAM Login request first).
   - Caller must have `super_admin` or `faculty_admin` role.
-
+  
   ## Query Parameters
   - `include_inactive` (boolean, optional, default: false)
     - false => return only active batches (is_active = true, deleted_at IS NULL)
     - true  => include inactive batches (is_active may be false; soft-deleted excluded)
-
+  
   ## Response (200 OK)
   {
     "batches": [
@@ -72,12 +76,12 @@ docs {
     ],
     "count": 1
   }
-
+  
   ## Notes
   - Returns ALL batches (root and child) in a flat structure ordered by creation time.
   - To get a hierarchical tree view use GET /api/v1/batches/tree instead.
   - Soft-deleted batches (deleted_at IS NOT NULL) are never returned.
-
+  
   ## Error Responses
   - 400 Bad Request  — invalid query parameters
   - 401 Unauthorized — missing or invalid token

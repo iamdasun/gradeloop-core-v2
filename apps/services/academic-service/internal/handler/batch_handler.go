@@ -35,7 +35,7 @@ func (h *BatchHandler) CreateBatch(c fiber.Ctx) error {
 		return utils.ErrBadRequest("invalid request body")
 	}
 
-	username := h.requireUsername(c)
+	username := requireUsername(c)
 	if username == "" {
 		return utils.ErrUnauthorized("user not authenticated")
 	}
@@ -64,7 +64,7 @@ func (h *BatchHandler) UpdateBatch(c fiber.Ctx) error {
 		return utils.ErrBadRequest("invalid request body")
 	}
 
-	username := h.requireUsername(c)
+	username := requireUsername(c)
 	if username == "" {
 		return utils.ErrUnauthorized("user not authenticated")
 	}
@@ -88,7 +88,7 @@ func (h *BatchHandler) DeactivateBatch(c fiber.Ctx) error {
 		return err
 	}
 
-	username := h.requireUsername(c)
+	username := requireUsername(c)
 	if username == "" {
 		return utils.ErrUnauthorized("user not authenticated")
 	}
@@ -214,13 +214,6 @@ func (h *BatchHandler) toBatchResponse(b *domain.Batch) *dto.BatchResponse {
 		CreatedAt:        b.CreatedAt,
 		UpdatedAt:        b.UpdatedAt,
 	}
-}
-
-// requireUsername extracts the username claim from Fiber context locals.
-// Returns an empty string when the claim is absent or not a string.
-func (h *BatchHandler) requireUsername(c fiber.Ctx) string {
-	username, _ := c.Locals("username").(string)
-	return username
 }
 
 // parseUUID parses a named route parameter as a UUID and returns a descriptive

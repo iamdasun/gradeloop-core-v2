@@ -10,13 +10,17 @@ import (
 )
 
 type Config struct {
-	HealthHandler         *handler.HealthHandler
-	FacultyHandler        *handler.FacultyHandler
-	DepartmentHandler     *handler.DepartmentHandler
-	DegreeHandler         *handler.DegreeHandler
-	SpecializationHandler *handler.SpecializationHandler
-	BatchHandler          *handler.BatchHandler
-	JWTSecretKey          []byte
+	HealthHandler           *handler.HealthHandler
+	FacultyHandler          *handler.FacultyHandler
+	DepartmentHandler       *handler.DepartmentHandler
+	DegreeHandler           *handler.DegreeHandler
+	SpecializationHandler   *handler.SpecializationHandler
+	BatchHandler            *handler.BatchHandler
+	BatchMemberHandler      *handler.BatchMemberHandler
+	CourseInstanceHandler   *handler.CourseInstanceHandler
+	CourseInstructorHandler *handler.CourseInstructorHandler
+	EnrollmentHandler       *handler.EnrollmentHandler
+	JWTSecretKey            []byte
 }
 
 // requireAdminRole is a custom middleware that checks for super_admin OR faculty_admin
@@ -92,9 +96,11 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	specializations.Put("/:id", cfg.SpecializationHandler.UpdateSpecialization)
 	specializations.Patch("/:id/deactivate", cfg.SpecializationHandler.DeactivateSpecialization)
 
+	// ─────────────────────────────────────────────────────────────────────────
 	// Batch / Group routes - Super Admin OR Faculty Admin
 	// NOTE: /batches/tree must be registered BEFORE /batches/:id to avoid
 	// Fiber treating "tree" as a UUID parameter.
+	// ─────────────────────────────────────────────────────────────────────────
 	batches := protected.Group("/batches", requireAdminRole())
 	batches.Post("/", cfg.BatchHandler.CreateBatch)
 	batches.Get("/", cfg.BatchHandler.ListBatches)
@@ -103,6 +109,43 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	batches.Get("/:id", cfg.BatchHandler.GetBatch)
 	batches.Put("/:id", cfg.BatchHandler.UpdateBatch)
 	batches.Patch("/:id/deactivate", cfg.BatchHandler.DeactivateBatch)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Batch member routes
+	// NOTE: GET /batches/:id/members is nested under the existing batches group
+	// so it naturally inherits the requireAdminRole() middleware.
+	// ─────────────────────────────────────────────────────────────────────────
+	batchMembers := protected.Group("/batch-members", requireAdminRole())
+	batchMembers.Post("/", cfg.BatchMemberHandler.AddBatchMember)
+	batchMembers.Delete("/:batchID/:userID", cfg.BatchMemberHandler.RemoveBatchMember)
+
+	// Nested under /batches/:id  (shares the already-protected batches group)
+	batches.Get("/:id/members", cfg.BatchMemberHandler.GetBatchMembers)
+	batches.Get("/:id/course-instances", cfg.CourseInstanceHandler.ListCourseInstancesByBatch)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Course instance routes
+	// ─────────────────────────────────────────────────────────────────────────
+	courseInstances := protected.Group("/course-instances", requireAdminRole())
+	courseInstances.Post("/", cfg.CourseInstanceHandler.CreateCourseInstance)
+	courseInstances.Put("/:id", cfg.CourseInstanceHandler.UpdateCourseInstance)
+	// Nested reads under course-instances (instructors & enrollments)
+	courseInstances.Get("/:id/instructors", cfg.CourseInstructorHandler.GetInstructors)
+	courseInstances.Get("/:id/enrollments", cfg.EnrollmentHandler.GetEnrollments)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Course instructor routes
+	// ─────────────────────────────────────────────────────────────────────────
+	courseInstructors := protected.Group("/course-instructors", requireAdminRole())
+	courseInstructors.Post("/", cfg.CourseInstructorHandler.AssignInstructor)
+	courseInstructors.Delete("/:instanceID/:userID", cfg.CourseInstructorHandler.RemoveInstructor)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Enrollment routes
+	// ─────────────────────────────────────────────────────────────────────────
+	enrollments := protected.Group("/enrollments", requireAdminRole())
+	enrollments.Post("/", cfg.EnrollmentHandler.EnrollStudent)
+	enrollments.Put("/:instanceID/:userID", cfg.EnrollmentHandler.UpdateEnrollment)
 
 	app.Get("/", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{

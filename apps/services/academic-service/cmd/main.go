@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/gradeloop/academic-service/internal/client"
 	"github.com/gradeloop/academic-service/internal/config"
+	_ "github.com/gradeloop/academic-service/internal/domain" // ensure all models are registered
 	"github.com/gradeloop/academic-service/internal/handler"
 	"github.com/gradeloop/academic-service/internal/middleware"
 	"github.com/gradeloop/academic-service/internal/repository"
@@ -91,6 +92,18 @@ func run() error {
 	// Initialize services for batches
 	batchService := service.NewBatchService(db.DB, batchRepo, degreeRepo, specializationRepo, auditClient, logger)
 
+	// Initialize repositories for enrollment management
+	batchMemberRepo := repository.NewBatchMemberRepository(db.DB)
+	courseInstanceRepo := repository.NewCourseInstanceRepository(db.DB)
+	courseInstructorRepo := repository.NewCourseInstructorRepository(db.DB)
+	enrollmentRepo := repository.NewEnrollmentRepository(db.DB)
+
+	// Initialize services for enrollment management
+	batchMemberService := service.NewBatchMemberService(batchRepo, batchMemberRepo, auditClient, logger)
+	courseInstanceService := service.NewCourseInstanceService(batchRepo, courseInstanceRepo, auditClient, logger)
+	courseInstructorService := service.NewCourseInstructorService(courseInstanceRepo, courseInstructorRepo, auditClient, logger)
+	enrollmentService := service.NewEnrollmentService(courseInstanceRepo, batchMemberRepo, enrollmentRepo, auditClient, logger)
+
 	// Initialize handlers
 	healthHandler := handler.NewHealthHandler()
 	facultyHandler := handler.NewFacultyHandler(facultyService, logger)
@@ -98,6 +111,12 @@ func run() error {
 	degreeHandler := handler.NewDegreeHandler(degreeService, logger)
 	specializationHandler := handler.NewSpecializationHandler(specializationService, logger)
 	batchHandler := handler.NewBatchHandler(batchService, logger)
+
+	// Initialize handlers for enrollment management
+	batchMemberHandler := handler.NewBatchMemberHandler(batchMemberService, logger)
+	courseInstanceHandler := handler.NewCourseInstanceHandler(courseInstanceService, logger)
+	courseInstructorHandler := handler.NewCourseInstructorHandler(courseInstructorService, logger)
+	enrollmentHandler := handler.NewEnrollmentHandler(enrollmentService, logger)
 
 	app := fiber.New(fiber.Config{
 		AppName:      "academic-service",
@@ -114,13 +133,17 @@ func run() error {
 	}))
 
 	router.SetupRoutes(app, router.Config{
-		HealthHandler:         healthHandler,
-		FacultyHandler:        facultyHandler,
-		DepartmentHandler:     departmentHandler,
-		DegreeHandler:         degreeHandler,
-		SpecializationHandler: specializationHandler,
-		BatchHandler:          batchHandler,
-		JWTSecretKey:          []byte(cfg.JWT.SecretKey),
+		HealthHandler:           healthHandler,
+		FacultyHandler:          facultyHandler,
+		DepartmentHandler:       departmentHandler,
+		DegreeHandler:           degreeHandler,
+		SpecializationHandler:   specializationHandler,
+		BatchHandler:            batchHandler,
+		BatchMemberHandler:      batchMemberHandler,
+		CourseInstanceHandler:   courseInstanceHandler,
+		CourseInstructorHandler: courseInstructorHandler,
+		EnrollmentHandler:       enrollmentHandler,
+		JWTSecretKey:            []byte(cfg.JWT.SecretKey),
 	})
 
 	sigChan := make(chan os.Signal, 1)
