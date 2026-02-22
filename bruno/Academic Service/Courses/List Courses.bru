@@ -1,0 +1,97 @@
+meta {
+  name: List Courses
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{COURSES_URL_V1}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+params:query {
+  ~include_inactive: false
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const courses = res.body.courses;
+    const count = res.body.count;
+
+    console.log("✅ Courses fetched. Count:", count);
+
+    if (courses && courses.length > 0) {
+      const first = courses[0];
+
+      const id = first.id;
+      if (id) {
+        bru.setEnvVar("COURSE_ID", id);
+        console.log("✅ COURSE_ID set from first course:", id);
+      }
+
+      console.log("ℹ️  First course code:", first.code);
+      console.log("ℹ️  First course title:", first.title);
+      console.log("ℹ️  First course credits:", first.credits);
+      console.log("ℹ️  First course is_active:", first.is_active);
+    } else {
+      console.log("ℹ️  No courses found.");
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # List Courses
+
+  Returns all courses in the catalog, ordered by creation date ascending.
+
+  ## Endpoint
+  GET /api/v1/courses
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Query Parameters
+  - `include_inactive` (bool, optional, default: false)
+    When true, soft-deleted and inactive courses are included in the results.
+
+  ## Response (200 OK)
+  {
+    "courses": [
+      {
+        "id":          "uuid",
+        "code":        "CS101",
+        "title":       "Introduction to Computer Science",
+        "description": "Basic concepts of computer science and programming",
+        "credits":     3,
+        "is_active":   true,
+        "created_at":  "2025-01-01T00:00:00Z",
+        "updated_at":  "2025-01-01T00:00:00Z"
+      }
+    ],
+    "count": 1
+  }
+
+  ## Variable Automation
+  On success this script:
+  - Sets {{COURSE_ID}} from the first course's id — used by Get Course,
+    Update Course, Deactivate Course, Add Prerequisite, List Prerequisites,
+    Remove Prerequisite, and Create Course Instance.
+
+  If no courses are returned, no variables are overwritten and a console
+  message is logged.
+
+  ## Error Responses
+  - 401 Unauthorized — missing or invalid token
+  - 403 Forbidden    — insufficient role
+}

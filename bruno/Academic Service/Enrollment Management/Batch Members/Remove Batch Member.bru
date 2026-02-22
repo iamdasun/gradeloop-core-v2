@@ -1,0 +1,74 @@
+meta {
+  name: Remove Batch Member
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{BATCH_MEMBERS_URL_V1}}/{{BATCH_ID}}/{{BATCH_MEMBER_USER_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Batch member removed successfully");
+    console.log("ℹ️  Removed batch_id:", bru.getEnvVar("BATCH_ID"));
+    console.log("ℹ️  Removed user_id:", bru.getEnvVar("BATCH_MEMBER_USER_ID"));
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Remove Batch Member
+
+  Removes a student from a batch by hard-deleting the membership row.
+
+  ## Endpoint
+  DELETE /api/v1/batch-members/:batchID/:userID
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `batchID`  (uuid, required) — resolved from {{BATCH_ID}}
+  - `userID`   (uuid, required) — resolved from {{BATCH_MEMBER_USER_ID}}
+
+  ## Prerequisites
+  - {{BATCH_ID}} must be set (run "Create Batch" or "Get Batch by ID" first).
+  - {{BATCH_MEMBER_USER_ID}} must be set (run "Add Batch Member" or
+    "List Batch Members" first — the post-response scripts populate it
+    automatically).
+
+  ## Business Rules
+  - The membership record must exist; otherwise a 404 is returned.
+  - The deletion is permanent (hard-delete — no soft-delete / restored_at).
+  - Removing a member does NOT automatically drop their enrollments in any
+    course instances for this batch. Handle enrollment cleanup separately if
+    required.
+  - An audit log entry with action BATCH_MEMBER_REMOVED is written on success.
+
+  ## Response (200 OK)
+  {
+    "message": "batch member removed successfully"
+  }
+
+  ## Variable Automation
+  No environment variables are modified by this request. The existing
+  {{BATCH_ID}} and {{BATCH_MEMBER_USER_ID}} values are only read, not updated.
+
+  ## Error Responses
+  - 400 Bad Request   — batchID or userID is not a valid UUID
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — membership record not found
+}

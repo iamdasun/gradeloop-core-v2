@@ -1,0 +1,129 @@
+meta {
+  name: Update Enrollment
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{ENROLLMENTS_URL_V1}}/{{COURSE_INSTANCE_ID}}/{{ENROLLMENT_USER_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "status": "Completed",
+    "final_grade": "A"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const instanceId = res.body.course_instance_id;
+    if (instanceId) {
+      bru.setEnvVar("COURSE_INSTANCE_ID", instanceId);
+      console.log("✅ COURSE_INSTANCE_ID confirmed:", instanceId);
+    }
+
+    const userId = res.body.user_id;
+    if (userId) {
+      bru.setEnvVar("ENROLLMENT_USER_ID", userId);
+      console.log("✅ ENROLLMENT_USER_ID confirmed:", userId);
+    }
+
+    const status = res.body.status;
+    if (status) {
+      console.log("✅ Updated enrollment status:", status);
+    }
+
+    const finalGrade = res.body.final_grade;
+    if (finalGrade) {
+      console.log("✅ Final grade recorded:", finalGrade);
+    }
+
+    const enrolledAt = res.body.enrolled_at;
+    if (enrolledAt) {
+      console.log("ℹ️  Original enrolled_at:", enrolledAt);
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Update Enrollment
+
+  Updates the status and/or final grade of an existing student enrollment.
+
+  ## Endpoint
+  PUT /api/v1/enrollments/:instanceID/:userID
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `instanceID` (uuid, required) — resolved from {{COURSE_INSTANCE_ID}}
+  - `userID`     (uuid, required) — resolved from {{ENROLLMENT_USER_ID}}
+
+  ## Prerequisites
+  - {{COURSE_INSTANCE_ID}} must be set (run "Create Course Instance" or
+    "List Course Instances by Batch" first — post-response scripts populate
+    it automatically).
+  - {{ENROLLMENT_USER_ID}} must be set (run "Enroll Student" or
+    "List Enrollments" first — post-response scripts populate it automatically).
+
+  ## Request Body
+  Both fields are optional — only non-empty values are applied.
+
+  - `status`      (string, optional)
+    Allowed values: Enrolled | Dropped | Completed | Failed
+
+  - `final_grade` (string, optional, max 10 chars)
+    Examples: A, B+, C, Pass, Fail, 4.0
+
+  ## Status Lifecycle
+  Typical progression:
+    Enrolled → Completed (with final_grade set)
+             → Dropped
+             → Failed    (with final_grade set)
+
+  The service does not enforce a strict one-way state machine, allowing
+  corrections if needed.
+
+  ## Business Rules
+  - The enrollment record must exist; otherwise a 404 is returned.
+  - At least one of status or final_grade should be supplied to make a
+    meaningful update (the request succeeds even if both are omitted, but
+    no changes will be applied).
+  - An audit log entry with action ENROLLMENT_UPDATED is written on success,
+    recording old and new values of status and final_grade in the changes field.
+  - enrolled_at is immutable — it is always the original enrollment timestamp.
+
+  ## Response (200 OK)
+  {
+    "course_instance_id": "uuid",
+    "user_id":            "uuid",
+    "status":             "Completed",
+    "final_grade":        "A",
+    "enrolled_at":        "2025-01-01T00:00:00Z"
+  }
+
+  ## Variable Automation
+  On success this script saves:
+  - COURSE_INSTANCE_ID — confirmed from response
+  - ENROLLMENT_USER_ID — confirmed from response
+
+  ## Error Responses
+  - 400 Bad Request   — invalid status value
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — enrollment record not found
+}

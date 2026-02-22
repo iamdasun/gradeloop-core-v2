@@ -1,0 +1,111 @@
+meta {
+  name: Add Prerequisite
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{COURSES_URL_V1}}/{{COURSE_ID}}/prerequisites
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "prerequisite_course_id": "{{PREREQUISITE_COURSE_ID}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    const courseId = res.body.course_id;
+    if (courseId) {
+      console.log("✅ Prerequisite added for course:", courseId);
+    }
+
+    const prereqId = res.body.prerequisite_course_id;
+    if (prereqId) {
+      bru.setEnvVar("PREREQUISITE_COURSE_ID", prereqId);
+      console.log("✅ PREREQUISITE_COURSE_ID confirmed:", prereqId);
+    }
+
+    const prereqCourse = res.body.prerequisite_course;
+    if (prereqCourse) {
+      console.log("ℹ️  Prerequisite course code:", prereqCourse.code);
+      console.log("ℹ️  Prerequisite course title:", prereqCourse.title);
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Add Prerequisite
+
+  Adds a prerequisite relationship between two courses. A prerequisite is
+  a course that must be completed before enrolling in the target course.
+
+  ## Endpoint
+  POST /api/v1/courses/:id/prerequisites
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — the course that requires the prerequisite,
+    resolved from {{COURSE_ID}}
+
+  ## Prerequisites
+  - {{COURSE_ID}} must be set (run "Create Course" or "List Courses" first).
+  - {{PREREQUISITE_COURSE_ID}} must be set to a different, existing course UUID.
+    Create a second course and copy its ID into this environment variable.
+
+  ## Request Body
+  - `prerequisite_course_id` (uuid, required) — the course that must be
+    completed before the target course
+
+  ## Business Rules
+  - A course cannot be a prerequisite of itself (400 Bad Request).
+  - Both the target course and the prerequisite course must exist and not
+    be soft-deleted.
+  - Duplicate prerequisite relationships return 409 Conflict.
+  - An audit log entry with action COURSE_PREREQUISITE_ADDED is written
+    on success.
+
+  ## Response (201 Created)
+  {
+    "course_id":              "uuid",
+    "prerequisite_course_id": "uuid",
+    "prerequisite_course": {
+      "id":          "uuid",
+      "code":        "CS101",
+      "title":       "Introduction to Computer Science",
+      "description": "...",
+      "credits":     3,
+      "is_active":   true,
+      "created_at":  "2025-01-01T00:00:00Z",
+      "updated_at":  "2025-01-01T00:00:00Z"
+    }
+  }
+
+  ## Variable Automation
+  On success this script saves:
+  - PREREQUISITE_COURSE_ID — confirmed from response, used by
+    Remove Prerequisite.
+
+  ## Error Responses
+  - 400 Bad Request   — missing prerequisite_course_id, or course is a
+                        prerequisite of itself
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — target course or prerequisite course not found
+  - 409 Conflict      — prerequisite relationship already exists
+}

@@ -1,0 +1,68 @@
+meta {
+  name: Deactivate Course
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{COURSES_URL_V1}}/{{COURSE_ID}}/deactivate
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Course deactivated successfully");
+    console.log("ℹ️  Message:", res.body.message);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Deactivate Course
+
+  Deactivates an existing active course. Deactivated courses are excluded
+  from default list results but are never hard-deleted.
+
+  ## Endpoint
+  PATCH /api/v1/courses/:id/deactivate
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — resolved from {{COURSE_ID}}
+
+  ## Prerequisites
+  - {{COURSE_ID}} must be set (run "Create Course" or "List Courses" first —
+    the post-response scripts populate it automatically).
+  - The course must currently be active (is_active = true). Attempting to
+    deactivate an already-inactive course returns 400 Bad Request.
+
+  ## Business Rules
+  - Sets `is_active` to false on the course record.
+  - Does NOT soft-delete the course — it remains queryable via
+    GET /courses/:id and via GET /courses?include_inactive=true.
+  - An audit log entry with action COURSE_DEACTIVATED is written on success,
+    recording the is_active transition (true → false).
+
+  ## Response (200 OK)
+  {
+    "message": "course deactivated successfully"
+  }
+
+  ## Error Responses
+  - 400 Bad Request  — course is already inactive
+  - 401 Unauthorized — missing or invalid token
+  - 403 Forbidden    — insufficient role
+  - 404 Not Found    — course not found or soft-deleted
+}

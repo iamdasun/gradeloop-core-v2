@@ -1,0 +1,102 @@
+meta {
+  name: Assign Instructor
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{COURSE_INSTRUCTORS_URL_V1}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "course_instance_id": "{{COURSE_INSTANCE_ID}}",
+    "user_id": "{{INSTRUCTOR_USER_ID}}",
+    "role": "Lead Instructor"
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    const instanceId = res.body.course_instance_id;
+    if (instanceId) {
+      bru.setEnvVar("COURSE_INSTANCE_ID", instanceId);
+      console.log("✅ COURSE_INSTANCE_ID confirmed:", instanceId);
+    }
+
+    const userId = res.body.user_id;
+    if (userId) {
+      bru.setEnvVar("INSTRUCTOR_USER_ID", userId);
+      console.log("✅ INSTRUCTOR_USER_ID saved:", userId);
+    }
+
+    const role = res.body.role;
+    if (role) {
+      console.log("✅ Instructor role:", role);
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Assign Instructor
+
+  Assigns an instructor (identified by IAM user_id) to a course instance.
+
+  ## Endpoint
+  POST /api/v1/course-instructors
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Prerequisites
+  - {{COURSE_INSTANCE_ID}} must be set (run "Create Course Instance" first —
+    the post-response script populates it automatically).
+  - {{INSTRUCTOR_USER_ID}} must be set in the environment — this is the IAM
+    user UUID of the instructor being assigned.
+
+  ## Request Body
+  - `course_instance_id` (uuid, required) — target course instance
+  - `user_id`            (uuid, required) — IAM user UUID of the instructor (no DB FK)
+  - `role`               (string, required)
+    Allowed values: Lead Instructor | Instructor | TA
+
+  ## Business Rules
+  - The referenced course instance must exist; otherwise a 404 is returned.
+  - An instructor can only be assigned once per course instance — duplicate
+    assignment returns 409 Conflict.
+  - user_id is a logical reference to the IAM service; no FK constraint is
+    enforced in the Academic Service database.
+  - An audit log entry with action COURSE_INSTRUCTOR_ASSIGNED is written on success.
+
+  ## Response (201 Created)
+  {
+    "course_instance_id": "uuid",
+    "user_id":            "uuid",
+    "role":               "Lead Instructor"
+  }
+
+  ## Variable Automation
+  On success this script saves:
+  - COURSE_INSTANCE_ID — confirmed from response
+  - INSTRUCTOR_USER_ID — confirmed from response (used by Remove Instructor
+                         and List Instructors)
+
+  ## Error Responses
+  - 400 Bad Request   — missing fields or invalid role value
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — course instance not found
+  - 409 Conflict      — instructor already assigned to this course instance
+}

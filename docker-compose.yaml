@@ -156,7 +156,7 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/departments`) || PathPrefix(`/api/v1/faculties`) || PathPrefix(`/api/v1/degrees`) || PathPrefix(`/api/v1/specializations`) || PathPrefix(`/api/v1/batches`) || PathPrefix(`/api/v1/debug`)"
+      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/departments`) || PathPrefix(`/api/v1/faculties`) || PathPrefix(`/api/v1/degrees`) || PathPrefix(`/api/v1/specializations`) || PathPrefix(`/api/v1/batches`) || PathPrefix(`/api/v1/batch-members`) || PathPrefix(`/api/v1/course-instances`) || PathPrefix(`/api/v1/course-instructors`) || PathPrefix(`/api/v1/enrollments`) || PathPrefix(`/api/v1/debug`)"
       - "traefik.http.routers.academic.priority=100"
       - "traefik.http.routers.academic.entrypoints=web"
       - "traefik.http.services.academic-service.loadbalancer.server.port=8083"

@@ -1,0 +1,110 @@
+meta {
+  name: Update Course
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{COURSES_URL_V1}}/{{COURSE_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "title": "Introduction to Computer Science (Updated)",
+    "description": "Updated description for the course",
+    "credits": 4,
+    "is_active": true
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const id = res.body.id;
+    if (id) {
+      bru.setEnvVar("COURSE_ID", id);
+      console.log("✅ COURSE_ID confirmed:", id);
+    }
+
+    const title = res.body.title;
+    if (title) {
+      console.log("✅ Updated title:", title);
+    }
+
+    const credits = res.body.credits;
+    if (credits !== undefined) {
+      console.log("✅ Updated credits:", credits);
+    }
+
+    const isActive = res.body.is_active;
+    if (isActive !== undefined) {
+      console.log("✅ Is active:", isActive);
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Update Course
+
+  Updates an existing course's mutable fields.
+
+  ## Endpoint
+  PUT /api/v1/courses/:id
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — resolved from {{COURSE_ID}}
+
+  ## Prerequisites
+  - {{COURSE_ID}} must be set (run "Create Course" or "List Courses" first —
+    the post-response scripts populate it automatically).
+
+  ## Request Body
+  All fields are optional — only provided fields are applied:
+  - `title`       (string, optional)  — new human-readable course title
+  - `description` (string, optional)  — updated course description
+  - `credits`     (int, optional)     — updated credit hours (must be non-negative)
+  - `is_active`   (bool, optional)    — toggle active status
+
+  ## Business Rules
+  - `code` is immutable and cannot be changed via this endpoint.
+  - `credits` must be a non-negative integer when provided.
+  - Only fields that differ from the current value are tracked in the audit log.
+  - An audit log entry with action COURSE_UPDATED is written on success,
+    recording old and new values for each changed field.
+
+  ## Response (200 OK)
+  {
+    "id":          "uuid",
+    "code":        "CS101",
+    "title":       "Introduction to Computer Science (Updated)",
+    "description": "Updated description for the course",
+    "credits":     4,
+    "is_active":   true,
+    "created_at":  "2025-01-01T00:00:00Z",
+    "updated_at":  "2025-01-01T00:00:00Z"
+  }
+
+  ## Variable Automation
+  On success this script saves:
+  - COURSE_ID — confirmed from response
+
+  ## Error Responses
+  - 400 Bad Request  — invalid credits value (negative)
+  - 401 Unauthorized — missing or invalid token
+  - 403 Forbidden    — insufficient role
+  - 404 Not Found    — course not found or soft-deleted
+}

@@ -53,17 +53,30 @@ func (s *Seeder) seedSemesters() error {
 	semesters := []domain.Semester{
 		{
 			Name:      "Fall 2024",
-			Year:      2024,
+			Code:      "FALL-2024",
+			TermType:  domain.TermTypeFall,
 			StartDate: "2024-09-01",
 			EndDate:   "2024-12-15",
-			IsActive:  true,
+			Status:    domain.SemesterStatusCompleted,
+			IsActive:  false,
 		},
 		{
 			Name:      "Spring 2025",
-			Year:      2025,
+			Code:      "SPRING-2025",
+			TermType:  domain.TermTypeSpring,
 			StartDate: "2025-01-15",
 			EndDate:   "2025-05-15",
-			IsActive:  false,
+			Status:    domain.SemesterStatusActive,
+			IsActive:  true,
+		},
+		{
+			Name:      "Summer 2025",
+			Code:      "SUMMER-2025",
+			TermType:  domain.TermTypeSummer,
+			StartDate: "2025-06-01",
+			EndDate:   "2025-08-15",
+			Status:    domain.SemesterStatusPlanned,
+			IsActive:  true,
 		},
 	}
 
@@ -133,39 +146,45 @@ func (s *Seeder) seedCourses() error {
 	courses := []domain.Course{
 		{
 			Code:        "CS101",
-			Name:        "Introduction to Computer Science",
+			Title:       "Introduction to Computer Science",
 			Description: "Basic concepts of computer science and programming",
 			Credits:     3,
+			IsActive:    true,
 		},
 		{
 			Code:        "CS201",
-			Name:        "Data Structures and Algorithms",
+			Title:       "Data Structures and Algorithms",
 			Description: "Fundamental data structures and algorithmic techniques",
 			Credits:     4,
+			IsActive:    true,
 		},
 		{
 			Code:        "CS301",
-			Name:        "Database Systems",
+			Title:       "Database Systems",
 			Description: "Database design, implementation, and management",
 			Credits:     3,
+			IsActive:    true,
 		},
 		{
 			Code:        "CS401",
-			Name:        "Software Engineering",
+			Title:       "Software Engineering",
 			Description: "Software development methodologies and practices",
 			Credits:     4,
+			IsActive:    true,
 		},
 		{
 			Code:        "MATH101",
-			Name:        "Calculus I",
+			Title:       "Calculus I",
 			Description: "Differential calculus and applications",
 			Credits:     4,
+			IsActive:    true,
 		},
 		{
 			Code:        "MATH201",
-			Name:        "Discrete Mathematics",
+			Title:       "Discrete Mathematics",
 			Description: "Mathematical foundations for computer science",
 			Credits:     3,
+			IsActive:    true,
 		},
 	}
 

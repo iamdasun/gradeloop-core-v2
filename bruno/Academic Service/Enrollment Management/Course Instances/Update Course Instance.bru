@@ -1,0 +1,127 @@
+meta {
+  name: Update Course Instance
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{COURSE_INSTANCES_URL_V1}}/{{COURSE_INSTANCE_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "status": "Active",
+    "max_enrollment": 30
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const id = res.body.id;
+    if (id) {
+      bru.setEnvVar("COURSE_INSTANCE_ID", id);
+      console.log("✅ COURSE_INSTANCE_ID confirmed:", id);
+    }
+
+    const batchId = res.body.batch_id;
+    if (batchId) {
+      bru.setEnvVar("BATCH_ID", batchId);
+      console.log("✅ BATCH_ID confirmed:", batchId);
+    }
+
+    const courseId = res.body.course_id;
+    if (courseId) {
+      bru.setEnvVar("COURSE_ID", courseId);
+      console.log("✅ COURSE_ID confirmed:", courseId);
+    }
+
+    const semesterId = res.body.semester_id;
+    if (semesterId) {
+      bru.setEnvVar("SEMESTER_ID", semesterId);
+      console.log("✅ SEMESTER_ID confirmed:", semesterId);
+    }
+
+    const status = res.body.status;
+    if (status) {
+      console.log("✅ Updated status:", status);
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Update Course Instance
+
+  Updates the status of an existing course instance.
+
+  ## Endpoint
+  PUT /api/v1/course-instances/:id
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — resolved from {{COURSE_INSTANCE_ID}}
+
+  ## Prerequisites
+  - {{COURSE_INSTANCE_ID}} must be set (run "Create Course Instance" first —
+    the post-response script populates it automatically).
+
+  ## Request Body
+  - `status`         (string, required) — new lifecycle status
+    Allowed values: Planned | Active | Completed | Cancelled
+  - `max_enrollment` (int, optional)    — maximum number of students allowed
+    to enroll; must be a non-negative integer (0 = unlimited)
+
+  ## Status Lifecycle
+  Recommended progression:
+    Planned → Active → Completed
+                     → Cancelled
+
+  Any valid status value is accepted — the service does not enforce a strict
+  one-way state machine, allowing corrections if needed.
+
+  ## Business Rules
+  - The course instance must exist; otherwise a 404 is returned.
+  - `status` and `max_enrollment` are the only mutable fields via this
+    endpoint. The course_id, semester_id, and batch_id are immutable
+    after creation.
+  - An audit log entry with action COURSE_INSTANCE_UPDATED is written,
+    recording old and new values for each changed field in `changes`.
+
+  ## Response (200 OK)
+  {
+    "id":             "uuid",
+    "course_id":      "uuid",
+    "semester_id":    "uuid",
+    "batch_id":       "uuid",
+    "status":         "Active",
+    "max_enrollment": 30,
+    "created_at":     "2025-01-01T00:00:00Z",
+    "updated_at":     "2025-01-01T00:00:00Z"
+  }
+
+  ## Variable Automation
+  On success this script saves:
+  - COURSE_INSTANCE_ID — confirmed from response
+  - BATCH_ID           — confirmed from response
+  - COURSE_ID          — confirmed from response
+  - SEMESTER_ID        — confirmed from response
+
+  ## Error Responses
+  - 400 Bad Request   — missing or invalid status value
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — course instance not found
+}

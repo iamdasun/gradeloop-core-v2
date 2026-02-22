@@ -1,0 +1,111 @@
+meta {
+  name: List Enrollments
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{COURSE_INSTANCES_URL_V1}}/{{COURSE_INSTANCE_ID}}/enrollments
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const enrollments = res.body.enrollments;
+    const count = res.body.count;
+
+    console.log("✅ Enrollments fetched. Count:", count);
+
+    if (enrollments && enrollments.length > 0) {
+      const first = enrollments[0];
+
+      const instanceId = first.course_instance_id;
+      if (instanceId) {
+        bru.setEnvVar("COURSE_INSTANCE_ID", instanceId);
+        console.log("✅ COURSE_INSTANCE_ID confirmed:", instanceId);
+      }
+
+      const userId = first.user_id;
+      if (userId) {
+        bru.setEnvVar("ENROLLMENT_USER_ID", userId);
+        console.log("✅ ENROLLMENT_USER_ID set from first enrollment:", userId);
+      }
+
+      console.log("ℹ️  First enrollment status:", first.status);
+      console.log("ℹ️  First enrollment final_grade:", first.final_grade || "(not graded yet)");
+      console.log("ℹ️  First enrollment enrolled_at:", first.enrolled_at);
+    } else {
+      console.log("ℹ️  No enrollments found for this course instance.");
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # List Enrollments
+
+  Returns all student enrollments for a specific course instance, ordered by
+  enrolled_at ascending.
+
+  ## Endpoint
+  GET /api/v1/course-instances/:id/enrollments
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — the UUID of the course instance, resolved from
+    {{COURSE_INSTANCE_ID}}
+
+  ## Prerequisites
+  - {{COURSE_INSTANCE_ID}} must be set (run "Create Course Instance" or
+    "List Course Instances by Batch" first — post-response scripts populate
+    it automatically).
+
+  ## Response (200 OK)
+  {
+    "enrollments": [
+      {
+        "course_instance_id": "uuid",
+        "user_id":            "uuid",
+        "status":             "Enrolled",
+        "final_grade":        "",
+        "enrolled_at":        "2025-01-01T00:00:00Z"
+      },
+      {
+        "course_instance_id": "uuid",
+        "user_id":            "uuid",
+        "status":             "Completed",
+        "final_grade":        "A",
+        "enrolled_at":        "2025-01-01T00:00:00Z"
+      }
+    ],
+    "count": 2
+  }
+
+  ## Variable Automation
+  On success this script:
+  - Confirms {{COURSE_INSTANCE_ID}} from the first enrollment's
+    course_instance_id field.
+  - Sets {{ENROLLMENT_USER_ID}} from the first enrollment's user_id field —
+    used by "Update Enrollment" so it works without manual copy-paste.
+
+  If the course instance has no enrollments yet, no variables are overwritten
+  and a console message is logged.
+
+  ## Error Responses
+  - 400 Bad Request   — id is not a valid UUID
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — course instance not found
+}

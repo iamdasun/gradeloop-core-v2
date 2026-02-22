@@ -1,0 +1,52 @@
+meta {
+  name: Enrollment Management
+  seq: 6
+}
+
+auth {
+  mode: inherit
+}
+
+docs {
+  # Enrollment Management
+
+  Manages the full enrollment lifecycle:
+
+    Degree → Batch → CourseInstance → Enrollment
+                       ↳ CourseInstructor
+
+  ## Sub-folders
+
+  | Folder              | Endpoints                                         |
+  |---------------------|---------------------------------------------------|
+  | Batch Members       | Add / List / Remove students from batches         |
+  | Course Instances    | Create / Update / List course offerings per batch |
+  | Course Instructors  | Assign / List / Remove instructors                |
+  | Enrollments         | Enroll / Update / List student enrollments        |
+
+  ## Authentication
+  All requests require a valid Bearer token.
+  Caller must have `super_admin` or `admin` role.
+
+  Run **IAM Service → Auth → Login** first to populate {{ACCESS_TOKEN}}.
+
+  ## Key Environment Variables
+
+  | Variable                | Set by                          | Used by                              |
+  |-------------------------|---------------------------------|--------------------------------------|
+  | BATCH_ID                | Create Batch / Get Batch by ID  | Add Batch Member, Create Instance    |
+  | BATCH_MEMBER_USER_ID    | Add Batch Member                | Remove Batch Member, Enroll Student  |
+  | COURSE_INSTANCE_ID      | Create Course Instance          | Assign Instructor, Enroll Student    |
+  | INSTRUCTOR_USER_ID      | Assign Instructor               | Remove Instructor                    |
+  | ENROLLMENT_USER_ID      | Enroll Student                  | Update Enrollment                    |
+
+  ## Recommended Execution Order
+
+  1. Batch Members → Add Batch Member
+  2. Course Instances → Create Course Instance
+  3. Course Instructors → Assign Instructor
+  4. Enrollments → Enroll Student
+
+  Variables are automatically captured via post-response scripts so subsequent
+  requests work without manual copy-paste.
+}

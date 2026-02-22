@@ -1,0 +1,78 @@
+meta {
+  name: Remove Instructor
+  type: http
+  seq: 3
+}
+
+delete {
+  url: {{COURSE_INSTRUCTORS_URL_V1}}/{{COURSE_INSTANCE_ID}}/{{INSTRUCTOR_USER_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Instructor removed successfully");
+    console.log("ℹ️  Removed from course_instance_id:", bru.getEnvVar("COURSE_INSTANCE_ID"));
+    console.log("ℹ️  Removed user_id:", bru.getEnvVar("INSTRUCTOR_USER_ID"));
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Remove Instructor
+
+  Removes an instructor assignment from a course instance by hard-deleting the
+  assignment row identified by the composite key (course_instance_id, user_id).
+
+  ## Endpoint
+  DELETE /api/v1/course-instructors/:instanceID/:userID
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `instanceID` (uuid, required) — resolved from {{COURSE_INSTANCE_ID}}
+  - `userID`     (uuid, required) — resolved from {{INSTRUCTOR_USER_ID}}
+
+  ## Prerequisites
+  - {{COURSE_INSTANCE_ID}} must be set (run "Create Course Instance" or
+    "List Course Instances by Batch" first — post-response scripts populate
+    it automatically).
+  - {{INSTRUCTOR_USER_ID}} must be set (run "Assign Instructor" or
+    "List Instructors" first — post-response scripts populate it automatically).
+
+  ## Business Rules
+  - The assignment record must exist; otherwise a 404 is returned.
+  - The deletion is permanent (hard-delete — there is no soft-delete for
+    instructor assignments).
+  - Removing an instructor does NOT affect any student enrollments in the same
+    course instance.
+  - An audit log entry with action COURSE_INSTRUCTOR_REMOVED is written on
+    success, recording the course_instance_id and user_id in the changes field.
+
+  ## Response (200 OK)
+  {
+    "message": "instructor removed successfully"
+  }
+
+  ## Variable Automation
+  No environment variables are modified by this request. The existing
+  {{COURSE_INSTANCE_ID}} and {{INSTRUCTOR_USER_ID}} values are only read,
+  not updated.
+
+  ## Error Responses
+  - 400 Bad Request   — instanceID or userID is not a valid UUID
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — instructor assignment not found
+}

@@ -1,0 +1,57 @@
+meta {
+  name: Semesters
+  seq: 8
+}
+
+auth {
+  mode: inherit
+}
+
+docs {
+  # Semesters
+
+  Manages the academic calendar. A Semester represents a specific academic
+  term identified by a unique code. Each semester has a term type, date range,
+  lifecycle status, and active flag.
+
+  ## Endpoints
+
+  | Method | Path                               | Description               |
+  |--------|------------------------------------|---------------------------|
+  | POST   | /api/v1/semesters                  | Create a new semester     |
+  | GET    | /api/v1/semesters                  | List all semesters        |
+  | GET    | /api/v1/semesters/:id              | Get a semester by ID      |
+  | PUT    | /api/v1/semesters/:id              | Update a semester         |
+  | PATCH  | /api/v1/semesters/:id/deactivate   | Deactivate a semester     |
+
+  ## Authentication
+  All requests require a valid Bearer token.
+  Caller must have `super_admin` or `admin` role.
+
+  Run **IAM Service → Auth → Login** first to populate {{ACCESS_TOKEN}}.
+
+  ## Key Environment Variables
+
+  | Variable    | Set by          | Used by                                        |
+  |-------------|-----------------|------------------------------------------------|
+  | SEMESTER_ID | Create Semester | Get, Update, Deactivate, Create Course Instance|
+
+  ## Term Types
+  Allowed values for `term_type`:
+  - Fall
+  - Spring
+  - Summer
+  - Winter
+
+  ## Status Lifecycle
+  Planned → Active → Completed
+                   → Cancelled
+
+  ## Recommended Execution Order
+
+  1. Create Semester
+  2. List Semesters
+  3. Get Semester by ID
+  4. Update Semester
+  5. Deactivate Semester
+}

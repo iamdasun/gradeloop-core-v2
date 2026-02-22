@@ -1,0 +1,29 @@
+meta {
+  name: Batch Members
+  seq: 1
+}
+
+auth {
+  mode: inherit
+}
+
+docs {
+  # Batch Members
+
+  Manages student membership in batches.
+
+  ## Endpoints
+  - POST   /api/v1/batch-members              — Add a student to a batch
+  - GET    /api/v1/batches/:id/members         — List all members of a batch
+  - DELETE /api/v1/batch-members/:batchID/:userID — Remove a student from a batch
+
+  ## Allowed Status Values
+  - Active
+  - Graduated
+  - Suspended
+  - Withdrawn
+
+  ## Variable Flow
+  Add Batch Member → saves {{BATCH_MEMBER_USER_ID}}
+  Remove Batch Member uses {{BATCH_ID}} + {{BATCH_MEMBER_USER_ID}}
+}

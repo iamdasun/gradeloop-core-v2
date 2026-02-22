@@ -1,0 +1,71 @@
+meta {
+  name: Remove Prerequisite
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{COURSES_URL_V1}}/{{COURSE_ID}}/prerequisites/{{PREREQUISITE_COURSE_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Prerequisite removed successfully");
+    console.log("ℹ️  Message:", res.body.message);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Remove Prerequisite
+
+  Removes a prerequisite relationship between two courses.
+
+  ## Endpoint
+  DELETE /api/v1/courses/:id/prerequisites/:prereqID
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id`       (uuid, required) — the course that owns the prerequisite,
+    resolved from {{COURSE_ID}}
+  - `prereqID` (uuid, required) — the prerequisite course to remove,
+    resolved from {{PREREQUISITE_COURSE_ID}}
+
+  ## Prerequisites
+  - {{COURSE_ID}} must be set (run "Create Course" or "List Courses" first).
+  - {{PREREQUISITE_COURSE_ID}} must be set (run "Add Prerequisite" or
+    "List Prerequisites" first — the post-response scripts populate it
+    automatically).
+  - The prerequisite relationship must currently exist; if it does not, a
+    404 Not Found is returned.
+
+  ## Business Rules
+  - Hard-deletes the prerequisite relationship row from course_prerequisites.
+  - Does not affect either course record itself.
+  - An audit log entry with action COURSE_PREREQUISITE_REMOVED is written
+    on success, recording both course_id and prerequisite_course_id.
+
+  ## Response (200 OK)
+  {
+    "message": "prerequisite removed successfully"
+  }
+
+  ## Error Responses
+  - 400 Bad Request   — id or prereqID is not a valid UUID
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — prerequisite relationship not found
+}

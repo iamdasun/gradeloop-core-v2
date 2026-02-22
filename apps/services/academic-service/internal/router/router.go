@@ -10,16 +10,22 @@ import (
 )
 
 type Config struct {
-	HealthHandler         *handler.HealthHandler
-	FacultyHandler        *handler.FacultyHandler
-	DepartmentHandler     *handler.DepartmentHandler
-	DegreeHandler         *handler.DegreeHandler
-	SpecializationHandler *handler.SpecializationHandler
-	BatchHandler          *handler.BatchHandler
-	JWTSecretKey          []byte
+	HealthHandler           *handler.HealthHandler
+	FacultyHandler          *handler.FacultyHandler
+	DepartmentHandler       *handler.DepartmentHandler
+	DegreeHandler           *handler.DegreeHandler
+	SpecializationHandler   *handler.SpecializationHandler
+	BatchHandler            *handler.BatchHandler
+	BatchMemberHandler      *handler.BatchMemberHandler
+	CourseInstanceHandler   *handler.CourseInstanceHandler
+	CourseInstructorHandler *handler.CourseInstructorHandler
+	EnrollmentHandler       *handler.EnrollmentHandler
+	CourseHandler           *handler.CourseHandler
+	SemesterHandler         *handler.SemesterHandler
+	JWTSecretKey            []byte
 }
 
-// requireAdminRole is a custom middleware that checks for super_admin OR faculty_admin
+// requireAdminRole is a custom middleware that checks for super_admin OR admin
 func requireAdminRole() fiber.Handler {
 	return func(c fiber.Ctx) error {
 		roleName, ok := c.Locals("role_name").(string)
@@ -31,12 +37,12 @@ func requireAdminRole() fiber.Handler {
 		normalized := strings.ToLower(strings.TrimSpace(roleName))
 		normalized = strings.ReplaceAll(normalized, " ", "_")
 
-		// Check if user has super_admin or faculty_admin role
-		if normalized == "super_admin" || normalized == "faculty_admin" {
+		// Check if user has super_admin or admin role
+		if normalized == "super_admin" || normalized == "admin" {
 			return c.Next()
 		}
 
-		return utils.ErrForbidden("Requires super_admin or faculty_admin role")
+		return utils.ErrForbidden("Requires super_admin or admin role")
 	}
 }
 
@@ -61,7 +67,7 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	faculties.Patch("/:id/deactivate", cfg.FacultyHandler.DeactivateFaculty)
 	faculties.Get("/:id/leaders", cfg.FacultyHandler.GetFacultyLeaders)
 
-	// Department routes - Super Admin OR Faculty Admin
+	// Department routes - Super Admin OR Admin
 	departments := protected.Group("/departments", requireAdminRole())
 	departments.Post("/", cfg.DepartmentHandler.CreateDepartment)
 	departments.Get("/", cfg.DepartmentHandler.ListDepartments)
@@ -71,11 +77,11 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	departments.Put("/:id", cfg.DepartmentHandler.UpdateDepartment)
 	departments.Patch("/:id/deactivate", cfg.DepartmentHandler.DeactivateDepartment)
 
-	// Faculty departments endpoint - Super Admin OR Faculty Admin
+	// Faculty departments endpoint - Super Admin OR Admin
 	facultiesAdmin := protected.Group("/faculties", requireAdminRole())
 	facultiesAdmin.Get("/:id/departments", cfg.DepartmentHandler.ListDepartmentsByFaculty)
 
-	// Degree routes - Super Admin OR Faculty Admin
+	// Degree routes - Super Admin OR Admin
 	degrees := protected.Group("/degrees", requireAdminRole())
 	degrees.Post("/", cfg.DegreeHandler.CreateDegree)
 	degrees.Get("/", cfg.DegreeHandler.ListDegrees)
@@ -85,16 +91,18 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	// List specializations for a degree
 	degrees.Get("/:id/specializations", cfg.SpecializationHandler.ListSpecializationsByDegree)
 
-	// Specialization routes - Super Admin OR Faculty Admin
+	// Specialization routes - Super Admin OR Admin
 	specializations := protected.Group("/specializations", requireAdminRole())
 	specializations.Post("/", cfg.SpecializationHandler.CreateSpecialization)
 	specializations.Get("/:id", cfg.SpecializationHandler.GetSpecialization)
 	specializations.Put("/:id", cfg.SpecializationHandler.UpdateSpecialization)
 	specializations.Patch("/:id/deactivate", cfg.SpecializationHandler.DeactivateSpecialization)
 
-	// Batch / Group routes - Super Admin OR Faculty Admin
+	// ─────────────────────────────────────────────────────────────────────────
+	// Batch / Group routes - Super Admin OR Admin
 	// NOTE: /batches/tree must be registered BEFORE /batches/:id to avoid
 	// Fiber treating "tree" as a UUID parameter.
+	// ─────────────────────────────────────────────────────────────────────────
 	batches := protected.Group("/batches", requireAdminRole())
 	batches.Post("/", cfg.BatchHandler.CreateBatch)
 	batches.Get("/", cfg.BatchHandler.ListBatches)
@@ -103,6 +111,67 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	batches.Get("/:id", cfg.BatchHandler.GetBatch)
 	batches.Put("/:id", cfg.BatchHandler.UpdateBatch)
 	batches.Patch("/:id/deactivate", cfg.BatchHandler.DeactivateBatch)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Batch member routes
+	// NOTE: GET /batches/:id/members is nested under the existing batches group
+	// so it naturally inherits the requireAdminRole() middleware.
+	// ─────────────────────────────────────────────────────────────────────────
+	batchMembers := protected.Group("/batch-members", requireAdminRole())
+	batchMembers.Post("/", cfg.BatchMemberHandler.AddBatchMember)
+	batchMembers.Delete("/:batchID/:userID", cfg.BatchMemberHandler.RemoveBatchMember)
+
+	// Nested under /batches/:id  (shares the already-protected batches group)
+	batches.Get("/:id/members", cfg.BatchMemberHandler.GetBatchMembers)
+	batches.Get("/:id/course-instances", cfg.CourseInstanceHandler.ListCourseInstancesByBatch)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Course instance routes
+	// ─────────────────────────────────────────────────────────────────────────
+	courseInstances := protected.Group("/course-instances", requireAdminRole())
+	courseInstances.Post("/", cfg.CourseInstanceHandler.CreateCourseInstance)
+	courseInstances.Put("/:id", cfg.CourseInstanceHandler.UpdateCourseInstance)
+	// Nested reads under course-instances (instructors & enrollments)
+	courseInstances.Get("/:id/instructors", cfg.CourseInstructorHandler.GetInstructors)
+	courseInstances.Get("/:id/enrollments", cfg.EnrollmentHandler.GetEnrollments)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Course instructor routes
+	// ─────────────────────────────────────────────────────────────────────────
+	courseInstructors := protected.Group("/course-instructors", requireAdminRole())
+	courseInstructors.Post("/", cfg.CourseInstructorHandler.AssignInstructor)
+	courseInstructors.Delete("/:instanceID/:userID", cfg.CourseInstructorHandler.RemoveInstructor)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Enrollment routes
+	// ─────────────────────────────────────────────────────────────────────────
+	enrollments := protected.Group("/enrollments", requireAdminRole())
+	enrollments.Post("/", cfg.EnrollmentHandler.EnrollStudent)
+	enrollments.Put("/:instanceID/:userID", cfg.EnrollmentHandler.UpdateEnrollment)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Course routes
+	// NOTE: /courses/:id/prerequisites must be registered after /courses/:id
+	// ─────────────────────────────────────────────────────────────────────────
+	courses := protected.Group("/courses", requireAdminRole())
+	courses.Post("/", cfg.CourseHandler.CreateCourse)
+	courses.Get("/", cfg.CourseHandler.ListCourses)
+	courses.Get("/:id", cfg.CourseHandler.GetCourse)
+	courses.Put("/:id", cfg.CourseHandler.UpdateCourse)
+	courses.Patch("/:id/deactivate", cfg.CourseHandler.DeactivateCourse)
+	courses.Post("/:id/prerequisites", cfg.CourseHandler.AddPrerequisite)
+	courses.Get("/:id/prerequisites", cfg.CourseHandler.ListPrerequisites)
+	courses.Delete("/:id/prerequisites/:prereqID", cfg.CourseHandler.RemovePrerequisite)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Semester routes
+	// ─────────────────────────────────────────────────────────────────────────
+	semesters := protected.Group("/semesters", requireAdminRole())
+	semesters.Post("/", cfg.SemesterHandler.CreateSemester)
+	semesters.Get("/", cfg.SemesterHandler.ListSemesters)
+	semesters.Get("/:id", cfg.SemesterHandler.GetSemester)
+	semesters.Put("/:id", cfg.SemesterHandler.UpdateSemester)
+	semesters.Patch("/:id/deactivate", cfg.SemesterHandler.DeactivateSemester)
 
 	app.Get("/", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{

@@ -1,0 +1,115 @@
+meta {
+  name: Enroll Student
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{ENROLLMENTS_URL_V1}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "course_instance_id": "{{COURSE_INSTANCE_ID}}",
+    "user_id": "{{ENROLLMENT_USER_ID}}",
+    "status": "Enrolled"
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    const instanceId = res.body.course_instance_id;
+    if (instanceId) {
+      bru.setEnvVar("COURSE_INSTANCE_ID", instanceId);
+      console.log("✅ COURSE_INSTANCE_ID confirmed:", instanceId);
+    }
+
+    const userId = res.body.user_id;
+    if (userId) {
+      bru.setEnvVar("ENROLLMENT_USER_ID", userId);
+      console.log("✅ ENROLLMENT_USER_ID saved:", userId);
+    }
+
+    const status = res.body.status;
+    if (status) {
+      console.log("✅ Enrollment status:", status);
+    }
+
+    const enrolledAt = res.body.enrolled_at;
+    if (enrolledAt) {
+      console.log("✅ Enrolled at:", enrolledAt);
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Enroll Student
+
+  Enrolls a student (identified by IAM user_id) into a course instance.
+
+  ## Endpoint
+  POST /api/v1/enrollments
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Prerequisites
+  - {{COURSE_INSTANCE_ID}} must be set (run "Create Course Instance" or
+    "List Course Instances by Batch" first — post-response scripts populate
+    it automatically).
+  - {{ENROLLMENT_USER_ID}} must be set in the environment — this is the IAM
+    user UUID of the student being enrolled. The student must already be a
+    member of the batch that owns the target course instance (run "Add Batch
+    Member" first).
+
+  ## Request Body
+  - `course_instance_id` (uuid, required) — target course instance
+  - `user_id`            (uuid, required) — IAM user UUID of the student (no DB FK)
+  - `status`             (string, optional, default: "Enrolled")
+    Allowed values: Enrolled | Dropped | Completed | Failed
+
+  ## Business Rules
+  - The referenced course instance must exist; otherwise a 404 is returned.
+  - The student MUST be a member of the batch that owns the course instance
+    (batch_members.batch_id = instance.batch_id AND user_id = req.user_id).
+    If the membership is missing the request is rejected with 400
+    "student not in batch".
+  - Duplicate enrollment (same course_instance_id + user_id) is rejected
+    with 409 Conflict.
+  - user_id is a logical reference to the IAM service; no FK constraint is
+    enforced in the Academic Service database.
+  - An audit log entry with action STUDENT_ENROLLED is written on success.
+
+  ## Response (201 Created)
+  {
+    "course_instance_id": "uuid",
+    "user_id":            "uuid",
+    "status":             "Enrolled",
+    "final_grade":        "",
+    "enrolled_at":        "2025-01-01T00:00:00Z"
+  }
+
+  ## Variable Automation
+  On success this script saves:
+  - COURSE_INSTANCE_ID — confirmed from response
+  - ENROLLMENT_USER_ID — confirmed from response (used by Update Enrollment)
+
+  ## Error Responses
+  - 400 Bad Request   — missing fields, invalid status, or student not in batch
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — course instance not found
+  - 409 Conflict      — student already enrolled in this course instance
+}

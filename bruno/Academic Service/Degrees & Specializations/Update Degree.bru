@@ -41,7 +41,7 @@ docs {
   - `id` (in URL) - UUID of the degree to update. Replace `{{DEGREE_ID}}` variable with a valid degree UUID.
   
   ## Authentication
-  - Requires a valid bearer token (set via `{{ACCESS_TOKEN}}`). The role must be `super_admin` or `faculty_admin` (department admins can also manage degrees depending on deployment policies).
+  - Requires a valid bearer token (set via `{{ACCESS_TOKEN}}`). The role must be `super_admin` or `admin` (department admins can also manage degrees depending on deployment policies).
   
   ## Request Body
   - `name` (string, optional) — New display name for the degree. 3..255 characters.

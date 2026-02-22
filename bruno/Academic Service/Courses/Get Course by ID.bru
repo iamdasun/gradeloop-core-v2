@@ -1,0 +1,73 @@
+meta {
+  name: Get Course by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{COURSES_URL_V1}}/{{COURSE_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const id = res.body.id;
+    if (id) {
+      bru.setEnvVar("COURSE_ID", id);
+      console.log("✅ COURSE_ID confirmed:", id);
+    }
+
+    console.log("ℹ️  Code:", res.body.code);
+    console.log("ℹ️  Title:", res.body.title);
+    console.log("ℹ️  Credits:", res.body.credits);
+    console.log("ℹ️  Is Active:", res.body.is_active);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Get Course by ID
+
+  Retrieves a single course by its UUID.
+
+  ## Endpoint
+  GET /api/v1/courses/:id
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — resolved from {{COURSE_ID}}
+
+  ## Prerequisites
+  - {{COURSE_ID}} must be set (run "Create Course" or "List Courses" first —
+    the post-response scripts populate it automatically).
+
+  ## Response (200 OK)
+  {
+    "id":          "uuid",
+    "code":        "CS101",
+    "title":       "Introduction to Computer Science",
+    "description": "Basic concepts of computer science and programming",
+    "credits":     3,
+    "is_active":   true,
+    "created_at":  "2025-01-01T00:00:00Z",
+    "updated_at":  "2025-01-01T00:00:00Z"
+  }
+
+  ## Error Responses
+  - 400 Bad Request  — id is not a valid UUID
+  - 401 Unauthorized — missing or invalid token
+  - 403 Forbidden    — insufficient role
+  - 404 Not Found    — course not found or soft-deleted
+}

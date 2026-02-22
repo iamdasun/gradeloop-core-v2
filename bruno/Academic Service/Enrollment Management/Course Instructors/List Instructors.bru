@@ -1,0 +1,105 @@
+meta {
+  name: List Instructors
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{COURSE_INSTANCES_URL_V1}}/{{COURSE_INSTANCE_ID}}/instructors
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const instructors = res.body.instructors;
+    const count = res.body.count;
+
+    console.log("✅ Instructors fetched. Count:", count);
+
+    if (instructors && instructors.length > 0) {
+      const first = instructors[0];
+
+      const instanceId = first.course_instance_id;
+      if (instanceId) {
+        bru.setEnvVar("COURSE_INSTANCE_ID", instanceId);
+        console.log("✅ COURSE_INSTANCE_ID confirmed:", instanceId);
+      }
+
+      const userId = first.user_id;
+      if (userId) {
+        bru.setEnvVar("INSTRUCTOR_USER_ID", userId);
+        console.log("✅ INSTRUCTOR_USER_ID set from first instructor:", userId);
+      }
+
+      console.log("ℹ️  First instructor role:", first.role);
+    } else {
+      console.log("ℹ️  No instructors assigned to this course instance.");
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # List Instructors
+
+  Returns all instructors assigned to a specific course instance, ordered by
+  role ascending.
+
+  ## Endpoint
+  GET /api/v1/course-instances/:id/instructors
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — the UUID of the course instance, resolved from
+    {{COURSE_INSTANCE_ID}}
+
+  ## Prerequisites
+  - {{COURSE_INSTANCE_ID}} must be set (run "Create Course Instance" or
+    "List Course Instances by Batch" first — post-response scripts populate
+    it automatically).
+
+  ## Response (200 OK)
+  {
+    "instructors": [
+      {
+        "course_instance_id": "uuid",
+        "user_id":            "uuid",
+        "role":               "Lead Instructor"
+      },
+      {
+        "course_instance_id": "uuid",
+        "user_id":            "uuid",
+        "role":               "TA"
+      }
+    ],
+    "count": 2
+  }
+
+  ## Variable Automation
+  On success this script:
+  - Confirms {{COURSE_INSTANCE_ID}} from the first instructor's
+    course_instance_id field.
+  - Sets {{INSTRUCTOR_USER_ID}} from the first instructor's user_id field —
+    used by "Remove Instructor" so it works without manual copy-paste.
+
+  If the course instance has no instructors yet, no variables are overwritten
+  and a console message is logged.
+
+  ## Error Responses
+  - 400 Bad Request   — id is not a valid UUID
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — course instance not found
+}

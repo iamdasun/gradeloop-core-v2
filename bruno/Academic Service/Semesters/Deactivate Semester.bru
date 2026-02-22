@@ -1,0 +1,68 @@
+meta {
+  name: Deactivate Semester
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{SEMESTERS_URL_V1}}/{{SEMESTER_ID}}/deactivate
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Semester deactivated successfully");
+    console.log("ℹ️  Message:", res.body.message);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Deactivate Semester
+
+  Deactivates an existing active semester. Deactivated semesters are excluded
+  from default list results but are never hard-deleted.
+
+  ## Endpoint
+  PATCH /api/v1/semesters/:id/deactivate
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — resolved from {{SEMESTER_ID}}
+
+  ## Prerequisites
+  - {{SEMESTER_ID}} must be set (run "Create Semester" or "List Semesters"
+    first — the post-response scripts populate it automatically).
+  - The semester must currently be active (is_active = true). Attempting to
+    deactivate an already-inactive semester returns 400 Bad Request.
+
+  ## Business Rules
+  - Sets `is_active` to false on the semester record.
+  - Does NOT soft-delete the semester — it remains queryable via
+    GET /semesters/:id and via GET /semesters?include_inactive=true.
+  - An audit log entry with action SEMESTER_DEACTIVATED is written on success,
+    recording the is_active transition (true → false).
+
+  ## Response (200 OK)
+  {
+    "message": "semester deactivated successfully"
+  }
+
+  ## Error Responses
+  - 400 Bad Request  — semester is already inactive
+  - 401 Unauthorized — missing or invalid token
+  - 403 Forbidden    — insufficient role
+  - 404 Not Found    — semester not found or soft-deleted
+}

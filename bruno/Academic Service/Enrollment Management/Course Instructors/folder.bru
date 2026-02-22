@@ -1,0 +1,28 @@
+meta {
+  name: Course Instructors
+  seq: 3
+}
+
+auth {
+  mode: inherit
+}
+
+docs {
+  # Course Instructors
+
+  Manages instructor assignments to course instances.
+
+  ## Endpoints
+  - POST   /api/v1/course-instructors                          — Assign instructor
+  - GET    /api/v1/course-instances/:id/instructors            — List instructors
+  - DELETE /api/v1/course-instructors/:instanceID/:userID      — Remove instructor
+
+  ## Allowed Roles
+  - Lead Instructor
+  - Instructor
+  - TA
+
+  ## Variable Flow
+  Assign Instructor → saves INSTRUCTOR_USER_ID
+  Remove Instructor → uses COURSE_INSTANCE_ID + INSTRUCTOR_USER_ID
+}

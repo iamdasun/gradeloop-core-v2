@@ -1,0 +1,116 @@
+meta {
+  name: List Course Instances by Batch
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{BATCHES_URL_V1}}/{{BATCH_ID}}/course-instances
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const instances = res.body.course_instances;
+    const count = res.body.count;
+
+    console.log("✅ Course instances fetched. Count:", count);
+
+    if (instances && instances.length > 0) {
+      const first = instances[0];
+
+      const id = first.id;
+      if (id) {
+        bru.setEnvVar("COURSE_INSTANCE_ID", id);
+        console.log("✅ COURSE_INSTANCE_ID set from first instance:", id);
+      }
+
+      const batchId = first.batch_id;
+      if (batchId) {
+        bru.setEnvVar("BATCH_ID", batchId);
+        console.log("✅ BATCH_ID confirmed:", batchId);
+      }
+
+      const courseId = first.course_id;
+      if (courseId) {
+        bru.setEnvVar("COURSE_ID", courseId);
+        console.log("✅ COURSE_ID confirmed:", courseId);
+      }
+
+      const semesterId = first.semester_id;
+      if (semesterId) {
+        bru.setEnvVar("SEMESTER_ID", semesterId);
+        console.log("✅ SEMESTER_ID confirmed:", semesterId);
+      }
+
+      console.log("ℹ️  First instance status:", first.status);
+      console.log("ℹ️  First instance created_at:", first.created_at);
+    } else {
+      console.log("ℹ️  No course instances found for this batch.");
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # List Course Instances by Batch
+
+  Returns all course instances associated with a specific batch, ordered by
+  creation time ascending.
+
+  ## Endpoint
+  GET /api/v1/batches/:id/course-instances
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — the UUID of the batch, resolved from {{BATCH_ID}}
+
+  ## Prerequisites
+  - {{BATCH_ID}} must be set (run "Create Batch" or "Get Batch by ID" first).
+
+  ## Response (200 OK)
+  {
+    "course_instances": [
+      {
+        "id":           "uuid",
+        "course_id":    "uuid",
+        "semester_id":  "uuid",
+        "batch_id":     "uuid",
+        "status":       "Planned",
+        "created_at":   "2025-01-01T00:00:00Z",
+        "updated_at":   "2025-01-01T00:00:00Z"
+      }
+    ],
+    "count": 1
+  }
+
+  ## Variable Automation
+  On success this script:
+  - Sets {{COURSE_INSTANCE_ID}} from the first instance's id — used by
+    Assign Instructor, List Instructors, Enroll Student, List Enrollments,
+    and Update Enrollment.
+  - Confirms {{BATCH_ID}} from the first instance's batch_id field.
+  - Confirms {{COURSE_ID}} from the first instance's course_id field.
+  - Confirms {{SEMESTER_ID}} from the first instance's semester_id field.
+
+  If the batch has no course instances yet, no variables are overwritten and a
+  console message is logged.
+
+  ## Error Responses
+  - 400 Bad Request   — id is not a valid UUID
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — batch not found
+}

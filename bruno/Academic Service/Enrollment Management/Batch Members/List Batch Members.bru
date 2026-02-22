@@ -1,0 +1,98 @@
+meta {
+  name: List Batch Members
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{BATCHES_URL_V1}}/{{BATCH_ID}}/members
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const members = res.body.members;
+    const count = res.body.count;
+
+    console.log("✅ Batch members fetched. Count:", count);
+
+    if (members && members.length > 0) {
+      const first = members[0];
+
+      const userId = first.user_id;
+      if (userId) {
+        bru.setEnvVar("BATCH_MEMBER_USER_ID", userId);
+        console.log("✅ BATCH_MEMBER_USER_ID set from first member:", userId);
+      }
+
+      const batchId = first.batch_id;
+      if (batchId) {
+        bru.setEnvVar("BATCH_ID", batchId);
+        console.log("✅ BATCH_ID confirmed:", batchId);
+      }
+
+      console.log("ℹ️  First member status:", first.status);
+      console.log("ℹ️  First member enrolled_at:", first.enrolled_at);
+    } else {
+      console.log("ℹ️  No members found in this batch.");
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # List Batch Members
+
+  Returns all students belonging to a specific batch.
+
+  ## Endpoint
+  GET /api/v1/batches/:id/members
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — the UUID of the batch, resolved from {{BATCH_ID}}
+
+  ## Prerequisites
+  - {{BATCH_ID}} must be set (run "Create Batch" or "Get Batch by ID" first).
+
+  ## Response (200 OK)
+  {
+    "members": [
+      {
+        "batch_id":    "uuid",
+        "user_id":     "uuid",
+        "status":      "Active",
+        "enrolled_at": "2025-01-01T00:00:00Z"
+      }
+    ],
+    "count": 1
+  }
+
+  ## Variable Automation
+  On success this script:
+  - Confirms {{BATCH_ID}} from the first member's batch_id field.
+  - Sets {{BATCH_MEMBER_USER_ID}} from the first member's user_id field so that
+    subsequent requests (Remove Batch Member, Enroll Student) work without
+    manual intervention.
+
+  If the batch has no members yet, no variables are overwritten and a console
+  message is logged.
+
+  ## Error Responses
+  - 400 Bad Request   — id is not a valid UUID
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — batch not found
+}

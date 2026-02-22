@@ -1,0 +1,31 @@
+meta {
+  name: Enrollments
+  seq: 4
+}
+
+auth {
+  mode: inherit
+}
+
+docs {
+  # Enrollments
+
+  Manages student enrollments into course instances.
+
+  ## Endpoints
+
+  | Method | Path                                          | Description              |
+  |--------|-----------------------------------------------|--------------------------|
+  | POST   | /api/v1/enrollments                           | Enroll a student         |
+  | GET    | /api/v1/course-instances/:id/enrollments      | List enrollments         |
+  | PUT    | /api/v1/enrollments/:instanceID/:userID       | Update enrollment        |
+
+  ## Business Rules
+  - Student must belong to the batch that owns the course instance
+  - Duplicate enrollments are rejected (409 Conflict)
+  - Allowed statuses: Enrolled, Dropped, Completed, Failed
+
+  ## Key Variables
+  - {{COURSE_INSTANCE_ID}}  — set by "Create Course Instance"
+  - {{ENROLLMENT_USER_ID}} — set by "Enroll Student"
+}

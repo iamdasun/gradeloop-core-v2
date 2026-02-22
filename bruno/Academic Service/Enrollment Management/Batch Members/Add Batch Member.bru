@@ -1,0 +1,106 @@
+meta {
+  name: Add Batch Member
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{BATCH_MEMBERS_URL_V1}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "batch_id": "{{BATCH_ID}}",
+    "user_id": "{{BATCH_MEMBER_USER_ID}}",
+    "status": "Active"
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    const batchId = res.body.batch_id;
+    if (batchId) {
+      bru.setEnvVar("BATCH_ID", batchId);
+      console.log("✅ BATCH_ID confirmed:", batchId);
+    }
+
+    const userId = res.body.user_id;
+    if (userId) {
+      bru.setEnvVar("BATCH_MEMBER_USER_ID", userId);
+      console.log("✅ BATCH_MEMBER_USER_ID saved:", userId);
+    }
+
+    const status = res.body.status;
+    if (status) {
+      console.log("✅ Membership status:", status);
+    }
+
+    const enrolledAt = res.body.enrolled_at;
+    if (enrolledAt) {
+      console.log("✅ Enrolled at:", enrolledAt);
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Add Batch Member
+
+  Adds a student (identified by IAM user_id) to a batch.
+
+  ## Endpoint
+  POST /api/v1/batch-members
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Prerequisites
+  - A valid {{BATCH_ID}} must be set (run "Create Batch" or "Get Batch by ID" first).
+  - {{BATCH_MEMBER_USER_ID}} must be set in the environment — this is the IAM
+    user UUID of the student being added.
+
+  ## Request Body
+  - `batch_id`  (uuid, required) — target batch
+  - `user_id`   (uuid, required) — IAM user UUID of the student (no DB FK)
+  - `status`    (string, optional, default: "Active")
+    Allowed values: Active | Graduated | Suspended | Withdrawn
+
+  ## Business Rules
+  - The batch must exist (not soft-deleted).
+  - The batch must be active (is_active = true).
+  - A user can only be a member of a batch once — duplicate membership returns 409.
+  - user_id is a logical reference to the IAM service; no FK constraint enforced.
+  - An audit log entry with action BATCH_MEMBER_ADDED is written on success.
+
+  ## Response (201 Created)
+  {
+    "batch_id":    "uuid",
+    "user_id":     "uuid",
+    "status":      "Active",
+    "enrolled_at": "2025-01-01T00:00:00Z"
+  }
+
+  ## Variable Automation
+  On success this script saves:
+  - BATCH_ID          — confirmed from response
+  - BATCH_MEMBER_USER_ID — confirmed from response (used by Remove Batch Member
+                           and Enroll Student)
+
+  ## Error Responses
+  - 400 Bad Request   — missing fields, invalid status, or batch is inactive
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — batch not found
+  - 409 Conflict      — user is already a member of this batch
+}

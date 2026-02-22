@@ -1,0 +1,128 @@
+meta {
+  name: Create Course Instance
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{COURSE_INSTANCES_URL_V1}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "course_id": "{{COURSE_ID}}",
+    "semester_id": "{{SEMESTER_ID}}",
+    "batch_id": "{{BATCH_ID}}",
+    "status": "Planned",
+    "max_enrollment": 30
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    const id = res.body.id;
+    if (id) {
+      bru.setEnvVar("COURSE_INSTANCE_ID", id);
+      console.log("✅ COURSE_INSTANCE_ID saved:", id);
+    }
+
+    const batchId = res.body.batch_id;
+    if (batchId) {
+      bru.setEnvVar("BATCH_ID", batchId);
+      console.log("✅ BATCH_ID confirmed:", batchId);
+    }
+
+    const courseId = res.body.course_id;
+    if (courseId) {
+      bru.setEnvVar("COURSE_ID", courseId);
+      console.log("✅ COURSE_ID confirmed:", courseId);
+    }
+
+    const semesterId = res.body.semester_id;
+    if (semesterId) {
+      bru.setEnvVar("SEMESTER_ID", semesterId);
+      console.log("✅ SEMESTER_ID confirmed:", semesterId);
+    }
+
+    const status = res.body.status;
+    if (status) {
+      console.log("✅ Course instance status:", status);
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Create Course Instance
+
+  Creates a new course instance — a specific course offered to a batch in a
+  given semester.
+
+  ## Endpoint
+  POST /api/v1/course-instances
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Prerequisites
+  - {{BATCH_ID}} must be set (run "Create Batch" or "Get Batch by ID" first).
+  - {{COURSE_ID}} is a logical UUID reference to the Course Catalog service.
+    Set it manually in the environment or replace inline.
+  - {{SEMESTER_ID}} is a logical UUID reference to the Academic Calendar service.
+    Set it manually in the environment or replace inline.
+
+  ## Request Body
+  - `course_id`      (uuid, required)   — logical ref to Course Catalog service
+  - `semester_id`    (uuid, required)   — logical ref to Academic Calendar service
+  - `batch_id`       (uuid, required)   — must be an active, non-deleted batch
+  - `status`         (string, optional, default: "Planned")
+    Allowed values: Planned | Active | Completed | Cancelled
+  - `max_enrollment` (int, optional, default: 0) — maximum number of students
+    allowed to enroll; must be a non-negative integer (0 = unlimited)
+
+  ## Business Rules
+  - The referenced batch must exist (not soft-deleted) and be active (is_active = true).
+  - Combination (course_id, semester_id, batch_id) must be unique — scheduling
+    the same course for the same batch in the same semester returns 409 Conflict.
+  - course_id and semester_id are cross-service logical references; no FK
+    constraints exist for them in the Academic Service database.
+  - An audit log entry with action COURSE_INSTANCE_CREATED is written on success.
+
+  ## Response (201 Created)
+  {
+    "id":             "uuid",
+    "course_id":      "uuid",
+    "semester_id":    "uuid",
+    "batch_id":       "uuid",
+    "status":         "Planned",
+    "max_enrollment": 30,
+    "created_at":     "2025-01-01T00:00:00Z",
+    "updated_at":     "2025-01-01T00:00:00Z"
+  }
+
+  ## Variable Automation
+  On success this script saves:
+  - COURSE_INSTANCE_ID — used by Assign Instructor, List Instructors,
+                         Enroll Student, List Enrollments, Update Enrollment
+  - BATCH_ID           — confirmed from response
+  - COURSE_ID          — confirmed from response
+  - SEMESTER_ID        — confirmed from response
+
+  ## Error Responses
+  - 400 Bad Request   — missing fields, invalid status, or batch inactive
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — batch not found
+  - 409 Conflict      — (course_id, semester_id, batch_id) already exists
+}

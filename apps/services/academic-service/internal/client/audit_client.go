@@ -36,6 +36,29 @@ const (
 	AuditActionBatchCreated     AuditAction = "BATCH_CREATED"
 	AuditActionBatchUpdated     AuditAction = "BATCH_UPDATED"
 	AuditActionBatchDeactivated AuditAction = "BATCH_DEACTIVATED"
+
+	// Course actions
+	AuditActionCourseCreated             AuditAction = "COURSE_CREATED"
+	AuditActionCourseUpdated             AuditAction = "COURSE_UPDATED"
+	AuditActionCourseDeactivated         AuditAction = "COURSE_DEACTIVATED"
+	AuditActionCoursePrerequisiteAdded   AuditAction = "COURSE_PREREQUISITE_ADDED"
+	AuditActionCoursePrerequisiteRemoved AuditAction = "COURSE_PREREQUISITE_REMOVED"
+
+	// Semester actions
+	AuditActionSemesterCreated     AuditAction = "SEMESTER_CREATED"
+	AuditActionSemesterUpdated     AuditAction = "SEMESTER_UPDATED"
+	AuditActionSemesterDeactivated AuditAction = "SEMESTER_DEACTIVATED"
+
+	// Enrollment management actions
+	AuditActionBatchMemberAdded         AuditAction = "BATCH_MEMBER_ADDED"
+	AuditActionBatchMemberRemoved       AuditAction = "BATCH_MEMBER_REMOVED"
+	AuditActionCourseInstanceCreated    AuditAction = "COURSE_INSTANCE_CREATED"
+	AuditActionCourseInstanceUpdated    AuditAction = "COURSE_INSTANCE_UPDATED"
+	AuditActionCourseInstructorAssigned AuditAction = "COURSE_INSTRUCTOR_ASSIGNED"
+	AuditActionCourseInstructorRemoved  AuditAction = "COURSE_INSTRUCTOR_REMOVED"
+	AuditActionStudentEnrolled          AuditAction = "STUDENT_ENROLLED"
+	AuditActionEnrollmentUpdated        AuditAction = "ENROLLMENT_UPDATED"
+	AuditActionEnrollmentRemoved        AuditAction = "ENROLLMENT_REMOVED"
 )
 
 // AuditLogRequest represents the request body for audit logging

@@ -1,0 +1,37 @@
+meta {
+  name: Course Instances
+  seq: 2
+}
+
+auth {
+  mode: inherit
+}
+
+docs {
+  # Course Instances
+
+  A CourseInstance represents a specific course offered to a batch in a
+  particular semester. Because course_id and semester_id are owned by external
+  services (Course Catalog & Academic Calendar), they are stored as logical UUID
+  references — no foreign-key constraints exist for them in this service.
+
+  ## Endpoints
+
+  | Method | Path                                | Description                    |
+  |--------|-------------------------------------|--------------------------------|
+  | POST   | /api/v1/course-instances            | Create a new course instance   |
+  | PUT    | /api/v1/course-instances/:id        | Update status of an instance   |
+  | GET    | /api/v1/batches/:id/course-instances| List all instances for a batch |
+
+  ## Status Lifecycle
+  Planned → Active → Completed
+                   → Cancelled
+
+  ## Unique Constraint
+  (course_id, semester_id, batch_id) — the same course cannot be scheduled
+  for the same batch in the same semester more than once.
+
+  ## Variable Automation
+  - COURSE_INSTANCE_ID is saved automatically after a successful POST.
+  - BATCH_ID must already be set (run Add Batch Member or Create Batch first).
+}

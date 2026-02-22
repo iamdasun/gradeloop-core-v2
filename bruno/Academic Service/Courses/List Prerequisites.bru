@@ -1,0 +1,104 @@
+meta {
+  name: List Prerequisites
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{COURSES_URL_V1}}/{{COURSE_ID}}/prerequisites
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const prerequisites = res.body.prerequisites;
+    const count = res.body.count;
+
+    console.log("✅ Prerequisites fetched. Count:", count);
+
+    if (prerequisites && prerequisites.length > 0) {
+      const first = prerequisites[0];
+
+      const prereqId = first.prerequisite_course_id;
+      if (prereqId) {
+        bru.setEnvVar("PREREQUISITE_COURSE_ID", prereqId);
+        console.log("✅ PREREQUISITE_COURSE_ID set from first prerequisite:", prereqId);
+      }
+
+      if (first.prerequisite_course) {
+        console.log("ℹ️  First prerequisite code:", first.prerequisite_course.code);
+        console.log("ℹ️  First prerequisite title:", first.prerequisite_course.title);
+        console.log("ℹ️  First prerequisite credits:", first.prerequisite_course.credits);
+      }
+    } else {
+      console.log("ℹ️  No prerequisites found for this course.");
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # List Prerequisites
+
+  Returns all prerequisite relationships for a given course. Each entry
+  includes the full prerequisite course details.
+
+  ## Endpoint
+  GET /api/v1/courses/:id/prerequisites
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — the course whose prerequisites are listed,
+    resolved from {{COURSE_ID}}
+
+  ## Prerequisites
+  - {{COURSE_ID}} must be set (run "Create Course" or "List Courses" first —
+    the post-response scripts populate it automatically).
+
+  ## Response (200 OK)
+  {
+    "prerequisites": [
+      {
+        "course_id":              "uuid",
+        "prerequisite_course_id": "uuid",
+        "prerequisite_course": {
+          "id":          "uuid",
+          "code":        "CS101",
+          "title":       "Introduction to Computer Science",
+          "description": "Basic concepts of computer science and programming",
+          "credits":     3,
+          "is_active":   true,
+          "created_at":  "2025-01-01T00:00:00Z",
+          "updated_at":  "2025-01-01T00:00:00Z"
+        }
+      }
+    ],
+    "count": 1
+  }
+
+  ## Variable Automation
+  On success this script:
+  - Sets {{PREREQUISITE_COURSE_ID}} from the first prerequisite's
+    prerequisite_course_id — used by Remove Prerequisite.
+
+  If no prerequisites are found, no variables are overwritten and a
+  console message is logged.
+
+  ## Error Responses
+  - 400 Bad Request  — id is not a valid UUID
+  - 401 Unauthorized — missing or invalid token
+  - 403 Forbidden    — insufficient role
+  - 404 Not Found    — course not found or soft-deleted
+}

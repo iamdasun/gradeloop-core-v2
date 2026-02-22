@@ -1,0 +1,51 @@
+meta {
+  name: Courses
+  seq: 7
+}
+
+auth {
+  mode: inherit
+}
+
+docs {
+  # Courses
+
+  Manages the course catalog. A Course is a reusable academic offering
+  identified by a unique code. Courses can be linked to one another via
+  prerequisites (self-referential many-to-many).
+
+  ## Endpoints
+
+  | Method | Path                                        | Description                        |
+  |--------|---------------------------------------------|------------------------------------|
+  | POST   | /api/v1/courses                             | Create a new course                |
+  | GET    | /api/v1/courses                             | List all courses                   |
+  | GET    | /api/v1/courses/:id                         | Get a course by ID                 |
+  | PUT    | /api/v1/courses/:id                         | Update a course                    |
+  | PATCH  | /api/v1/courses/:id/deactivate              | Deactivate a course                |
+  | POST   | /api/v1/courses/:id/prerequisites           | Add a prerequisite to a course     |
+  | GET    | /api/v1/courses/:id/prerequisites           | List prerequisites for a course    |
+  | DELETE | /api/v1/courses/:id/prerequisites/:prereqID | Remove a prerequisite from a course|
+
+  ## Authentication
+  All requests require a valid Bearer token.
+  Caller must have `super_admin` or `admin` role.
+
+  Run **IAM Service → Auth → Login** first to populate {{ACCESS_TOKEN}}.
+
+  ## Key Environment Variables
+
+  | Variable              | Set by               | Used by                                   |
+  |-----------------------|----------------------|-------------------------------------------|
+  | COURSE_ID             | Create Course        | Get, Update, Deactivate, Add Prerequisite |
+  | PREREQUISITE_COURSE_ID| Create Course        | Add / Remove Prerequisite                 |
+
+  ## Recommended Execution Order
+
+  1. Create Course (main)
+  2. Create Course (prerequisite)
+  3. Add Prerequisite
+  4. List Prerequisites
+  5. Update Course
+  6. Deactivate Course
+}

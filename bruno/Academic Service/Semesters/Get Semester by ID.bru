@@ -1,0 +1,78 @@
+meta {
+  name: Get Semester by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{SEMESTERS_URL_V1}}/{{SEMESTER_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const id = res.body.id;
+    if (id) {
+      bru.setEnvVar("SEMESTER_ID", id);
+      console.log("✅ SEMESTER_ID confirmed:", id);
+    }
+
+    console.log("ℹ️  Code:", res.body.code);
+    console.log("ℹ️  Name:", res.body.name);
+    console.log("ℹ️  Term Type:", res.body.term_type);
+    console.log("ℹ️  Status:", res.body.status);
+    console.log("ℹ️  Start Date:", res.body.start_date);
+    console.log("ℹ️  End Date:", res.body.end_date);
+    console.log("ℹ️  Is Active:", res.body.is_active);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Get Semester by ID
+
+  Retrieves a single semester by its UUID.
+
+  ## Endpoint
+  GET /api/v1/semesters/:id
+
+  ## Authentication
+  - Requires a valid bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Path Parameters
+  - `id` (uuid, required) — resolved from {{SEMESTER_ID}}
+
+  ## Prerequisites
+  - {{SEMESTER_ID}} must be set (run "Create Semester" or "List Semesters"
+    first — the post-response scripts populate it automatically).
+
+  ## Response (200 OK)
+  {
+    "id":         "uuid",
+    "name":       "Fall 2025",
+    "code":       "FALL-2025",
+    "term_type":  "Fall",
+    "start_date": "2025-09-01",
+    "end_date":   "2025-12-15",
+    "status":     "Planned",
+    "is_active":  true,
+    "created_at": "2025-01-01T00:00:00Z",
+    "updated_at": "2025-01-01T00:00:00Z"
+  }
+
+  ## Error Responses
+  - 400 Bad Request  — id is not a valid UUID
+  - 401 Unauthorized — missing or invalid token
+  - 403 Forbidden    — insufficient role
+  - 404 Not Found    — semester not found or soft-deleted
+}
