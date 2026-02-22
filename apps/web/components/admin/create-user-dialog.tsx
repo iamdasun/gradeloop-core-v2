@@ -17,20 +17,19 @@ import { SelectNative } from '@/components/ui/select-native';
 import { useAdminUsersStore } from '@/lib/stores/adminUsersStore';
 import { usersApi, handleApiError } from '@/lib/api/users';
 import { toast } from '@/lib/hooks/use-toast';
-import type { CreateUserRequest, FormErrors } from '@/types/admin.types';
-import type { UserListItem } from '@/types/auth.types';
+import type { CreateUserRequest, CreateUserResponse, FormErrors } from '@/types/admin.types';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: (user: UserListItem) => void;
+  onSuccess: () => void;
 }
 
 const EMPTY: CreateUserRequest = {
   username: '',
   email: '',
   role_id: '',
-  password: '',
+  user_type: '',
 };
 
 function validate(values: CreateUserRequest): FormErrors {
@@ -42,6 +41,11 @@ function validate(values: CreateUserRequest): FormErrors {
     errors.email = 'Enter a valid email address';
   }
   if (!values.role_id) errors.role_id = 'Role is required';
+  if (!values.user_type) errors.user_type = 'User type is required';
+  if (values.user_type === 'student' && !values.student_id?.trim())
+    errors.student_id = 'Student ID is required for student type';
+  if (values.user_type === 'employee' && !values.designation?.trim())
+    errors.designation = 'Designation is required for employee type';
   return errors;
 }
 
@@ -79,11 +83,9 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
 
     setSubmitting(true);
     try {
-      const payload: CreateUserRequest = { ...values };
-      if (!payload.password?.trim()) delete payload.password;
-      const user = await usersApi.create(payload);
-      toast.success('User created', `${user.username} has been added.`);
-      onSuccess(user);
+      const user: CreateUserResponse = await usersApi.create(values);
+      toast.success('User created', `${user.username} has been added. An activation email has been sent.`);
+      onSuccess();
       onOpenChange(false);
     } catch (err) {
       toast.error('Failed to create user', handleApiError(err));
@@ -147,19 +149,66 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
             )}
           </div>
 
-          {/* Password */}
+          {/* User Type */}
           <div className="space-y-1.5">
-            <Label htmlFor="cu-password">Password</Label>
-            <Input
-              id="cu-password"
-              type="password"
-              placeholder="Leave blank for auto-generated"
-              value={values.password ?? ''}
-              onChange={(e) => set('password', e.target.value)}
-              autoComplete="new-password"
+            <Label htmlFor="cu-usertype">
+              User Type <span className="text-red-500">*</span>
+            </Label>
+            <SelectNative
+              id="cu-usertype"
+              value={values.user_type}
+              onChange={(e) => set('user_type', e.target.value)}
               disabled={submitting}
-            />
+            >
+              <option value="">Select user type</option>
+              <option value="student">Student</option>
+              <option value="employee">Employee</option>
+              <option value="all">Other / Admin</option>
+            </SelectNative>
+            {errors.user_type && (
+              <p className="text-xs text-red-500">{errors.user_type}</p>
+            )}
           </div>
+
+          {/* Student ID (only for student type) */}
+          {values.user_type === 'student' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="cu-studentid">
+                Student ID <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="cu-studentid"
+                placeholder="e.g. STU-2024-001"
+                value={values.student_id ?? ''}
+                onChange={(e) => set('student_id', e.target.value)}
+                autoComplete="off"
+                disabled={submitting}
+              />
+              {errors.student_id && (
+                <p className="text-xs text-red-500">{errors.student_id}</p>
+              )}
+            </div>
+          )}
+
+          {/* Designation (only for employee type) */}
+          {values.user_type === 'employee' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="cu-designation">
+                Designation <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="cu-designation"
+                placeholder="e.g. Lecturer"
+                value={values.designation ?? ''}
+                onChange={(e) => set('designation', e.target.value)}
+                autoComplete="off"
+                disabled={submitting}
+              />
+              {errors.designation && (
+                <p className="text-xs text-red-500">{errors.designation}</p>
+              )}
+            </div>
+          )}
 
           {/* Role */}
           <div className="space-y-1.5">

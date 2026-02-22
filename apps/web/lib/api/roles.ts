@@ -5,6 +5,8 @@ import type { Role, Permission } from '@/types/auth.types';
 function normalizeArray<T>(raw: any): T[] {
   if (Array.isArray(raw)) return raw as T[];
   if (Array.isArray(raw?.data)) return raw.data as T[];
+  // GET /roles returns { roles: [] }
+  if (Array.isArray(raw?.roles)) return raw.roles as T[];
   return [];
 }
 

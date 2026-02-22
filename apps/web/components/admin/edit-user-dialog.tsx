@@ -18,7 +18,7 @@ import { SelectNative } from '@/components/ui/select-native';
 import { useAdminUsersStore } from '@/lib/stores/adminUsersStore';
 import { usersApi, handleApiError } from '@/lib/api/users';
 import { toast } from '@/lib/hooks/use-toast';
-import type { UpdateUserRequest, FormErrors } from '@/types/admin.types';
+import type { UpdateUserRequest, UpdateUserResponse, FormErrors } from '@/types/admin.types';
 import type { UserListItem } from '@/types/auth.types';
 
 interface Props {
@@ -28,14 +28,14 @@ interface Props {
   onSuccess: (updated: UserListItem) => void;
 }
 
-interface FormValues extends UpdateUserRequest {
+interface FormValues {
   role_id: string;
+  is_active: boolean;
 }
 
 export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
   const { roles, rolesLoading, fetchRoles } = useAdminUsersStore();
   const [values, setValues] = React.useState<FormValues>({
-    full_name: '',
     is_active: true,
     role_id: '',
   });
@@ -46,7 +46,6 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
   React.useEffect(() => {
     if (user && open) {
       setValues({
-        full_name: (user as UserListItem & { full_name?: string }).full_name ?? '',
         is_active: user.is_active,
         role_id: user.role_id ?? '',
       });
@@ -55,33 +54,33 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
     }
   }, [user, open, fetchRoles]);
 
-  /** Track whether the role has changed vs original. */
-  const roleChanged = user && values.role_id && values.role_id !== user.role_id;
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
 
     setSubmitting(true);
     try {
-      // 1. Update profile fields
-      const profilePayload: UpdateUserRequest = {
+      const payload: UpdateUserRequest = {
         is_active: values.is_active,
       };
-      if (values.full_name?.trim()) profilePayload.full_name = values.full_name.trim();
-
-      const updated = await usersApi.update(user.id, profilePayload);
-
-      // 2. Assign new role if changed
-      if (roleChanged && values.role_id) {
-        await usersApi.assignRole(user.id, { role_id: values.role_id });
+      // Only include role_id if it changed
+      if (values.role_id && values.role_id !== user.role_id) {
+        payload.role_id = values.role_id;
       }
 
+      const updated: UpdateUserResponse = await usersApi.update(user.id, payload);
+
+      // Merge response with original user to produce a full UserListItem
+      const resolvedRoleId = updated.role_id ?? values.role_id ?? user.role_id;
       const finalUser: UserListItem = {
-        ...updated,
-        role_id: values.role_id || updated.role_id,
+        ...user,
+        id: updated.id,
+        username: updated.username,
+        email: updated.email,
+        role_id: resolvedRoleId,
+        is_active: updated.is_active,
         role_name:
-          roles.find((r) => r.id === values.role_id)?.name ?? updated.role_name,
+          roles.find((r) => r.id === resolvedRoleId)?.name ?? user.role_name,
       };
 
       toast.success('User updated', `${user.username} has been updated.`);
@@ -126,23 +125,6 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
                 {user.email}
               </span>
             </div>
-          </div>
-
-          {/* Full name */}
-          <div className="space-y-1.5">
-            <Label htmlFor="eu-fullname">Display Name</Label>
-            <Input
-              id="eu-fullname"
-              placeholder="John Doe"
-              value={values.full_name ?? ''}
-              onChange={(e) =>
-                setValues((v) => ({ ...v, full_name: e.target.value }))
-              }
-              disabled={submitting}
-            />
-            {errors.full_name && (
-              <p className="text-xs text-red-500">{errors.full_name}</p>
-            )}
           </div>
 
           {/* Role */}

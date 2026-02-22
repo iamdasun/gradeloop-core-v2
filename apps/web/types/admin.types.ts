@@ -18,33 +18,53 @@ export interface PaginatedResponse<T> {
 
 // ── Users ────────────────────────────────────────────────────────────────────
 
+/** Query params supported by GET /users. */
 export interface ListUsersParams {
   page?: number;
   limit?: number;
-  search?: string;
-  role_id?: string;
-  is_active?: boolean;
+  /** Filter by user type: "all" | "student" | "employee" */
+  user_type?: string;
 }
 
+/** POST /users — backend requires user_type; student/employee need extra fields. */
 export interface CreateUserRequest {
   username: string;
   email: string;
   role_id: string;
-  password?: string;
+  /** "student" | "employee" | "all" */
+  user_type: string;
+  student_id?: string;
+  designation?: string;
+}
+
+/** Matches the backend CreateUserResponse DTO. */
+export interface CreateUserResponse {
+  id: string;
+  username: string;
+  email: string;
+  role_id: string;
+  is_active: boolean;
+  activation_link: string;
+  message: string;
 }
 
 /**
- * PUT /users/:id
- * The backend accepts full_name and is_active.
- * username/email are not updateable via this endpoint.
+ * PUT /users/:id — backend only accepts role_id and is_active.
+ * username / email / full_name are NOT updatable via this endpoint.
  */
 export interface UpdateUserRequest {
-  full_name?: string;
+  role_id?: string;
   is_active?: boolean;
 }
 
-export interface AssignRoleRequest {
+/** Matches the backend UpdateUserResponse DTO. */
+export interface UpdateUserResponse {
+  id: string;
+  username: string;
+  email: string;
   role_id: string;
+  is_active: boolean;
+  message: string;
 }
 
 // ── Form validation ──────────────────────────────────────────────────────────

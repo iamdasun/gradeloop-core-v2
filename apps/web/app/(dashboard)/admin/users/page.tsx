@@ -138,13 +138,7 @@ export default function UsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const params: Record<string, unknown> = { page, limit: PAGE_LIMIT };
-      if (debouncedSearch) params.search = debouncedSearch;
-      if (roleFilter) params.role_id = roleFilter;
-      if (statusFilter === 'active') params.is_active = true;
-      if (statusFilter === 'inactive') params.is_active = false;
-
-      const result = await usersApi.list(params);
+      const result = await usersApi.list({ page, limit: PAGE_LIMIT });
       setUsers(result.data);
       setTotal(result.total);
     } catch (err) {
@@ -152,20 +146,34 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, roleFilter, statusFilter]);
+  }, [page]);
 
   React.useEffect(() => { fetchUsers(); }, [fetchUsers]);
   React.useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
-  // ── Derived stats ────────────────────────────────────────────────────────
+  // ── Client-side filtering (backend doesn't support search/role/status params) ──
+  const displayUsers = React.useMemo(() => {
+    return users.filter((u) => {
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
+        if (!u.username.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q))
+          return false;
+      }
+      if (roleFilter && u.role_id !== roleFilter) return false;
+      if (statusFilter === 'active' && !u.is_active) return false;
+      if (statusFilter === 'inactive' && u.is_active) return false;
+      return true;
+    });
+  }, [users, debouncedSearch, roleFilter, statusFilter]);
+
+  // ── Derived stats ────────────────────────────────────────────────────────────
   const activeCount = users.filter((u) => u.is_active).length;
   const inactiveCount = users.filter((u) => !u.is_active).length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
-  function handleUserCreated(user: UserListItem) {
-    setUsers((prev) => [user, ...prev]);
-    setTotal((t) => t + 1);
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+  function handleUserCreated() {
+    fetchUsers();
   }
   function handleUserUpdated(updated: UserListItem) {
     setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
@@ -295,7 +303,7 @@ export default function UsersPage() {
               <TableBody>
                 {loading ? (
                   <TableSkeleton rows={8} />
-                ) : users.length === 0 ? (
+                ) : displayUsers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-16 text-center text-zinc-500">
                       <Users className="mx-auto h-10 w-10 text-zinc-300 dark:text-zinc-600 mb-3" />
@@ -308,7 +316,7 @@ export default function UsersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  users.map((user) => (
+                  displayUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
