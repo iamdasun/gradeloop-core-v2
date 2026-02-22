@@ -1,0 +1,118 @@
+meta {
+  name: List Assignments by Course Instance
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{ASSIGNMENTS_URL_V1}}/course-instance/{{COURSE_INSTANCE_ID_FOR_ASSIGNMENT}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const count = res.body.count;
+    const assignments = res.body.assignments;
+
+    console.log("✅ Assignments retrieved:", count);
+
+    if (assignments && assignments.length > 0) {
+      // Save the first assignment ID for subsequent requests if not already set
+      const firstId = assignments[0].id;
+      if (firstId && !bru.getEnvVar("ASSIGNMENT_ID")) {
+        bru.setEnvVar("ASSIGNMENT_ID", firstId);
+        console.log("✅ ASSIGNMENT_ID set from first result:", firstId);
+      }
+
+      assignments.forEach((a, i) => {
+        console.log(`  [${i + 1}] ${a.title} (id: ${a.id})`);
+        console.log(`       is_active: ${a.is_active}, allow_group: ${a.allow_group_submission}, ai: ${a.enable_ai_assistant}`);
+      });
+    } else {
+      console.log("ℹ️  No active assignments found for this course instance.");
+    }
+  }
+
+  if (res.status === 400) {
+    console.log("❌ Bad request — COURSE_INSTANCE_ID_FOR_ASSIGNMENT may be missing or invalid.");
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # List Assignments by Course Instance
+
+  Returns all **active** assignments belonging to the specified CourseInstance,
+  ordered by creation time ascending.
+
+  Deactivated assignments (`is_active = false`) are excluded from results.
+
+  ## Endpoint
+  GET /api/v1/assignments/course-instance/:courseInstanceId
+
+  ## Authentication
+  - Requires a valid Bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Prerequisites
+  - {{COURSE_INSTANCE_ID_FOR_ASSIGNMENT}} must be set.
+    Copy the `id` from Academic Service → Course Instances → Create Course Instance,
+    or run "Create Assignment" first (it auto-saves this variable on success).
+
+  ## Path Parameters
+  | Parameter          | Type | Required | Description                          |
+  |--------------------|------|----------|--------------------------------------|
+  | courseInstanceId   | uuid | ✅       | UUID of the target CourseInstance    |
+
+  ## Business Rules
+  - Only assignments with `is_active = true` are included.
+  - Results are ordered by `created_at ASC`.
+  - An empty array is returned (not 404) when the course instance exists but
+    has no active assignments.
+
+  ## Response (200 OK)
+  ```json
+  {
+    "assignments": [
+      {
+        "id":                      "uuid",
+        "course_instance_id":      "uuid",
+        "title":                   "Assignment 1",
+        "description":             "...",
+        "code":                    "CS101-A1",
+        "release_at":              "2025-08-01T09:00:00Z",
+        "due_at":                  "2025-08-15T23:59:00Z",
+        "late_due_at":             "2025-08-18T23:59:00Z",
+        "allow_late_submissions":  true,
+        "enforce_time_limit":      120,
+        "allow_group_submission":  true,
+        "max_group_size":          4,
+        "enable_ai_assistant":     true,
+        "enable_socratic_feedback":true,
+        "allow_regenerate":        false,
+        "is_active":               true,
+        "created_by":              "uuid",
+        "created_at":              "2025-01-01T00:00:00Z",
+        "updated_at":              "2025-01-01T00:00:00Z"
+      }
+    ],
+    "count": 1
+  }
+  ```
+
+  ## Error Responses
+  | Status | Reason                                                       |
+  |--------|--------------------------------------------------------------|
+  | 400    | courseInstanceId is not a valid UUID                         |
+  | 401    | Missing or invalid Bearer token                              |
+  | 403    | Insufficient role (requires super_admin or admin)            |
+}

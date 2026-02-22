@@ -1,0 +1,163 @@
+meta {
+  name: Update Assignment
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{ASSIGNMENTS_URL_V1}}/{{ASSIGNMENT_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "title": "Assignment 1: Introduction to Algorithms (Revised)",
+    "description": "Implement and analyse three classic sorting algorithms. Updated with extra requirements.",
+    "code": "CS101-A1-REV",
+    "due_at": "2025-08-20T23:59:00Z",
+    "late_due_at": "2025-08-23T23:59:00Z",
+    "allow_late_submissions": true,
+    "enforce_time_limit": 90,
+    "allow_group_submission": true,
+    "max_group_size": 3,
+    "enable_ai_assistant": true,
+    "enable_socratic_feedback": true,
+    "allow_regenerate": true
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const id = res.body.id;
+    if (id) {
+      bru.setEnvVar("ASSIGNMENT_ID", id);
+      console.log("✅ ASSIGNMENT_ID confirmed:", id);
+    }
+
+    console.log("✅ Assignment updated successfully");
+    console.log("   Title:", res.body.title);
+    console.log("   Code:", res.body.code);
+    console.log("   Is Active:", res.body.is_active);
+    console.log("   Allow Group Submission:", res.body.allow_group_submission);
+    console.log("   Max Group Size:", res.body.max_group_size);
+    console.log("   Enable AI Assistant:", res.body.enable_ai_assistant);
+    console.log("   Enable Socratic Feedback:", res.body.enable_socratic_feedback);
+    console.log("   Allow Regenerate:", res.body.allow_regenerate);
+    console.log("   Enforce Time Limit:", res.body.enforce_time_limit);
+  }
+
+  if (res.status === 400) {
+    console.log("❌ Validation error:", res.body.message);
+  }
+
+  if (res.status === 404) {
+    console.log("❌ Assignment not found or already deactivated.");
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Update Assignment
+
+  Partially updates an existing active assignment's configuration fields.
+  All fields in the request body are optional — only the fields provided
+  will be applied (PATCH semantics).
+
+  To soft-delete / deactivate an assignment, use the dedicated
+  "Deactivate Assignment" request, or send `{"is_active": false}` in the body.
+
+  ## Endpoint
+  PATCH /api/v1/assignments/:id
+
+  ## Authentication
+  - Requires a valid Bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Prerequisites
+  - {{ASSIGNMENT_ID}} must be set.
+    Run "Create Assignment" first, or set it manually in the environment.
+
+  ## Path Parameters
+  - `id` (uuid, required) — the assignment UUID
+
+  ## Request Body Fields (all optional)
+  | Field                    | Type      | Description                                                  |
+  |--------------------------|-----------|--------------------------------------------------------------|
+  | title                    | string    | Updated assignment title                                     |
+  | description              | string    | Updated description / instructions                           |
+  | code                     | string    | Updated short identifier                                     |
+  | release_at               | timestamp | Updated release timestamp                                    |
+  | due_at                   | timestamp | Updated primary deadline                                     |
+  | late_due_at              | timestamp | Updated late deadline; must be ≥ due_at if both present      |
+  | allow_late_submissions   | boolean   | Toggle late submission acceptance                            |
+  | enforce_time_limit       | integer   | Time limit in minutes; null removes the limit                |
+  | allow_group_submission   | boolean   | Toggle group submission                                      |
+  | max_group_size           | integer   | Max group size; must be ≥ 2 if allow_group_submission = true |
+  | enable_ai_assistant      | boolean   | Toggle AI assistant feature flag                             |
+  | enable_socratic_feedback | boolean   | Toggle Socratic AI feedback                                  |
+  | allow_regenerate         | boolean   | Toggle AI response regeneration                              |
+  | is_active                | boolean   | Set to false to soft-delete (deactivate) the assignment      |
+
+  ## Validation Rules
+  1. If both `due_at` and `late_due_at` are effective after the patch,
+     `late_due_at` must be ≥ `due_at`.
+     Violation → 400 "invalid late_due_at: must be on or after due_at"
+  2. If effective `allow_group_submission = true`, effective `max_group_size`
+     must be ≥ 2.
+     Violation → 400 "max_group_size must be at least 2 when allow_group_submission is true"
+  3. If effective `allow_group_submission = false`, `max_group_size` is
+     automatically forced to 1.
+  4. The assignment must currently be active (is_active = true).
+     Attempting to update a deactivated assignment returns 404.
+
+  ## Audit Log
+  On success, an audit entry is written to the IAM Service:
+  - Action: ASSIGNMENT_UPDATED  (for regular config changes)
+  - Action: ASSIGNMENT_DEACTIVATED  (when is_active is set to false)
+  - Entity: assignment
+  - Entity ID: the assignment UUID
+  - Changes: a diff map of every field that changed
+
+  ## Response (200 OK)
+  Returns the full updated assignment object:
+  ```json
+  {
+    "id":                      "uuid",
+    "course_instance_id":      "uuid",
+    "title":                   "Assignment 1: Introduction to Algorithms (Revised)",
+    "description":             "...",
+    "code":                    "CS101-A1-REV",
+    "release_at":              "2025-08-01T09:00:00Z",
+    "due_at":                  "2025-08-20T23:59:00Z",
+    "late_due_at":             "2025-08-23T23:59:00Z",
+    "allow_late_submissions":  true,
+    "enforce_time_limit":      90,
+    "allow_group_submission":  true,
+    "max_group_size":          3,
+    "enable_ai_assistant":     true,
+    "enable_socratic_feedback":true,
+    "allow_regenerate":        true,
+    "is_active":               true,
+    "created_by":              "uuid",
+    "created_at":              "2025-01-01T00:00:00Z",
+    "updated_at":              "2025-01-02T00:00:00Z"
+  }
+  ```
+
+  ## Error Responses
+  | Status | Reason                                                               |
+  |--------|----------------------------------------------------------------------|
+  | 400    | Invalid UUID, validation failure (late_due_at, max_group_size, etc.) |
+  | 401    | Missing or invalid Bearer token                                      |
+  | 403    | Insufficient role (requires super_admin or admin)                    |
+  | 404    | Assignment not found or already deactivated                          |
+}

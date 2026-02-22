@@ -1,0 +1,102 @@
+meta {
+  name: Get Assignment by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{ASSIGNMENTS_URL_V1}}/{{ASSIGNMENT_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const id = res.body.id;
+    if (id) {
+      bru.setEnvVar("ASSIGNMENT_ID", id);
+      console.log("✅ ASSIGNMENT_ID confirmed:", id);
+    }
+
+    const courseInstanceId = res.body.course_instance_id;
+    if (courseInstanceId) {
+      bru.setEnvVar("COURSE_INSTANCE_ID_FOR_ASSIGNMENT", courseInstanceId);
+      console.log("✅ COURSE_INSTANCE_ID_FOR_ASSIGNMENT confirmed:", courseInstanceId);
+    }
+
+    console.log("✅ Assignment title:", res.body.title);
+    console.log("✅ Is active:", res.body.is_active);
+    console.log("✅ Allow group submission:", res.body.allow_group_submission);
+    console.log("✅ Max group size:", res.body.max_group_size);
+    console.log("✅ Enable AI assistant:", res.body.enable_ai_assistant);
+  }
+
+  if (res.status === 404) {
+    console.log("❌ Assignment not found — it may have been deactivated or the ASSIGNMENT_ID is wrong.");
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Get Assignment by ID
+
+  Retrieves a single active assignment by its UUID.
+  Deactivated assignments (is_active = false) return 404 Not Found.
+
+  ## Endpoint
+  GET /api/v1/assignments/:id
+
+  ## Authentication
+  - Requires a valid Bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Prerequisites
+  - {{ASSIGNMENT_ID}} must be set.
+    Run "Create Assignment" first, or set it manually in the environment.
+
+  ## Path Parameters
+  - `id` (uuid, required) — the assignment UUID
+
+  ## Business Rules
+  - Only assignments with `is_active = true` are returned.
+  - Deactivated assignments (soft-deleted) return 404.
+
+  ## Response (200 OK)
+  ```json
+  {
+    "id":                      "uuid",
+    "course_instance_id":      "uuid",
+    "title":                   "Assignment 1",
+    "description":             "Write a report on...",
+    "code":                    "ASN-001",
+    "release_at":              "2025-01-10T08:00:00Z",
+    "due_at":                  "2025-01-20T23:59:00Z",
+    "late_due_at":             "2025-01-22T23:59:00Z",
+    "allow_late_submissions":  true,
+    "enforce_time_limit":      null,
+    "allow_group_submission":  true,
+    "max_group_size":          4,
+    "enable_ai_assistant":     true,
+    "enable_socratic_feedback":false,
+    "allow_regenerate":        false,
+    "is_active":               true,
+    "created_by":              "uuid",
+    "created_at":              "2025-01-01T00:00:00Z",
+    "updated_at":              "2025-01-01T00:00:00Z"
+  }
+  ```
+
+  ## Error Responses
+  - 400 Bad Request   — id is not a valid UUID
+  - 401 Unauthorized  — missing or invalid token
+  - 403 Forbidden     — insufficient role
+  - 404 Not Found     — assignment not found or is deactivated
+}

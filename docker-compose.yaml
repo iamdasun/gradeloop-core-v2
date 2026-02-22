@@ -211,6 +211,70 @@ services:
         compress: "true"
 
   # =============================================================================
+  # Assessment Service (Go Fiber)
+  # =============================================================================
+  assessment-service:
+    build:
+      context: ./apps/services/assessment-service
+      dockerfile: Dockerfile
+    container_name: assessment-service
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.assessment.rule=PathPrefix(`/api/v1/assignments`)"
+      - "traefik.http.routers.assessment.priority=100"
+      - "traefik.http.routers.assessment.entrypoints=web"
+      - "traefik.http.services.assessment-service.loadbalancer.server.port=8084"
+      # Request Size Limiting (1MB)
+      - "traefik.http.middlewares.assessment-limit.buffering.maxRequestBodyBytes=1048576"
+      # Rate Limiting
+      - "traefik.http.middlewares.assessment-ratelimit.ratelimit.average=500"
+      - "traefik.http.middlewares.assessment-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.assessment-ratelimit.ratelimit.burst=50"
+      # Apply middlewares
+      - "traefik.http.routers.assessment.middlewares=assessment-limit,assessment-ratelimit"
+
+    env_file:
+      - .env
+
+    environment:
+      - SERVER_PORT=${ASSESSMENT_SVC_PORT}
+      - ENABLE_PREFORK=${ASSESSMENT_SVC_ENABLE_PREFORK}
+      - DB_HOST=${GRA_DB_HOST}
+      - DB_PORT=${GRA_DB_PORT}
+      - DB_USER=${GRA_DB_USER}
+      - DB_PASSWORD=${GRA_DB_PASSWORD}
+      - DB_NAME=${ASSESSMENT_SVC_DB_NAME}
+      - DB_SSLMODE=${GRA_DB_SSLMODE}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - IAM_SERVICE_URL=http://iam-service:8081
+
+    expose:
+      - "8084"
+
+    depends_on:
+      iam-service:
+        condition: service_healthy
+
+    networks:
+      - gradeloop-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # =============================================================================
   # RabbitMQ (Message Broker)
   # =============================================================================
   rabbitmq:

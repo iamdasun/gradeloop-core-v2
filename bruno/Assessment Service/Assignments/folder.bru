@@ -1,0 +1,56 @@
+meta {
+  name: Assignments
+  seq: 1
+}
+
+auth {
+  mode: inherit
+}
+
+docs {
+  # Assignments
+
+  An Assignment represents a task given to students enrolled in a CourseInstance.
+  The `course_instance_id` is a logical cross-service reference to the Academics
+  Service — no foreign-key constraint is enforced in the Assessment Service database.
+
+  ## Endpoints
+
+  | Method | Path                                                    | Description                              |
+  |--------|---------------------------------------------------------|------------------------------------------|
+  | POST   | /api/v1/assignments                                     | Create a new assignment                  |
+  | GET    | /api/v1/assignments/:id                                 | Get an active assignment by ID           |
+  | PATCH  | /api/v1/assignments/:id                                 | Update config fields / soft-delete       |
+  | GET    | /api/v1/assignments/course-instance/:courseInstanceId   | List all active assignments for a course |
+
+  ## Soft Delete
+  Assignments are never hard-deleted.  Setting `is_active = false` via PATCH
+  deactivates the record.  Deactivated assignments are invisible to GET by ID
+  and are excluded from list results.
+
+  ## Validation Rules
+  - `title` is required on creation.
+  - `course_instance_id` is required on creation.
+  - If both `due_at` and `late_due_at` are provided, `late_due_at` must be ≥ `due_at`.
+  - If `allow_group_submission = true`, `max_group_size` must be ≥ 2.
+  - If `allow_group_submission = false`, `max_group_size` is forced to 1.
+
+  ## AI Feature Flags
+  Setting `enable_ai_assistant = true` exposes AI-assisted features to students
+  on this assignment.  `enable_socratic_feedback` and `allow_regenerate` are
+  sub-flags that control specific AI behaviours.  No AI logic is implemented
+  in this service — these fields are purely configuration signals consumed by
+  the frontend or a dedicated AI service.
+
+  ## Audit Actions
+  | Trigger                    | Action                  |
+  |----------------------------|-------------------------|
+  | POST /assignments          | ASSIGNMENT_CREATED      |
+  | PATCH /assignments/:id     | ASSIGNMENT_UPDATED      |
+  | PATCH with is_active=false | ASSIGNMENT_DEACTIVATED  |
+
+  ## Variable Automation
+  - `ASSIGNMENT_ID` is saved automatically after a successful POST.
+  - `COURSE_INSTANCE_ID_FOR_ASSIGNMENT` must already be set (copy from
+    Academic Service → Course Instances → Create Course Instance).
+}

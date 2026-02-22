@@ -1,0 +1,128 @@
+meta {
+  name: Deactivate Assignment
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{ASSIGNMENTS_URL_V1}}/{{ASSIGNMENT_ID}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "is_active": false
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const isActive = res.body.is_active;
+    if (isActive === false) {
+      console.log("✅ Assignment deactivated successfully");
+      console.log("   ID:", res.body.id);
+      console.log("   Title:", res.body.title);
+      console.log("   Is Active:", res.body.is_active);
+      console.log("");
+      console.log("ℹ️  This assignment is now soft-deleted.");
+      console.log("   GET /assignments/:id will return 404 for this ID.");
+    } else {
+      console.log("⚠️  Unexpected: is_active is still true after deactivation request.");
+    }
+  }
+
+  if (res.status === 404) {
+    console.log("❌ Assignment not found — it may already be deactivated or the ASSIGNMENT_ID is wrong.");
+  }
+
+  if (res.status === 403) {
+    console.log("❌ Forbidden — requires super_admin or admin role.");
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Deactivate Assignment
+
+  Soft-deletes an assignment by setting `is_active = false`.
+  The record is never physically removed from the database.
+
+  This is a specialised form of the PATCH /assignments/:id endpoint.
+  It sends only `{"is_active": false}` in the request body, which triggers
+  the ASSIGNMENT_DEACTIVATED audit action instead of ASSIGNMENT_UPDATED.
+
+  ## Endpoint
+  PATCH /api/v1/assignments/:id
+
+  ## Authentication
+  - Requires a valid Bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Prerequisites
+  - {{ASSIGNMENT_ID}} must be set.
+    Run "Create Assignment" first, or set it manually in the environment.
+  - The assignment must currently be active (is_active = true).
+    Attempting to deactivate an already-deactivated assignment returns 404.
+
+  ## Request Body
+  ```json
+  {
+    "is_active": false
+  }
+  ```
+
+  Only `is_active` is required. Other fields may be included alongside it
+  to combine a config update with deactivation in a single request.
+
+  ## What Happens After Deactivation
+  - GET /api/v1/assignments/:id → 404 Not Found
+  - GET /api/v1/assignments/course-instance/:id → assignment excluded from list
+  - The record remains in the database with is_active = false for audit purposes.
+  - Re-activation is possible by sending PATCH with {"is_active": true}.
+
+  ## Audit Log
+  On success an audit entry is written to the IAM Service with action:
+  ASSIGNMENT_DEACTIVATED, entity: assignment, entity_id: <uuid>
+
+  ## Response (200 OK)
+  ```json
+  {
+    "id":                      "uuid",
+    "course_instance_id":      "uuid",
+    "title":                   "Assignment 1",
+    "description":             "...",
+    "code":                    "CS101-A1",
+    "release_at":              null,
+    "due_at":                  null,
+    "late_due_at":             null,
+    "allow_late_submissions":  false,
+    "enforce_time_limit":      null,
+    "allow_group_submission":  true,
+    "max_group_size":          4,
+    "enable_ai_assistant":     true,
+    "enable_socratic_feedback":false,
+    "allow_regenerate":        false,
+    "is_active":               false,
+    "created_by":              "uuid",
+    "created_at":              "2025-01-01T00:00:00Z",
+    "updated_at":              "2025-01-01T00:00:00Z"
+  }
+  ```
+
+  ## Error Responses
+  | Status | Reason                                                    |
+  |--------|-----------------------------------------------------------|
+  | 400    | id is not a valid UUID                                    |
+  | 401    | Missing or invalid Bearer token                           |
+  | 403    | Insufficient role (requires super_admin or admin)         |
+  | 404    | Assignment not found or already deactivated               |
+}

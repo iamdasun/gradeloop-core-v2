@@ -1,0 +1,154 @@
+meta {
+  name: Create Assignment
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{ASSIGNMENTS_URL_V1}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "course_instance_id": "{{COURSE_INSTANCE_ID_FOR_ASSIGNMENT}}",
+    "title": "Assignment 1: Introduction to Algorithms",
+    "description": "Implement and analyse three classic sorting algorithms.",
+    "code": "CS101-A1",
+    "release_at": "2025-08-01T09:00:00Z",
+    "due_at": "2025-08-15T23:59:00Z",
+    "late_due_at": "2025-08-18T23:59:00Z",
+    "allow_late_submissions": true,
+    "enforce_time_limit": 120,
+    "allow_group_submission": true,
+    "max_group_size": 4,
+    "enable_ai_assistant": true,
+    "enable_socratic_feedback": true,
+    "allow_regenerate": false
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    const id = res.body.id;
+    if (id) {
+      bru.setEnvVar("ASSIGNMENT_ID", id);
+      console.log("✅ ASSIGNMENT_ID saved:", id);
+    }
+
+    const courseInstanceId = res.body.course_instance_id;
+    if (courseInstanceId) {
+      bru.setEnvVar("COURSE_INSTANCE_ID_FOR_ASSIGNMENT", courseInstanceId);
+      console.log("✅ COURSE_INSTANCE_ID_FOR_ASSIGNMENT confirmed:", courseInstanceId);
+    }
+
+    console.log("✅ Assignment created successfully");
+    console.log("   Title:", res.body.title);
+    console.log("   Is Active:", res.body.is_active);
+    console.log("   Allow Group Submission:", res.body.allow_group_submission);
+    console.log("   Max Group Size:", res.body.max_group_size);
+    console.log("   Enable AI Assistant:", res.body.enable_ai_assistant);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
+docs {
+  # Create Assignment
+
+  Creates a new assignment linked to a CourseInstance from the Academics Service.
+  The `course_instance_id` is a logical cross-service UUID reference — no foreign
+  key is enforced in the Assessment Service database.
+
+  ## Endpoint
+  POST /api/v1/assignments
+
+  ## Authentication
+  - Requires a valid Bearer access token.
+  - Caller must have `super_admin` or `admin` role.
+
+  ## Prerequisites
+  - Set `COURSE_INSTANCE_ID_FOR_ASSIGNMENT` in the environment (copy from the
+    Academic Service → Course Instances → Create Course Instance response).
+
+  ## Request Body Fields
+  | Field                    | Type      | Required | Description                                                  |
+  |--------------------------|-----------|----------|--------------------------------------------------------------|
+  | course_instance_id       | uuid      | ✅       | Logical reference to a CourseInstance in Academics Service   |
+  | title                    | string    | ✅       | Assignment title (max 255 chars)                             |
+  | description              | string    | ❌       | Full description / instructions                              |
+  | code                     | string    | ❌       | Short identifier, e.g. "CS101-A1" (max 50 chars)            |
+  | release_at               | timestamp | ❌       | When the assignment becomes visible to students              |
+  | due_at                   | timestamp | ❌       | Primary submission deadline                                  |
+  | late_due_at              | timestamp | ❌       | Late submission deadline; must be ≥ due_at if both supplied  |
+  | allow_late_submissions   | boolean   | ❌       | Whether late submissions are accepted (default: false)       |
+  | enforce_time_limit       | integer   | ❌       | Time limit in minutes; null = no limit                       |
+  | allow_group_submission   | boolean   | ❌       | Whether students may submit in groups (default: false)       |
+  | max_group_size           | integer   | ❌       | Max students per group; must be ≥ 2 if group submission on   |
+  | enable_ai_assistant      | boolean   | ❌       | Expose AI assistant feature flag to students (default: false)|
+  | enable_socratic_feedback | boolean   | ❌       | Enable Socratic-style AI feedback (default: false)           |
+  | allow_regenerate         | boolean   | ❌       | Allow students to regenerate AI responses (default: false)   |
+
+  ## Validation Rules
+  1. `title` and `course_instance_id` are required.
+  2. If both `due_at` and `late_due_at` are present, `late_due_at` must be ≥ `due_at`.
+     Violation → 400 "invalid late_due_at: must be on or after due_at"
+  3. If `allow_group_submission = true`, `max_group_size` must be ≥ 2.
+     Violation → 400 "max_group_size must be at least 2 when allow_group_submission is true"
+  4. If `allow_group_submission = false` (or omitted), `max_group_size` is
+     automatically forced to 1 regardless of the value supplied.
+
+  ## AI Features
+  Setting `enable_ai_assistant = true` signals that this assignment should
+  surface AI-assisted tooling in the frontend.  No AI logic is executed in
+  the Assessment Service itself — these flags are purely configuration.
+
+  ## Audit Log
+  On success an audit entry is written to the IAM Service with action:
+  ASSIGNMENT_CREATED, entity: assignment, entity_id: <new UUID>
+
+  ## Response (201 Created)
+  ```json
+  {
+    "id": "uuid",
+    "course_instance_id": "uuid",
+    "title": "Assignment 1: Introduction to Algorithms",
+    "description": "...",
+    "code": "CS101-A1",
+    "release_at": "2025-08-01T09:00:00Z",
+    "due_at": "2025-08-15T23:59:00Z",
+    "late_due_at": "2025-08-18T23:59:00Z",
+    "allow_late_submissions": true,
+    "enforce_time_limit": 120,
+    "allow_group_submission": true,
+    "max_group_size": 4,
+    "enable_ai_assistant": true,
+    "enable_socratic_feedback": true,
+    "allow_regenerate": false,
+    "is_active": true,
+    "created_by": "uuid",
+    "created_at": "2025-01-01T00:00:00Z",
+    "updated_at": "2025-01-01T00:00:00Z"
+  }
+  ```
+
+  ## Variable Automation
+  On success this script saves:
+  - `ASSIGNMENT_ID` — used by Get, Update, and Deactivate requests
+  - `COURSE_INSTANCE_ID_FOR_ASSIGNMENT` — confirmed from response
+
+  ## Error Responses
+  | Status | Reason                                                          |
+  |--------|-----------------------------------------------------------------|
+  | 400    | Missing required fields, invalid late_due_at, invalid group cfg |
+  | 401    | Missing or invalid Bearer token                                 |
+  | 403    | Insufficient role (requires super_admin or admin)               |
+}

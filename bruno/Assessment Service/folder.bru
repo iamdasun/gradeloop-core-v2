@@ -1,0 +1,47 @@
+meta {
+  name: Assessment Service
+}
+
+docs {
+  # Assessment Service
+
+  The Assessment Service manages Assignments and their configurable settings.
+  Assignments belong logically to a CourseInstance from the Academics Service
+  (cross-service UUID reference — no FK enforced).
+
+  ## Base URL
+  All endpoints are prefixed with: /api/v1
+
+  ## Authentication
+  Every endpoint requires a valid Bearer token issued by the IAM Service.
+  Run: IAM Service > Auth > Login to obtain an access token.
+  Tokens are saved automatically into {{ACCESS_TOKEN}}.
+
+  ## Role Requirements
+  All assignment mutations require super_admin or admin role.
+
+  ## Available Endpoints
+
+  | Method | Path                                                    | Description                         |
+  |--------|---------------------------------------------------------|-------------------------------------|
+  | POST   | /api/v1/assignments                                     | Create a new assignment             |
+  | GET    | /api/v1/assignments/:id                                 | Get a single active assignment      |
+  | PATCH  | /api/v1/assignments/:id                                 | Update config / soft-delete         |
+  | GET    | /api/v1/assignments/course-instance/:courseInstanceId   | List assignments for a course       |
+
+  ## Soft Delete
+  Assignments are never hard-deleted. Send PATCH with {"is_active": false} to
+  deactivate. Deactivated assignments are invisible to GET and list endpoints.
+
+  ## Audit Logging
+  Every mutation emits an audit entry to the IAM Service:
+  - ASSIGNMENT_CREATED
+  - ASSIGNMENT_UPDATED
+  - ASSIGNMENT_DEACTIVATED
+
+  ## Environment Variables Used
+  - ASSIGNMENTS_URL_V1           — base URL for assignment endpoints
+  - ASSIGNMENT_ID                — saved after a successful POST
+  - COURSE_INSTANCE_ID_FOR_ASSIGNMENT — the course instance UUID to scope requests
+  - ACCESS_TOKEN                 — JWT access token from IAM Service login
+}
