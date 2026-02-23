@@ -88,6 +88,9 @@ const navItems: NavItem[] = [
       { title: "Departments", href: "/admin/academics/departments", icon: Building2 },
       { title: "Degrees", href: "/admin/academics/degrees", icon: Award },
       { title: "Courses", href: "/admin/academics/courses", icon: BookOpen },
+      { title: "Semesters", href: "/admin/academics/semesters", icon: Calendar },
+      { title: "Groups", href: "/admin/academics/groups", icon: Users2 },
+      { title: "Enrollment", href: "/admin/academics/enrollment", icon: ClipboardList },
     ],
   },
   {
