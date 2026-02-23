@@ -30,7 +30,7 @@ export interface ListUsersParams {
 
 /** POST /users — backend requires user_type; student/employee need extra fields. */
 export interface CreateUserRequest {
-  username: string;
+  full_name: string;
   email: string;
   role_id: string;
   /** "student" | "employee" | "all" */
@@ -42,7 +42,7 @@ export interface CreateUserRequest {
 /** Matches the backend CreateUserResponse DTO. */
 export interface CreateUserResponse {
   id: string;
-  username: string;
+  full_name: string;
   email: string;
   role_id: string;
   is_active: boolean;

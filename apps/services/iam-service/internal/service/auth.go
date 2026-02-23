@@ -88,6 +88,7 @@ func (s *authService) Login(ctx context.Context, username, password string) (*dt
 	accessToken, _, err := jwt.GenerateAccessToken(
 		user.ID,
 		user.Username,
+		user.FullName,
 		user.RoleName,
 		user.Permissions,
 		s.secretKey,
@@ -173,6 +174,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*d
 	accessToken, expiresAt, err := jwt.GenerateAccessToken(
 		user.ID,
 		user.Username,
+		user.FullName,
 		user.RoleName,
 		user.Permissions,
 		s.secretKey,
@@ -204,7 +206,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*d
 	return &dto.RefreshTokenResponse{
 		AccessToken:  accessToken,
 		RefreshToken: newRefreshToken,
-		ExpiresIn:    int64(expiresAt.Sub(time.Now()) / time.Second),
+		ExpiresIn:    int64(time.Until(expiresAt) / time.Second),
 	}, nil
 }
 
@@ -233,6 +235,7 @@ func (s *authService) getUserByID(ctx context.Context, userID uuid.UUID) (*dto.U
 			users.id,
 			users.username,
 			users.email,
+			users.full_name,
 			users.password_hash,
 			users.role_id,
 			roles.name as role_name,

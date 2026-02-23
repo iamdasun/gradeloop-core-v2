@@ -50,8 +50,9 @@ import type { UserListItem } from "@/types/auth.types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function initials(username: string) {
-  return username
+function getInitials(fullName: string, username: string) {
+  const name = fullName || username;
+  return name
     .split(/[.\-_\s@]/)
     .map((p) => p[0]?.toUpperCase() ?? "")
     .slice(0, 2)
@@ -178,6 +179,7 @@ export default function UsersPage() {
       if (debouncedSearch) {
         const q = debouncedSearch.toLowerCase();
         if (
+          !u.full_name?.toLowerCase().includes(q) &&
           !u.username.toLowerCase().includes(q) &&
           !u.email.toLowerCase().includes(q)
         )
@@ -265,7 +267,7 @@ export default function UsersPage() {
           <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <Input
-              placeholder="Search by username or email…"
+              placeholder="Search by name or email…"
               className="pl-9"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -335,7 +337,7 @@ export default function UsersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-[200px]">User</TableHead>
+                  <TableHead className="min-w-[200px]">Full Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden md:table-cell">Joined</TableHead>
@@ -370,12 +372,12 @@ export default function UsersPage() {
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9 shrink-0">
                             <AvatarFallback className="bg-zinc-100 dark:bg-zinc-800 text-sm">
-                              {initials(user.username)}
+                              {getInitials(user.full_name, user.username)}
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
                             <p className="font-medium text-sm truncate">
-                              {user.username}
+                              {user.full_name || user.username}
                             </p>
                             <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
                               {user.email}
@@ -399,9 +401,9 @@ export default function UsersPage() {
                       <TableCell className="hidden lg:table-cell text-sm text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                         {user.last_login_at
                           ? new Date(user.last_login_at).toLocaleDateString(
-                              "en-US",
-                              { dateStyle: "medium" },
-                            )
+                            "en-US",
+                            { dateStyle: "medium" },
+                          )
                           : "—"}
                       </TableCell>
                       <TableCell>

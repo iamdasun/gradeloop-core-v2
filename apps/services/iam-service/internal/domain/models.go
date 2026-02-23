@@ -31,6 +31,10 @@ type User struct {
 	ID                      uuid.UUID      `gorm:"type:uuid;primarykey" json:"id"`
 	Username                string         `gorm:"uniqueIndex:idx_users_username,where:deleted_at IS NULL;not null;size:100" json:"username"`
 	Email                   string         `gorm:"uniqueIndex:idx_users_email,where:deleted_at IS NULL;not null;size:255" json:"email"`
+	FullName                string         `gorm:"size:255" json:"full_name"`
+	AvatarURL               string         `gorm:"size:512" json:"avatar_url"`
+	Faculty                 string         `gorm:"size:255" json:"faculty"`
+	Department              string         `gorm:"size:255" json:"department"`
 	PasswordHash            string         `gorm:"not null;size:255" json:"-"`
 	RoleID                  *uuid.UUID     `gorm:"type:uuid;index" json:"role_id"`
 	Role                    *Role          `gorm:"foreignKey:RoleID" json:"role,omitempty"`

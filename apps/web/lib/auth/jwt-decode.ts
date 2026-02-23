@@ -12,6 +12,7 @@ export interface IamTokenClaims {
   username: string;
   /** Single role name assigned to the user */
   role_name: string;
+  full_name: string;
   /** Flat list of permission names granted through the role */
   permissions: string[];
   /** Expiry unix timestamp */

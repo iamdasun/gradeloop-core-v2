@@ -6,14 +6,23 @@ type UserResponse struct {
 	ID          uuid.UUID `json:"id"`
 	Username    string    `json:"username"`
 	Email       string    `json:"email"`
+	FullName    string    `json:"full_name"`
+	AvatarURL   string    `json:"avatar_url"`
 	RoleID      uuid.UUID `json:"role_id"`
 	RoleName    string    `json:"role_name"`
 	UserType    string    `json:"user_type"`
+	Faculty     string    `json:"faculty,omitempty"`
+	Department  string    `json:"department,omitempty"`
 	StudentID   string    `json:"student_id,omitempty"`
 	Designation string    `json:"designation,omitempty"`
 	IsActive    bool      `json:"is_active"`
 	LastLoginAt *string   `json:"last_login_at"`
 	CreatedAt   string    `json:"created_at"`
+}
+
+type UpdateAvatarResponse struct {
+	AvatarURL string `json:"avatar_url"`
+	Message   string `json:"message"`
 }
 
 type GetUsersResponse struct {

@@ -66,25 +66,25 @@ interface NavGroup {
 type NavItem = NavLink | NavGroup;
 
 const navItems: NavItem[] = [
-  { title: "Dashboard",   href: "/admin",              icon: LayoutDashboard },
-  { title: "Users",       href: "/admin/users",        icon: Users },
+  { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
+  { title: "Users", href: "/admin/users", icon: Users },
   {
     type: "group",
     title: "Academics",
     icon: School,
     baseHref: "/admin/academics",
     children: [
-      { title: "Faculties",   href: "/admin/academics/faculties",   icon: Landmark },
+      { title: "Faculties", href: "/admin/academics/faculties", icon: Landmark },
       { title: "Departments", href: "/admin/academics/departments", icon: Building2 },
-      { title: "Degrees",     href: "/admin/academics/degrees",     icon: Award },
-      { title: "Courses",     href: "/admin/academics/courses",     icon: BookOpen },
+      { title: "Degrees", href: "/admin/academics/degrees", icon: Award },
+      { title: "Courses", href: "/admin/academics/courses", icon: BookOpen },
     ],
   },
-  { title: "Assignments", href: "/admin/assignments",  icon: FileText },
-  { title: "Students",    href: "/admin/students",     icon: GraduationCap },
-  { title: "Analytics",   href: "/admin/analytics",   icon: BarChart3 },
-  { title: "Calendar",    href: "/admin/calendar",     icon: Calendar },
-  { title: "Settings",    href: "/admin/settings",    icon: Settings },
+  { title: "Assignments", href: "/admin/assignments", icon: FileText },
+  { title: "Students", href: "/admin/students", icon: GraduationCap },
+  { title: "Analytics", href: "/admin/analytics", icon: BarChart3 },
+  { title: "Calendar", href: "/admin/calendar", icon: Calendar },
+  { title: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
 interface MobileSidebarProps {
@@ -97,11 +97,10 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
 
-  const displayName = user?.username ?? '—';
-  const displayEmail = user?.role_name ?? '';
-  const initials = user
-    ? user.username.slice(0, 2).toUpperCase()
-    : '??';
+  const displayName = user?.full_name || user?.username || '—';
+  const initials = user?.full_name
+    ? user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    : user?.username?.slice(0, 2).toUpperCase() || '??';
 
   const [openGroups, setOpenGroups] = React.useState<Set<string>>(() => {
     const initial = new Set<string>();
@@ -259,11 +258,8 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
                   <Avatar className="h-8 w-8 shrink-0">
                     <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
-                  <div className="flex flex-1 flex-col items-start text-left text-sm">
-                    <span className="font-medium">{displayName}</span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {displayEmail}
-                    </span>
+                  <div className="flex flex-1 items-center text-left text-sm">
+                    <span className="font-medium truncate max-w-[150px]">{displayName}</span>
                   </div>
                 </Button>
               </DropdownMenuTrigger>

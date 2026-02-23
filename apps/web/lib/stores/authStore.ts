@@ -79,6 +79,7 @@ export const useAuthStore = create<AuthState>()(
         const user: User = {
           id: claims.user_id,
           username: claims.username,
+          full_name: claims.full_name,
           role_name: claims.role_name ?? '',
           permissions: claims.permissions ?? [],
         };
@@ -95,6 +96,7 @@ export const useAuthStore = create<AuthState>()(
         const user: User = {
           id: claims.user_id,
           username: claims.username,
+          full_name: claims.full_name,
           role_name: claims.role_name ?? '',
           permissions: claims.permissions ?? [],
         };
@@ -144,6 +146,7 @@ export const useAuthStore = create<AuthState>()(
           const user: User = {
             id: claims.user_id,
             username: claims.username,
+            full_name: claims.full_name,
             role_name: claims.role_name ?? '',
             permissions: claims.permissions ?? [],
           };

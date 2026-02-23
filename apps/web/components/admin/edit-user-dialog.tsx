@@ -91,7 +91,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
           roles.find((r) => r.id === resolvedRoleId)?.name ?? user.role_name,
       };
 
-      toast.success('User updated', `${user.username} has been updated.`);
+      toast.success('User updated', `${user.full_name || user.username} has been updated.`);
       onSuccess(finalUser);
       onOpenChange(false);
     } catch (err) {
@@ -114,7 +114,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
             <div>
               <DialogTitle>Edit User</DialogTitle>
               <DialogDescription>
-                Editing <strong>{user.username}</strong>
+                Editing <strong>{user.full_name || user.username}</strong>
               </DialogDescription>
             </div>
           </div>
@@ -124,8 +124,8 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
           {/* Read-only info */}
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-4 py-3 space-y-1">
             <div className="flex justify-between text-sm">
-              <span className="text-zinc-500">Username</span>
-              <span className="font-medium">{user.username}</span>
+              <span className="text-zinc-500">Full Name</span>
+              <span className="font-medium">{user.full_name || user.username}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500">Email</span>

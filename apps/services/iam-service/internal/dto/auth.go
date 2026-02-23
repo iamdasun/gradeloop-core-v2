@@ -27,6 +27,7 @@ type UserWithRole struct {
 	ID                      uuid.UUID
 	Username                string
 	Email                   string
+	FullName                string
 	PasswordHash            string
 	RoleID                  *uuid.UUID
 	RoleName                string
@@ -38,7 +39,7 @@ type UserWithRole struct {
 // User DTOs
 
 type CreateUserRequest struct {
-	Username    string `json:"username" validate:"required"`
+	FullName    string `json:"full_name" validate:"required"`
 	Email       string `json:"email" validate:"required,email"`
 	RoleID      string `json:"role_id" validate:"required"`
 	UserType    string `json:"user_type" validate:"required,oneof=student employee all"`
@@ -48,7 +49,7 @@ type CreateUserRequest struct {
 
 type CreateUserResponse struct {
 	ID             uuid.UUID `json:"id"`
-	Username       string    `json:"username"`
+	FullName       string    `json:"full_name"`
 	Email          string    `json:"email"`
 	RoleID         uuid.UUID `json:"role_id"`
 	IsActive       bool      `json:"is_active"`

@@ -26,7 +26,7 @@ interface Props {
 }
 
 const EMPTY: CreateUserRequest = {
-  username: '',
+  full_name: '',
   email: '',
   role_id: '',
   user_type: '',
@@ -34,7 +34,7 @@ const EMPTY: CreateUserRequest = {
 
 function validate(values: CreateUserRequest): FormErrors {
   const errors: FormErrors = {};
-  if (!values.username.trim()) errors.username = 'Username is required';
+  if (!values.full_name.trim()) errors.full_name = 'Full Name is required';
   if (!values.email.trim()) {
     errors.email = 'Email is required';
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
@@ -98,7 +98,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
     setSubmitting(true);
     try {
       const user: CreateUserResponse = await usersApi.create(values);
-      toast.success('User created', `${user.username} has been added. An activation email has been sent.`);
+      toast.success('User created', `${user.full_name} has been added. An activation email has been sent.`);
       onSuccess();
       onOpenChange(false);
     } catch (err) {
@@ -126,21 +126,21 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-          {/* Username */}
+          {/* Full Name */}
           <div className="space-y-1.5">
-            <Label htmlFor="cu-username">
-              Username <span className="text-red-500">*</span>
+            <Label htmlFor="cu-fullname">
+              Full Name <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="cu-username"
-              placeholder="e.g. john.doe"
-              value={values.username}
-              onChange={(e) => set('username', e.target.value)}
+              id="cu-fullname"
+              placeholder="e.g. John Doe"
+              value={values.full_name}
+              onChange={(e) => set('full_name', e.target.value)}
               autoComplete="off"
               disabled={submitting}
             />
-            {errors.username && (
-              <p className="text-xs text-red-500">{errors.username}</p>
+            {errors.full_name && (
+              <p className="text-xs text-red-500">{errors.full_name}</p>
             )}
           </div>
 

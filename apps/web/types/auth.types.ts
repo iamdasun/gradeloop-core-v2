@@ -8,6 +8,7 @@
 export interface User {
   id: string;          // user_id claim
   username: string;
+  full_name: string;
   role_name: string;   // single flat role string from JWT
   permissions: string[]; // flat permission names from JWT
 }
@@ -87,6 +88,7 @@ export interface UserListItem {
   id: string;
   username: string;
   email: string;
+  full_name: string;
   role_id: string;
   role_name: string;
   user_type: string;

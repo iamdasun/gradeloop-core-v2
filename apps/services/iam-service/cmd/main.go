@@ -19,6 +19,7 @@ import (
 	"github.com/gradeloop/iam-service/internal/repository/migrations"
 	"github.com/gradeloop/iam-service/internal/router"
 	"github.com/gradeloop/iam-service/internal/service"
+	"github.com/gradeloop/iam-service/internal/storage"
 	"github.com/gradeloop/iam-service/internal/utils"
 	"go.uber.org/zap"
 )
@@ -118,6 +119,19 @@ func run() error {
 		permissionRepo,
 	)
 
+	minioStorage, err := storage.NewMinIOStorage(
+		cfg.MinIO.Endpoint,
+		cfg.MinIO.AccessKey,
+		cfg.MinIO.SecretKey,
+		cfg.MinIO.Bucket,
+		cfg.MinIO.UseSSL,
+		cfg.MinIO.PublicHost,
+		logger,
+	)
+	if err != nil {
+		return fmt.Errorf("connecting to minio: %w", err)
+	}
+
 	healthHandler := handler.NewHealthHandler()
 	authHandler := handler.NewAuthHandler(
 		authService,
@@ -126,7 +140,7 @@ func run() error {
 		cfg.JWT.CookieSecure,
 		cfg.JWT.CookieSameSite,
 	)
-	userHandler := handler.NewUserHandler(userService)
+	userHandler := handler.NewUserHandler(userService, minioStorage)
 	roleHandler := handler.NewRoleHandler(roleService)
 	permissionHandler := handler.NewPermissionHandler(permissionService)
 

@@ -40,6 +40,7 @@ func (r *authRepository) GetUserByUsername(ctx context.Context, username string)
 			users.id,
 			users.username,
 			users.email,
+			users.full_name,
 			users.password_hash,
 			users.role_id,
 			roles.name as role_name,

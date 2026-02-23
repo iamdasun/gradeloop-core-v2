@@ -7,15 +7,18 @@ import (
 
 	"github.com/gradeloop/iam-service/internal/dto"
 	"github.com/gradeloop/iam-service/internal/service"
+	"github.com/gradeloop/iam-service/internal/storage"
 )
 
 type UserHandler struct {
-	userService service.UserService
+	userService  service.UserService
+	minioStorage *storage.MinIOStorage
 }
 
-func NewUserHandler(userService service.UserService) *UserHandler {
+func NewUserHandler(userService service.UserService, minioStorage *storage.MinIOStorage) *UserHandler {
 	return &UserHandler{
-		userService: userService,
+		userService:  userService,
+		minioStorage: minioStorage,
 	}
 }
 
@@ -101,6 +104,53 @@ func (h *UserHandler) RestoreUser(c fiber.Ctx) error {
 	}
 
 	return c.SendStatus(fiber.StatusOK)
+}
+
+// GetProfile returns the profile of the current authenticated user
+func (h *UserHandler) GetProfile(c fiber.Ctx) error {
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
+	}
+
+	response, err := h.userService.GetProfile(c.RequestCtx(), userID)
+	if err != nil {
+		return handleUserError(err)
+	}
+
+	return c.JSON(response)
+}
+
+// UpdateAvatar uploads a new avatar image to MinIO and updates the user record.
+// Accepted formats: JPEG, PNG, GIF, WebP — max 5 MB.
+func (h *UserHandler) UpdateAvatar(c fiber.Ctx) error {
+	userID, ok := c.Locals("user_id").(string)
+	if !ok || userID == "" {
+		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
+	}
+
+	file, err := c.FormFile("avatar")
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "No avatar file provided")
+	}
+
+	// 5 MB hard limit — keep in sync with the Traefik buffering middleware.
+	const maxSize = 5 * 1024 * 1024
+	if file.Size > maxSize {
+		return fiber.NewError(fiber.StatusBadRequest, "Avatar file too large (max 5 MB)")
+	}
+
+	avatarURL, err := h.minioStorage.UploadAvatar(c.RequestCtx(), userID, file)
+	if err != nil {
+		return fiber.NewError(fiber.StatusUnprocessableEntity, err.Error())
+	}
+
+	response, err := h.userService.UpdateAvatar(c.RequestCtx(), userID, avatarURL)
+	if err != nil {
+		return handleUserError(err)
+	}
+
+	return c.JSON(response)
 }
 
 func handleUserError(err error) error {

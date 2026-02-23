@@ -34,6 +34,8 @@ type UserService interface {
 	UpdateUser(ctx context.Context, id string, req *dto.UpdateUserRequest) (*dto.UpdateUserResponse, error)
 	DeleteUser(ctx context.Context, id string) error
 	RestoreUser(ctx context.Context, id string) error
+	GetProfile(ctx context.Context, userID string) (*dto.UserResponse, error)
+	UpdateAvatar(ctx context.Context, userID string, avatarURL string) (*dto.UpdateAvatarResponse, error)
 }
 
 type userService struct {
@@ -91,17 +93,8 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 		return nil, ErrRoleNotFound
 	}
 
-	// Check if username already exists
-	existingUser, err := s.userRepo.GetUserByUsername(ctx, req.Username)
-	if err != nil {
-		return nil, fmt.Errorf("checking username: %w", err)
-	}
-	if existingUser != nil {
-		return nil, ErrUsernameTaken
-	}
-
 	// Check if email already exists
-	existingUser, err = s.userRepo.GetUserByEmail(ctx, req.Email)
+	existingUser, err := s.userRepo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
 		return nil, fmt.Errorf("checking email: %w", err)
 	}
@@ -131,8 +124,9 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 
 	user := &domain.User{
 		ID:                      uuid.New(),
-		Username:                req.Username,
+		Username:                req.Email,
 		Email:                   req.Email,
+		FullName:                req.FullName,
 		PasswordHash:            string(passwordHash),
 		RoleID:                  &roleID,
 		IsActive:                false,
@@ -203,7 +197,7 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 
 	return &dto.CreateUserResponse{
 		ID:             user.ID,
-		Username:       user.Username,
+		FullName:       user.FullName,
 		Email:          user.Email,
 		RoleID:         roleID,
 		IsActive:       user.IsActive,
@@ -310,9 +304,13 @@ func (s *userService) GetUsers(ctx context.Context, page, limit int, userType st
 			ID:          user.ID,
 			Username:    user.Username,
 			Email:       user.Email,
+			FullName:    user.FullName,
+			AvatarURL:   user.AvatarURL,
 			RoleID:      roleID,
 			RoleName:    roleName,
 			UserType:    resolvedUserType,
+			Faculty:     user.Faculty,
+			Department:  user.Department,
 			StudentID:   studentID,
 			Designation: designation,
 			IsActive:    user.IsActive,
@@ -418,6 +416,90 @@ func (s *userService) RestoreUser(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (s *userService) GetProfile(ctx context.Context, id string) (*dto.UserResponse, error) {
+	userID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("fetching user: %w", err)
+	}
+	if user == nil {
+		return nil, ErrUserNotFound
+	}
+
+	roleName := ""
+	if user.Role != nil {
+		roleName = user.Role.Name
+	}
+
+	var roleID uuid.UUID
+	if user.RoleID != nil {
+		roleID = *user.RoleID
+	}
+
+	resolvedUserType := "all"
+	studentID := ""
+	designation := ""
+
+	// Check for profiles
+	var student domain.UserProfileStudent
+	if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
+		resolvedUserType = "student"
+		studentID = student.StudentID
+	} else {
+		var employee domain.UserProfileEmployee
+		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&employee).Error; err == nil {
+			resolvedUserType = "employee"
+			designation = employee.Designation
+		}
+	}
+
+	return &dto.UserResponse{
+		ID:          user.ID,
+		Username:    user.Username,
+		Email:       user.Email,
+		FullName:    user.FullName,
+		AvatarURL:   user.AvatarURL,
+		RoleID:      roleID,
+		RoleName:    roleName,
+		UserType:    resolvedUserType,
+		Faculty:     user.Faculty,
+		Department:  user.Department,
+		StudentID:   studentID,
+		Designation: designation,
+		IsActive:    user.IsActive,
+		CreatedAt:   user.CreatedAt.Format(time.RFC3339),
+	}, nil
+}
+
+func (s *userService) UpdateAvatar(ctx context.Context, id string, avatarURL string) (*dto.UpdateAvatarResponse, error) {
+	userID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("fetching user: %w", err)
+	}
+	if user == nil {
+		return nil, ErrUserNotFound
+	}
+
+	user.AvatarURL = avatarURL
+	if err := s.userRepo.UpdateUser(ctx, user); err != nil {
+		return nil, fmt.Errorf("updating user avatar: %w", err)
+	}
+
+	return &dto.UpdateAvatarResponse{
+		AvatarURL: user.AvatarURL,
+		Message:   "Avatar updated successfully",
+	}, nil
 }
 
 // generateTempPassword generates a cryptographically secure random password

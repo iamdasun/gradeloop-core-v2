@@ -88,9 +88,6 @@ const navItems: NavItem[] = [
       { title: "Departments", href: "/admin/academics/departments", icon: Building2 },
       { title: "Degrees", href: "/admin/academics/degrees", icon: Award },
       { title: "Courses", href: "/admin/academics/courses", icon: BookOpen },
-      { title: "Semesters", href: "/admin/academics/semesters", icon: Calendar },
-      { title: "Groups", href: "/admin/academics/groups", icon: Users2 },
-      { title: "Enrollment", href: "/admin/academics/enrollment", icon: ClipboardList },
     ],
   },
   {
@@ -130,11 +127,10 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
 
-  const displayName = user?.username ?? '—';
-  const displayEmail = user?.role_name ?? '';
-  const initials = user
-    ? user.username.slice(0, 2).toUpperCase()
-    : '??';
+  const displayName = user?.full_name || user?.username || '—';
+  const initials = user?.full_name
+    ? user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+    : user?.username?.slice(0, 2).toUpperCase() || '??';
 
   // Auto-open any group whose child is active on mount
   const [openGroups, setOpenGroups] = React.useState<Set<string>>(() => {
@@ -318,11 +314,8 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               {!collapsed && (
-                <div className="flex flex-1 flex-col items-start text-left text-sm">
-                  <span className="font-medium">{displayName}</span>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {displayEmail}
-                  </span>
+                <div className="flex flex-1 items-center text-left text-sm">
+                  <span className="font-medium truncate max-w-[150px]">{displayName}</span>
                 </div>
               )}
             </Button>
@@ -330,7 +323,11 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/profile" className="flex w-full cursor-pointer items-center">
+                Profile
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

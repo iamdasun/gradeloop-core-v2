@@ -12,6 +12,7 @@ type Config struct {
 	Server          ServerConfig
 	Database        DatabaseConfig
 	JWT             JWTConfig
+	MinIO           MinIOConfig
 	FrontendURL     string
 	EmailServiceURL string
 }
@@ -28,6 +29,15 @@ type DatabaseConfig struct {
 	Password string
 	Name     string
 	SSLMode  string
+}
+
+type MinIOConfig struct {
+	Endpoint   string
+	AccessKey  string
+	SecretKey  string
+	Bucket     string
+	UseSSL     bool
+	PublicHost string // base URL used to build public object URLs
 }
 
 type JWTConfig struct {
@@ -67,6 +77,14 @@ func Load() (*Config, error) {
 			RefreshTokenExpiry: getEnvAsInt64("JWT_REFRESH_TOKEN_EXPIRY", 7), // 7 days
 			CookieSecure:       getEnvAsBool("JWT_COOKIE_SECURE", false),
 			CookieSameSite:     getEnv("JWT_COOKIE_SAMESITE", "Lax"),
+		},
+		MinIO: MinIOConfig{
+			Endpoint:   getEnv("MINIO_ENDPOINT", "minio:9000"),
+			AccessKey:  getEnv("MINIO_ACCESS_KEY", "minioadmin"),
+			SecretKey:  getEnv("MINIO_SECRET_KEY", "minioadmin"),
+			Bucket:     getEnv("MINIO_BUCKET", "avatars"),
+			UseSSL:     getEnvAsBool("MINIO_USE_SSL", false),
+			PublicHost: getEnv("MINIO_PUBLIC_HOST", "http://localhost:9000"),
 		},
 		FrontendURL:     getEnv("FRONTEND_URL", "http://localhost:3000"),
 		EmailServiceURL: getEnv("EMAIL_SERVICE_URL", "http://localhost:8082"),

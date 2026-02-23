@@ -33,8 +33,9 @@ interface Props {
   onDelete: (user: UserListItem) => void;
 }
 
-function initials(username: string) {
-  return username
+function getInitials(fullName: string, username: string) {
+  const name = fullName || username;
+  return name
     .split(/[.\-_\s]/)
     .map((p) => p[0]?.toUpperCase() ?? '')
     .slice(0, 2)
@@ -78,11 +79,11 @@ export function UserDetailsDialog({
         <div className="flex items-center gap-4 py-2">
           <Avatar className="h-14 w-14 text-lg">
             <AvatarFallback className="bg-zinc-100 dark:bg-zinc-800">
-              {initials(user.username)}
+              {getInitials(user.full_name, user.username)}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold">{user.username}</h3>
+            <h3 className="text-base font-semibold">{user.full_name || user.username}</h3>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
               {user.email}
             </p>
@@ -115,9 +116,9 @@ export function UserDetailsDialog({
             <User className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
             <div>
               <dt className="text-zinc-500 dark:text-zinc-400 text-xs">
-                Username
+                Full Name
               </dt>
-              <dd>{user.username}</dd>
+              <dd>{user.full_name || '—'}</dd>
             </div>
           </div>
 

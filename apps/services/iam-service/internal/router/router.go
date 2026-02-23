@@ -33,6 +33,8 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	// Protected auth routes (require authentication)
 	authProtected := api.Group("/auth", middleware.AuthMiddleware(cfg.JWTSecretKey))
 	authProtected.Post("/change-password", cfg.AuthHandler.ChangePassword)
+	authProtected.Get("/profile", cfg.UserHandler.GetProfile)
+	authProtected.Patch("/profile/avatar", cfg.UserHandler.UpdateAvatar)
 
 	// User routes with authentication middleware (admin-only operations)
 	users := api.Group("/users", middleware.AuthMiddleware(cfg.JWTSecretKey))
