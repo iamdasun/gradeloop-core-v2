@@ -50,7 +50,7 @@ function validate(values: CreateUserRequest): FormErrors {
 }
 
 export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
-  const { roles, rolesLoading, fetchRoles } = useAdminUsersStore();
+  const { roles, rolesLoading, rolesError, fetchRoles, refetchRoles } = useAdminUsersStore();
   const [values, setValues] = React.useState<CreateUserRequest>(EMPTY);
   const [errors, setErrors] = React.useState<FormErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
@@ -68,8 +68,22 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
     }
   }, [open]);
 
+  // Filter roles to only those compatible with the selected user_type.
+  // A role is compatible when role.user_type matches or role.user_type === 'all'.
+  const compatibleRoles = React.useMemo(() => {
+    if (!values.user_type) return roles;
+    return roles.filter(
+      (r) => r.user_type === values.user_type || r.user_type === 'all',
+    );
+  }, [roles, values.user_type]);
+
   function set(field: keyof CreateUserRequest, value: string) {
-    setValues((prev) => ({ ...prev, [field]: value }));
+    setValues((prev) => {
+      const next = { ...prev, [field]: value };
+      // When user_type changes the previously selected role may be incompatible—reset it.
+      if (field === 'user_type') next.role_id = '';
+      return next;
+    });
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
 
@@ -220,16 +234,26 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
               value={values.role_id}
               onChange={(e) => set('role_id', e.target.value)}
               disabled={submitting || rolesLoading}
+              title={rolesError ? `Roles unavailable: ${rolesError}` : undefined}
             >
               <option value="">
-                {rolesLoading ? 'Loading roles…' : 'Select a role'}
+                {rolesLoading ? 'Loading roles…' : rolesError ? 'Roles unavailable' : 'Select a role'}
               </option>
-              {roles.map((r) => (
+              {compatibleRoles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
                 </option>
               ))}
             </SelectNative>
+            {rolesError && (
+              <button
+                type="button"
+                className="text-xs text-red-500 hover:underline"
+                onClick={() => refetchRoles()}
+              >
+                Retry loading roles
+              </button>
+            )}
             {errors.role_id && (
               <p className="text-xs text-red-500">{errors.role_id}</p>
             )}

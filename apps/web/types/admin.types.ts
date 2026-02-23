@@ -24,6 +24,8 @@ export interface ListUsersParams {
   limit?: number;
   /** Filter by user type: "all" | "student" | "employee" */
   user_type?: string;
+  /** Filter by role UUID — forwarded as role_id to backend GET /users */
+  role_id?: string;
 }
 
 /** POST /users — backend requires user_type; student/employee need extra fields. */

@@ -123,7 +123,7 @@ export default function UsersPage() {
   const [revokeUser, setRevokeUser] = React.useState<UserListItem | null>(null);
   const [deleteUser, setDeleteUser] = React.useState<UserListItem | null>(null);
 
-  const { roles, fetchRoles } = useAdminUsersStore();
+  const { roles, rolesLoading, rolesError, fetchRoles, refetchRoles } = useAdminUsersStore();
 
   // ── Debounce search ──────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -138,7 +138,11 @@ export default function UsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await usersApi.list({ page, limit: PAGE_LIMIT });
+      const result = await usersApi.list({
+        page,
+        limit: PAGE_LIMIT,
+        role_id: roleFilter || undefined,
+      });
       setUsers(result.data);
       setTotal(result.total);
     } catch (err) {
@@ -146,12 +150,12 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, roleFilter]);
 
   React.useEffect(() => { fetchUsers(); }, [fetchUsers]);
   React.useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
-  // ── Client-side filtering (backend doesn't support search/role/status params) ──
+  // ── Client-side filtering (search & status only — role filter is server-side) ──
   const displayUsers = React.useMemo(() => {
     return users.filter((u) => {
       if (debouncedSearch) {
@@ -159,12 +163,11 @@ export default function UsersPage() {
         if (!u.username.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q))
           return false;
       }
-      if (roleFilter && u.role_id !== roleFilter) return false;
       if (statusFilter === 'active' && !u.is_active) return false;
       if (statusFilter === 'inactive' && u.is_active) return false;
       return true;
     });
-  }, [users, debouncedSearch, roleFilter, statusFilter]);
+  }, [users, debouncedSearch, statusFilter]);
 
   // ── Derived stats ────────────────────────────────────────────────────────────
   const activeCount = users.filter((u) => u.is_active).length;
@@ -253,12 +256,25 @@ export default function UsersPage() {
             className="sm:w-44"
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
+            disabled={rolesLoading}
+            title={rolesError ? `Roles unavailable: ${rolesError}` : undefined}
           >
-            <option value="">All roles</option>
+            <option value="">
+              {rolesLoading ? 'Loading roles…' : rolesError ? 'Roles unavailable' : 'All roles'}
+            </option>
             {roles.map((r) => (
               <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </SelectNative>
+          {rolesError && (
+            <button
+              type="button"
+              className="text-xs text-red-500 hover:underline shrink-0"
+              onClick={() => refetchRoles()}
+            >
+              Retry roles
+            </button>
+          )}
           <SelectNative
             className="sm:w-40"
             value={statusFilter}

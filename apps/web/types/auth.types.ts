@@ -18,6 +18,9 @@ export interface User {
 export interface Role {
   id: string;
   name: string;
+  /** Matches backend RoleResponse.user_type: "student" | "employee" | "all" */
+  user_type: string;
+  is_system_role?: boolean;
   description?: string;
   permissions?: Permission[];
 }

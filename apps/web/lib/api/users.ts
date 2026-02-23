@@ -47,6 +47,7 @@ export const usersApi = {
     if (params.page !== undefined) cleanParams.page = params.page;
     if (params.limit !== undefined) cleanParams.limit = params.limit;
     if (params.user_type) cleanParams.user_type = params.user_type;
+    if (params.role_id) cleanParams.role_id = params.role_id;
 
     const { data } = await axiosInstance.get('/users', { params: cleanParams });
     return normalizePaginated(data, params);

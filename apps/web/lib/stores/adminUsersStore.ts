@@ -32,6 +32,8 @@ export const useAdminUsersStore = create<AdminUsersState>((set, get) => ({
   rolesError: null,
 
   fetchRoles: async () => {
+    // Skip if already loaded successfully or a request is in flight.
+    // Allow retry when a previous attempt errored (roles.length === 0 && rolesError !== null).
     if (get().roles.length > 0 || get().rolesLoading) return;
     await loadRoles(set);
   },

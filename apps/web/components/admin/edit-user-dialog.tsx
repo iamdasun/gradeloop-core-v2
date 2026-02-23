@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { SelectNative } from '@/components/ui/select-native';
@@ -34,7 +33,7 @@ interface FormValues {
 }
 
 export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
-  const { roles, rolesLoading, fetchRoles } = useAdminUsersStore();
+  const { roles, rolesLoading, rolesError, fetchRoles, refetchRoles } = useAdminUsersStore();
   const [values, setValues] = React.useState<FormValues>({
     is_active: true,
     role_id: '',
@@ -53,6 +52,15 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
       fetchRoles();
     }
   }, [user, open, fetchRoles]);
+
+  // Only show roles compatible with the user's type so admins can't accidentally
+  // assign a student-only role to an employee, etc.
+  const compatibleRoles = React.useMemo(() => {
+    if (!user?.user_type) return roles;
+    return roles.filter(
+      (r) => r.user_type === user.user_type || r.user_type === 'all',
+    );
+  }, [roles, user?.user_type]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,6 +133,10 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
                 {user.email}
               </span>
             </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-zinc-500">User Type</span>
+              <span className="font-medium capitalize">{user.user_type || '—'}</span>
+            </div>
           </div>
 
           {/* Role */}
@@ -137,16 +149,26 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
                 setValues((v) => ({ ...v, role_id: e.target.value }))
               }
               disabled={submitting || rolesLoading}
+              title={rolesError ? `Roles unavailable: ${rolesError}` : undefined}
             >
               <option value="">
-                {rolesLoading ? 'Loading…' : 'Select role'}
+                {rolesLoading ? 'Loading…' : rolesError ? 'Roles unavailable' : 'Select role'}
               </option>
-              {roles.map((r) => (
+              {compatibleRoles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
                 </option>
               ))}
             </SelectNative>
+            {rolesError && (
+              <button
+                type="button"
+                className="text-xs text-red-500 hover:underline"
+                onClick={() => refetchRoles()}
+              >
+                Retry loading roles
+              </button>
+            )}
           </div>
 
           {/* Active status */}
