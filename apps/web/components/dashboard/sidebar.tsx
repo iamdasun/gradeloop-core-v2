@@ -14,12 +14,17 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   LogOut,
+  School,
+  Building2,
+  Award,
+  Landmark,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,12 +36,34 @@ import {
 import { useAuthStore } from "@/lib/stores/authStore";
 import { useLogoutMutation } from "@/lib/hooks/useAuthMutation";
 
-interface NavItem {
+// ── Nav item type system ──────────────────────────────────────────────────────
+
+interface NavLink {
+  type?: "link";
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
 }
+
+interface NavChild {
+  title: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+interface NavGroup {
+  type: "group";
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  /** Treated as the active root for pathname detection and collapsed-mode link */
+  baseHref: string;
+  children: NavChild[];
+}
+
+type NavItem = NavLink | NavGroup;
+
+// ── Nav configuration ─────────────────────────────────────────────────────────
 
 const navItems: NavItem[] = [
   {
@@ -50,9 +77,16 @@ const navItems: NavItem[] = [
     icon: Users,
   },
   {
-    title: "Courses",
-    href: "/admin/courses",
-    icon: BookOpen,
+    type: "group",
+    title: "Academics",
+    icon: School,
+    baseHref: "/admin/academics",
+    children: [
+      { title: "Faculties",   href: "/admin/academics/faculties",   icon: Landmark },
+      { title: "Departments", href: "/admin/academics/departments", icon: Building2 },
+      { title: "Degrees",     href: "/admin/academics/degrees",     icon: Award },
+      { title: "Courses",     href: "/admin/academics/courses",     icon: BookOpen },
+    ],
   },
   {
     title: "Assignments",
@@ -97,6 +131,28 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
     ? user.username.slice(0, 2).toUpperCase()
     : '??';
 
+  // Auto-open any group whose child is active on mount
+  const [openGroups, setOpenGroups] = React.useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    navItems.forEach((item) => {
+      if (item.type === "group") {
+        if (item.children.some((c) => pathname.startsWith(c.href))) {
+          initial.add(item.title);
+        }
+      }
+    });
+    return initial;
+  });
+
+  const toggleGroup = React.useCallback((key: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   return (
     <div
       className={cn(
@@ -124,11 +180,97 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
       <ScrollArea className="flex-1 px-3 py-4">
         <nav className="flex flex-col gap-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            const Icon = item.icon;
+            // ── Group item ──────────────────────────────────────────────────
+            if (item.type === "group") {
+              const isGroupActive = pathname.startsWith(item.baseHref);
+              const isOpen = openGroups.has(item.title);
+              const GroupIcon = item.icon;
+
+              if (collapsed) {
+                // Collapsed: icon only, link to baseHref (overview)
+                return (
+                  <Link key={item.title} href={item.baseHref}>
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        "w-full justify-start gap-3 px-2",
+                        isGroupActive
+                          ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 dark:bg-zinc-50 dark:text-zinc-900"
+                          : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                      )}
+                      title={item.title}
+                    >
+                      <GroupIcon className="h-5 w-5 shrink-0" />
+                    </Button>
+                  </Link>
+                );
+              }
+
+              return (
+                <div key={item.title} className="flex flex-col">
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start gap-3 px-3",
+                      isGroupActive && !isOpen
+                        ? "bg-zinc-100 dark:bg-zinc-800"
+                        : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                    )}
+                    onClick={() => toggleGroup(item.title)}
+                  >
+                    <GroupIcon className="h-5 w-5 shrink-0" />
+                    <span className="flex-1 text-left text-sm font-medium">
+                      {item.title}
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-200",
+                        isOpen && "rotate-180",
+                      )}
+                    />
+                  </Button>
+
+                  {/* Children */}
+                  <div
+                    className={cn(
+                      "overflow-hidden transition-all duration-200",
+                      isOpen ? "max-h-52 opacity-100" : "max-h-0 opacity-0",
+                    )}
+                  >
+                    <div className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-zinc-200 pl-2 dark:border-zinc-800">
+                      {item.children.map((child) => {
+                        const isChildActive = pathname === child.href || pathname.startsWith(child.href + "/");
+                        const ChildIcon = child.icon;
+                        return (
+                          <Link key={child.href} href={child.href}>
+                            <Button
+                              variant="ghost"
+                              className={cn(
+                                "h-8 w-full justify-start gap-2 px-3 text-sm",
+                                isChildActive
+                                  ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 dark:bg-zinc-50 dark:text-zinc-900"
+                                  : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                              )}
+                            >
+                              <ChildIcon className="h-4 w-4 shrink-0" />
+                              <span>{child.title}</span>
+                            </Button>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // ── Regular link item ───────────────────────────────────────────
+            const navLink = item as NavLink;
+            const isActive = pathname === navLink.href;
+            const Icon = navLink.icon;
 
             return (
-              <Link key={item.href} href={item.href}>
+              <Link key={navLink.href} href={navLink.href}>
                 <Button
                   variant="ghost"
                   className={cn(
@@ -138,15 +280,15 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
                       ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-50/90"
                       : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
                   )}
-                  title={collapsed ? item.title : undefined}
+                  title={collapsed ? navLink.title : undefined}
                 >
                   <Icon className="h-5 w-5 shrink-0" />
                   {!collapsed && (
-                    <span className="flex-1 text-left">{item.title}</span>
+                    <span className="flex-1 text-left">{navLink.title}</span>
                   )}
-                  {!collapsed && item.badge && (
+                  {!collapsed && navLink.badge && (
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-xs text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900">
-                      {item.badge}
+                      {navLink.badge}
                     </span>
                   )}
                 </Button>
