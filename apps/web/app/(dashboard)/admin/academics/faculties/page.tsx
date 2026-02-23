@@ -77,9 +77,8 @@ function FacultyCard({ faculty, canWrite, onEdit, onToggleActive }: FacultyCardP
     >
       {/* Active accent stripe */}
       <div
-        className={`absolute left-0 top-0 h-full w-1 rounded-l-xl transition-colors ${
-          faculty.is_active ? 'bg-amber-500' : 'bg-zinc-300 dark:bg-zinc-700'
-        }`}
+        className={`absolute left-0 top-0 h-full w-1 rounded-l-xl transition-colors ${faculty.is_active ? 'bg-amber-500' : 'bg-zinc-300 dark:bg-zinc-700'
+          }`}
       />
 
       <div className="p-5 pl-6 flex flex-col gap-3 flex-1">
@@ -138,11 +137,10 @@ function FacultyCard({ faculty, canWrite, onEdit, onToggleActive }: FacultyCardP
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => onToggleActive(faculty)}
-                  className={`gap-2 ${
-                    faculty.is_active
+                  className={`gap-2 ${faculty.is_active
                       ? 'text-red-600 focus:text-red-600'
                       : 'text-emerald-600 focus:text-emerald-600'
-                  }`}
+                    }`}
                 >
                   {faculty.is_active
                     ? <><PowerOff className="h-3.5 w-3.5" /> Deactivate</>
@@ -191,24 +189,35 @@ export default function FacultiesPage() {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showInactive]);
 
   React.useEffect(() => { load(); }, [load]);
 
-  // ── Toggle active ─────────────────────────────────────────────────────────
+  const [togglingIds, setTogglingIds] = React.useState<Set<string>>(new Set());
+
   async function handleToggleActive(faculty: Faculty) {
     try {
-      let updated: Faculty;
       if (faculty.is_active) {
         await facultiesApi.deactivate(faculty.id);
-        updated = { ...faculty, is_active: false };
+        setFaculties((prev) => prev.map((f) => (f.id === faculty.id ? { ...f, is_active: false } : f)));
         toast.success('Faculty deactivated', faculty.name);
+
+        if (!showInactive) {
+          setTogglingIds((prev) => new Set(prev).add(faculty.id));
+          setTimeout(() => {
+            setTogglingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(faculty.id);
+              return next;
+            });
+          }, 1500);
+        }
       } else {
-        updated = await facultiesApi.reactivate(faculty.id);
+        const updated = await facultiesApi.reactivate(faculty.id);
+        setFaculties((prev) => prev.map((f) => (f.id === faculty.id ? updated : f)));
         toast.success('Faculty reactivated', faculty.name);
       }
-      setFaculties((prev) => prev.map((f) => (f.id === faculty.id ? updated : f)));
     } catch (err) {
       toast.error('Action failed', handleApiError(err));
     }
@@ -216,7 +225,9 @@ export default function FacultiesPage() {
 
   if (!canAccess) return null;
 
-  const visible = showInactive ? faculties : faculties.filter((f) => f.is_active);
+  const visible = showInactive
+    ? faculties
+    : faculties.filter((f) => f.is_active || togglingIds.has(f.id));
 
   return (
     <div className="space-y-6">

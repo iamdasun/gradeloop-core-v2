@@ -32,11 +32,11 @@ import type { Degree, DegreeLevel } from '@/types/academics.types';
 // ── Level badge colour map ────────────────────────────────────────────────────
 
 const LEVEL_VARIANT: Record<DegreeLevel, 'info' | 'purple' | 'success' | 'warning' | 'secondary'> = {
-  Undergraduate:  'info',
-  Postgraduate:   'purple',
-  Doctoral:       'success',
-  Diploma:        'warning',
-  Certificate:    'secondary',
+  Undergraduate: 'info',
+  Postgraduate: 'purple',
+  Doctoral: 'success',
+  Diploma: 'warning',
+  Certificate: 'secondary',
 };
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -88,9 +88,8 @@ function DegreeCard({ degree, canWrite, onEdit, onToggleActive }: DegreeCardProp
     >
       {/* Level accent stripe */}
       <div
-        className={`absolute left-0 top-0 h-full w-1 rounded-l-xl ${
-          degree.is_active ? 'bg-violet-500' : 'bg-zinc-300 dark:bg-zinc-700'
-        }`}
+        className={`absolute left-0 top-0 h-full w-1 rounded-l-xl ${degree.is_active ? 'bg-violet-500' : 'bg-zinc-300 dark:bg-zinc-700'
+          }`}
       />
 
       <div className="p-5 pl-6 flex flex-col gap-3 flex-1">
@@ -180,23 +179,38 @@ export default function DegreesPage() {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showInactive]);
 
   React.useEffect(() => { load(); }, [load]);
 
+  // IDs of degrees being toggled — used for visual transition feedback
+  const [togglingIds, setTogglingIds] = React.useState<Set<string>>(new Set());
+
   async function handleToggleActive(degree: Degree) {
     try {
-      let updated: Degree;
       if (degree.is_active) {
         await degreesApi.deactivate(degree.id);
-        updated = { ...degree, is_active: false };
+        // Update local state immediately
+        setDegrees((prev) => prev.map((d) => (d.id === degree.id ? { ...d, is_active: false } : d)));
         toast.success('Degree deactivated', degree.name);
+
+        // If not showing inactive, briefly keep item visible then fade out
+        if (!showInactive) {
+          setTogglingIds((prev) => new Set(prev).add(degree.id));
+          setTimeout(() => {
+            setTogglingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(degree.id);
+              return next;
+            });
+          }, 1500);
+        }
       } else {
-        updated = await degreesApi.reactivate(degree.id);
+        const updated = await degreesApi.reactivate(degree.id);
+        setDegrees((prev) => prev.map((d) => (d.id === degree.id ? updated : d)));
         toast.success('Degree reactivated', degree.name);
       }
-      setDegrees((prev) => prev.map((d) => (d.id === degree.id ? updated : d)));
     } catch (err) {
       toast.error('Action failed', handleApiError(err));
     }
@@ -204,7 +218,10 @@ export default function DegreesPage() {
 
   if (!canAccess) return null;
 
-  const visible = showInactive ? degrees : degrees.filter((d) => d.is_active || showInactive);
+  // Show active degrees + any that are mid-toggle transition (so the fade-out is visible)
+  const visible = showInactive
+    ? degrees
+    : degrees.filter((d) => d.is_active || togglingIds.has(d.id));
 
   return (
     <div className="space-y-6">
