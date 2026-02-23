@@ -46,9 +46,6 @@ class Settings(BaseSettings):
     )
     SENTRY_DSN: Optional[str] = Field(None, description="Sentry DSN (optional)")
 
-    class Config:  # kept for pydantic compatibility; model_config above is the primary config in pydantic-settings
-        env_prefix = "CIPAS_"
-        frozen = True
 
 
 def configure_logging(settings: Settings) -> None:

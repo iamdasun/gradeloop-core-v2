@@ -75,6 +75,7 @@ ARG APP_GROUP=cipas
 ARG APP_HOME=/app
 ENV VENV_PATH=/opt/venv
 ENV PATH="${VENV_PATH}/bin:$PATH"
+ENV PYTHONPATH=/app/src
 ENV PYTHONUNBUFFERED=1
 
 # Create group and user (system account, no password)
