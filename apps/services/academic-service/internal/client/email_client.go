@@ -61,7 +61,7 @@ func (c *EmailClient) SendEmail(ctx context.Context, req *SendEmailRequest) (*Se
 	}
 
 	// Create HTTP request
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/email/send", bytes.NewBuffer(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/emails/send", bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}

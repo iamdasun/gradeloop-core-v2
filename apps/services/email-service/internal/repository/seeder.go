@@ -23,6 +23,7 @@ func SeedTemplates(db *gorm.DB) {
         .content { padding: 20px; }
         .button { display: inline-block; padding: 10px 20px; color: white; background-color: #2196F3; text-decoration: none; border-radius: 5px; margin-top: 20px; }
         .footer { margin-top: 20px; font-size: 0.8em; color: #777; text-align: center; }
+        .password-box { background-color: #f4f4f4; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 1.2em; text-align: center; margin: 20px 0; letter-spacing: 2px; }
     </style>
 </head>
 <body>
@@ -31,9 +32,11 @@ func SeedTemplates(db *gorm.DB) {
             <h2>Welcome to GradeLoop</h2>
         </div>
         <div class="content">
-            <p>Hello {{username}},</p>
+            <p>Hello {{name}},</p>
             <p>Your GradeLoop account has been created successfully by an administrator.</p>
-            <p>To activate your account and set your password, please click the button below:</p>
+            <p>Here is your temporary password:</p>
+            <div class="password-box">{{password}}</div>
+            <p>To activate your account and set your own password, please click the button below:</p>
             <p style="text-align:center;">
                 <a href="{{activation_link}}" class="button">Activate Account</a>
             </p>
@@ -48,11 +51,14 @@ func SeedTemplates(db *gorm.DB) {
     </div>
 </body>
 </html>`,
-			BodyText: `Hello {{username}},
+			BodyText: `Hello {{name}},
 
 Your GradeLoop account has been created successfully by an administrator.
 
-To activate your account and set your password, please visit the following link:
+Here is your temporary password:
+{{password}}
+
+To activate your account and set your own password, please visit the following link:
 {{activation_link}}
 
 Note: This activation link will expire in 24 hours.

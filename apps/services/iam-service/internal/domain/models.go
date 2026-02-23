@@ -35,11 +35,13 @@ type User struct {
 	AvatarURL               string         `gorm:"size:512" json:"avatar_url"`
 	Faculty                 string         `gorm:"size:255" json:"faculty"`
 	Department              string         `gorm:"size:255" json:"department"`
-	PasswordHash            string         `gorm:"not null;size:255" json:"-"`
+	PasswordHash            string         `gorm:"size:255" json:"-"`
 	RoleID                  *uuid.UUID     `gorm:"type:uuid;index" json:"role_id"`
 	Role                    *Role          `gorm:"foreignKey:RoleID" json:"role,omitempty"`
 	IsActive                bool           `gorm:"not null;default:true" json:"is_active"`
 	IsPasswordResetRequired bool           `gorm:"not null;default:false" json:"is_password_reset_required"`
+	EmailVerified           bool           `gorm:"not null;default:false" json:"email_verified"`
+	PasswordSetAt           *time.Time     `json:"password_set_at,omitempty"`
 	DeletedAt               gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 	CreatedAt               time.Time      `json:"created_at"`
 	UpdatedAt               time.Time      `json:"updated_at"`

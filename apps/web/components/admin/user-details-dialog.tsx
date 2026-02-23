@@ -83,7 +83,7 @@ export function UserDetailsDialog({
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold">{user.full_name || user.username}</h3>
+            <h3 className="text-base font-semibold">{user.full_name || "No Name"}</h3>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
               {user.email}
             </p>
@@ -141,18 +141,6 @@ export function UserDetailsDialog({
               <dd>{user.role_name}</dd>
             </div>
           </div>
-
-          {user.user_type && (
-            <div className="flex items-start gap-3">
-              <User className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
-              <div>
-                <dt className="text-zinc-500 dark:text-zinc-400 text-xs">
-                  User Type
-                </dt>
-                <dd className="capitalize">{user.user_type}</dd>
-              </div>
-            </div>
-          )}
 
           {user.designation && (
             <div className="flex items-start gap-3">

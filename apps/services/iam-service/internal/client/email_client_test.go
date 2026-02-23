@@ -34,8 +34,8 @@ func TestSendEmail_Success(t *testing.T) {
 		}
 
 		// Verify request path
-		if r.URL.Path != "/api/v1/email/send" {
-			t.Errorf("expected path /api/v1/email/send, got %s", r.URL.Path)
+		if r.URL.Path != "/api/v1/emails/send" {
+			t.Errorf("expected path /api/v1/emails/send, got %s", r.URL.Path)
 		}
 
 		// Verify content type
@@ -136,57 +136,6 @@ func TestSendEmail_ServerError(t *testing.T) {
 	}
 }
 
-func TestSendActivationEmail_Success(t *testing.T) {
-	// Create mock server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var req SendEmailRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Errorf("failed to decode request: %v", err)
-		}
-
-		// Verify template name
-		if req.TemplateName != "user_activation" {
-			t.Errorf("expected template 'user_activation', got %s", req.TemplateName)
-		}
-
-		// Verify variables
-		if req.Variables["username"] != "testuser" {
-			t.Errorf("expected username 'testuser', got %v", req.Variables["username"])
-		}
-
-		if req.Variables["activation_link"] != "http://localhost:3000/activate?token=abc123" {
-			t.Errorf("expected activation_link, got %v", req.Variables["activation_link"])
-		}
-
-		// Verify recipient
-		if len(req.Recipients) != 1 || req.Recipients[0] != "test@example.com" {
-			t.Errorf("expected recipient 'test@example.com', got %v", req.Recipients)
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusAccepted)
-		json.NewEncoder(w).Encode(SendEmailResponse{
-			Message: "Email queued for sending",
-			ID:      "activation-123",
-			Status:  "pending",
-		})
-	}))
-	defer server.Close()
-
-	client := NewEmailClient(server.URL)
-
-	err := client.SendActivationEmail(
-		context.Background(),
-		"test@example.com",
-		"testuser",
-		"http://localhost:3000/activate?token=abc123",
-	)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestSendPasswordResetEmail_Success(t *testing.T) {
 	// Create mock server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -201,8 +150,8 @@ func TestSendPasswordResetEmail_Success(t *testing.T) {
 		}
 
 		// Verify variables
-		if req.Variables["username"] != "testuser" {
-			t.Errorf("expected username 'testuser', got %v", req.Variables["username"])
+		if req.Variables["name"] != "Test User" {
+			t.Errorf("expected name 'Test User', got %v", req.Variables["name"])
 		}
 
 		if req.Variables["reset_link"] != "http://localhost:3000/reset?token=xyz789" {
@@ -229,7 +178,7 @@ func TestSendPasswordResetEmail_Success(t *testing.T) {
 	err := client.SendPasswordResetEmail(
 		context.Background(),
 		"test@example.com",
-		"testuser",
+		"Test User",
 		"http://localhost:3000/reset?token=xyz789",
 	)
 

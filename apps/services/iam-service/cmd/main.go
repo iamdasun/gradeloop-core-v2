@@ -92,8 +92,9 @@ func run() error {
 	userService := service.NewUserService(
 		db.DB,
 		userRepo,
+		authRepo,
 		cfg.JWT.SecretKey,
-		24, // Activation token expiry: 24 hours
+		24, // Reset token expiry for new users: 24 hours
 		emailClient,
 		cfg.FrontendURL,
 	)

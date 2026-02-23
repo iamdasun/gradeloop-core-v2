@@ -1,4 +1,4 @@
-import { axiosInstance } from './axios';
+import { axiosInstance } from "./axios";
 import type {
   LoginRequest,
   LoginResponse,
@@ -7,7 +7,9 @@ import type {
   ResetPasswordRequest,
   ResetPasswordResponse,
   RefreshTokenResponse,
-} from '@/types/auth.types';
+  ActivateAccountRequest,
+  ActivateAccountResponse,
+} from "@/types/auth.types";
 
 export const authApi = {
   /**
@@ -17,7 +19,7 @@ export const authApi = {
    */
   login: async (credentials: LoginRequest): Promise<LoginResponse> => {
     const { data } = await axiosInstance.post<LoginResponse>(
-      '/auth/login',
+      "/auth/login",
       credentials,
     );
     return data;
@@ -27,7 +29,7 @@ export const authApi = {
    * Logout – revokes the refresh token and clears the cookie.
    */
   logout: async (): Promise<void> => {
-    await axiosInstance.post('/auth/logout');
+    await axiosInstance.post("/auth/logout");
   },
 
   /**
@@ -37,7 +39,7 @@ export const authApi = {
     payload: ForgotPasswordRequest,
   ): Promise<ForgotPasswordResponse> => {
     const { data } = await axiosInstance.post<ForgotPasswordResponse>(
-      '/auth/forgot-password',
+      "/auth/forgot-password",
       payload,
     );
     return data;
@@ -50,7 +52,7 @@ export const authApi = {
     payload: ResetPasswordRequest,
   ): Promise<ResetPasswordResponse> => {
     const { data } = await axiosInstance.post<ResetPasswordResponse>(
-      '/auth/reset-password',
+      "/auth/reset-password",
       payload,
     );
     return data;
@@ -61,9 +63,8 @@ export const authApi = {
    * Called automatically by the axios interceptor on 401.
    */
   refreshToken: async (): Promise<RefreshTokenResponse> => {
-    const { data } = await axiosInstance.post<RefreshTokenResponse>(
-      '/auth/refresh',
-    );
+    const { data } =
+      await axiosInstance.post<RefreshTokenResponse>("/auth/refresh");
     return data;
   },
 
@@ -74,7 +75,21 @@ export const authApi = {
     current_password: string;
     new_password: string;
   }): Promise<{ message: string }> => {
-    const { data } = await axiosInstance.post('/auth/change-password', payload);
+    const { data } = await axiosInstance.post("/auth/change-password", payload);
+    return data;
+  },
+
+  /**
+   * Activate a user account using the token from the activation email.
+   * The server generates a temporary password and sends it via welcome email.
+   */
+  activateAccount: async (
+    payload: ActivateAccountRequest,
+  ): Promise<ActivateAccountResponse> => {
+    const { data } = await axiosInstance.post<ActivateAccountResponse>(
+      "/auth/activate",
+      payload,
+    );
     return data;
   },
 };

@@ -61,7 +61,7 @@ func (c *EmailClient) SendEmail(ctx context.Context, req *SendEmailRequest) (*Se
 	}
 
 	// Create HTTP request
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/email/send", bytes.NewBuffer(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/emails/send", bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
@@ -99,33 +99,32 @@ func (c *EmailClient) SendEmail(ctx context.Context, req *SendEmailRequest) (*Se
 	return &emailResp, nil
 }
 
-// SendActivationEmail sends an account activation email
-func (c *EmailClient) SendActivationEmail(ctx context.Context, email, username, activationLink string) error {
+// SendWelcomeEmail sends a welcome email with temporary login credentials after account activation
+func (c *EmailClient) SendWelcomeEmail(ctx context.Context, email, fullName, tempPassword string) error {
 	req := &SendEmailRequest{
-		TemplateName: "user_activation",
+		TemplateName: "welcome_email",
 		Recipients:   []string{email},
 		Variables: map[string]interface{}{
-			"username":        username,
-			"activation_link": activationLink,
-			"link":            activationLink,
+			"name":     fullName,
+			"password": tempPassword,
 		},
 	}
 
 	_, err := c.SendEmail(ctx, req)
 	if err != nil {
-		return fmt.Errorf("sending activation email: %w", err)
+		return fmt.Errorf("sending welcome email: %w", err)
 	}
 
 	return nil
 }
 
 // SendPasswordResetEmail sends a password reset email
-func (c *EmailClient) SendPasswordResetEmail(ctx context.Context, email, username, resetLink string) error {
+func (c *EmailClient) SendPasswordResetEmail(ctx context.Context, email, fullName, resetLink string) error {
 	req := &SendEmailRequest{
 		TemplateName: "password_reset",
 		Recipients:   []string{email},
 		Variables: map[string]interface{}{
-			"username":   username,
+			"name":       fullName,
 			"reset_link": resetLink,
 			"link":       resetLink,
 		},

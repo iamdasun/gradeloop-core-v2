@@ -26,13 +26,6 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-type ActivationClaims struct {
-	UserID   uuid.UUID `json:"user_id"`
-	Username string    `json:"username"`
-	Email    string    `json:"email"`
-	jwt.RegisteredClaims
-}
-
 type TokenPair struct {
 	AccessToken  string
 	RefreshToken string
@@ -164,67 +157,4 @@ func (j *JWT) ValidateToken(tokenString string) (*Claims, error) {
 
 func (j *JWT) GetRefreshTokenExpiry() time.Time {
 	return time.Now().Add(j.refreshTokenExpiry)
-}
-
-// GenerateActivationToken generates a time-limited JWT token for account activation
-func GenerateActivationToken(userID uuid.UUID, username, email string, secretKey []byte, expiry time.Duration) (string, time.Time, error) {
-	if len(secretKey) == 0 {
-		return "", time.Time{}, errors.New("secret key cannot be empty")
-	}
-
-	expiresAt := time.Now().Add(expiry)
-
-	claims := ActivationClaims{
-		UserID:   userID,
-		Username: username,
-		Email:    email,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expiresAt),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "iam-service",
-			Subject:   userID.String(),
-			ID:        uuid.New().String(),
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	signedToken, err := token.SignedString(secretKey)
-	if err != nil {
-		return "", time.Time{}, fmt.Errorf("signing activation token: %w", err)
-	}
-
-	return signedToken, expiresAt, nil
-}
-
-// ValidateActivationToken validates and parses an activation token
-func ValidateActivationToken(tokenString string, secretKey []byte) (*ActivationClaims, error) {
-	if len(secretKey) == 0 {
-		return nil, errors.New("secret key cannot be empty")
-	}
-
-	token, err := jwt.ParseWithClaims(tokenString, &ActivationClaims{}, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return secretKey, nil
-	})
-
-	if err != nil {
-		if errors.Is(err, jwt.ErrTokenExpired) {
-			return nil, ErrExpiredToken
-		}
-		return nil, fmt.Errorf("parsing activation token: %w", err)
-	}
-
-	if !token.Valid {
-		return nil, ErrInvalidToken
-	}
-
-	claims, ok := token.Claims.(*ActivationClaims)
-	if !ok {
-		return nil, ErrInvalidToken
-	}
-
-	return claims, nil
 }

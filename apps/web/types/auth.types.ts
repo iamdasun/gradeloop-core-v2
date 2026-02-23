@@ -6,10 +6,10 @@
  * permissions).  There is no /users/me profile endpoint.
  */
 export interface User {
-  id: string;          // user_id claim
+  id: string; // user_id claim
   username: string;
   full_name: string;
-  role_name: string;   // single flat role string from JWT
+  role_name: string; // single flat role string from JWT
   permissions: string[]; // flat permission names from JWT
 }
 
@@ -65,6 +65,16 @@ export interface ResetPasswordRequest {
 
 export interface ResetPasswordResponse {
   message: string;
+}
+
+export interface ActivateAccountRequest {
+  token: string;
+}
+
+export interface ActivateAccountResponse {
+  message: string;
+  username: string;
+  email: string;
 }
 
 export interface RefreshTokenResponse {

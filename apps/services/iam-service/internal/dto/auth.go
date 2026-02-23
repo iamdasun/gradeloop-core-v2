@@ -48,23 +48,13 @@ type CreateUserRequest struct {
 }
 
 type CreateUserResponse struct {
-	ID             uuid.UUID `json:"id"`
-	FullName       string    `json:"full_name"`
-	Email          string    `json:"email"`
-	RoleID         uuid.UUID `json:"role_id"`
-	IsActive       bool      `json:"is_active"`
-	ActivationLink string    `json:"activation_link"`
-	Message        string    `json:"message"`
-}
-
-type ActivateUserRequest struct {
-	Token    string `json:"token" validate:"required"`
-	Password string `json:"password" validate:"required,min=8"`
-}
-
-type ActivateUserResponse struct {
-	Message  string `json:"message"`
-	Username string `json:"username"`
+	ID        uuid.UUID `json:"id"`
+	FullName  string    `json:"full_name"`
+	Email     string    `json:"email"`
+	RoleID    uuid.UUID `json:"role_id"`
+	IsActive  bool      `json:"is_active"`
+	ResetLink string    `json:"reset_link"`
+	Message   string    `json:"message"`
 }
 
 // Password Management DTOs

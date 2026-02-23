@@ -163,12 +163,6 @@ func handleUserError(err error) error {
 		return fiber.NewError(fiber.StatusConflict, "Email already exists")
 	case service.ErrRoleNotFound:
 		return fiber.NewError(fiber.StatusBadRequest, "Role not found")
-	case service.ErrInvalidActivationToken:
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid activation token")
-	case service.ErrActivationTokenExpired:
-		return fiber.NewError(fiber.StatusBadRequest, "Activation token expired")
-	case service.ErrUserAlreadyActive:
-		return fiber.NewError(fiber.StatusBadRequest, "User is already active")
 	case service.ErrUserNotFound:
 		return fiber.NewError(fiber.StatusNotFound, "User not found")
 	default:

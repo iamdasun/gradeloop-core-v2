@@ -39,7 +39,6 @@ func (h *AuthHandler) RegisterRoutes(app *fiber.App) {
 	auth.Post("/login", h.Login)
 	auth.Post("/refresh", h.RefreshToken)
 	auth.Post("/logout", h.Logout)
-	auth.Post("/activate", h.Activate)
 	auth.Post("/forgot-password", h.ForgotPassword)
 	auth.Post("/reset-password", h.ResetPassword)
 	auth.Post("/change-password", h.ChangePassword)
@@ -140,25 +139,6 @@ func (h *AuthHandler) Logout(c fiber.Ctx) error {
 	})
 }
 
-func (h *AuthHandler) Activate(c fiber.Ctx) error {
-	var req dto.ActivateUserRequest
-
-	if err := c.Bind().Body(&req); err != nil {
-		return fiber.ErrBadRequest
-	}
-
-	if req.Token == "" || req.Password == "" {
-		return fiber.ErrBadRequest
-	}
-
-	response, err := h.userService.ActivateUser(c.RequestCtx(), req.Token, req.Password)
-	if err != nil {
-		return handleAuthError(err)
-	}
-
-	return c.JSON(response)
-}
-
 func (h *AuthHandler) ChangePassword(c fiber.Ctx) error {
 	var req dto.ChangePasswordRequest
 
@@ -246,13 +226,7 @@ func handleAuthError(err error) error {
 	case service.ErrUserNotFound:
 		return fiber.NewError(fiber.StatusNotFound, "User not found")
 	case service.ErrRefreshTokenNotFound, service.ErrRefreshTokenExpired, service.ErrRefreshTokenRevoked:
-		return fiber.NewError(fiber.StatusUnauthorized, "Invalid or expired refresh token")
-	case service.ErrInvalidActivationToken:
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid activation token")
-	case service.ErrActivationTokenExpired:
-		return fiber.NewError(fiber.StatusBadRequest, "Activation token expired")
-	case service.ErrUserAlreadyActive:
-		return fiber.NewError(fiber.StatusBadRequest, "User is already active")
+		return fiber.NewError(fiber.StatusUnauthorized, "Invalid or expired refresh token") // removed activation token errors
 	case service.ErrCurrentPasswordInvalid:
 		return fiber.NewError(fiber.StatusUnauthorized, "Current password is incorrect")
 	case service.ErrNewPasswordSameAsOld:
@@ -263,6 +237,8 @@ func handleAuthError(err error) error {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid password reset token")
 	case service.ErrPasswordResetTokenExpired:
 		return fiber.NewError(fiber.StatusBadRequest, "Password reset token has expired")
+	case service.ErrPasswordResetLinkExpiredResent:
+		return fiber.NewError(fiber.StatusBadRequest, "Your reset link has expired. A new link has been sent to your email.")
 	case service.ErrPasswordResetTokenUsed:
 		return fiber.NewError(fiber.StatusBadRequest, "Password reset token has already been used")
 	default:

@@ -180,6 +180,53 @@ If you did not request a password reset, please ignore this email or contact sup
 Best regards,
 The GradeLoop Team`,
 		},
+		"user_activation": {
+			Subject: "Activate Your GradeLoop Account",
+			BodyHTML: `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .header { background-color: #4CAF50; color: white; padding: 10px; text-align: center; border-radius: 5px 5px 0 0; }
+        .content { padding: 20px; }
+        .button { display: inline-block; padding: 10px 20px; color: white; background-color: #4CAF50; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+        .footer { margin-top: 20px; font-size: 0.8em; color: #777; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Activate Your GradeLoop Account</h2>
+        </div>
+        <div class="content">
+            <p>Hello {{name}},</p>
+            <p>Thank you for registering with GradeLoop. Please activate your account by clicking the button below:</p>
+            <p style="text-align:center;">
+                <a href="{{activation_link}}" class="button">Activate Account</a>
+            </p>
+            <p>If you did not create an account, please ignore this email.</p>
+            <p>Alternatively, you can copy and paste the following link into your browser:</p>
+            <p>{{activation_link}}</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 GradeLoop. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>`,
+			BodyText: `Hello {{name}},
+
+Thank you for registering with GradeLoop. Please activate your account using the link below:
+
+{{activation_link}}
+
+If you did not create an account, please ignore this email.
+
+Best regards,
+The GradeLoop Team`,
+		},
 	}
 
 	// Prefer template_name (from publisher). If provided, use our in-memory templates.

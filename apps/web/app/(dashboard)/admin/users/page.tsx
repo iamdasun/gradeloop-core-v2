@@ -180,7 +180,6 @@ export default function UsersPage() {
         const q = debouncedSearch.toLowerCase();
         if (
           !u.full_name?.toLowerCase().includes(q) &&
-          !u.username.toLowerCase().includes(q) &&
           !u.email.toLowerCase().includes(q)
         )
           return false;
@@ -377,7 +376,7 @@ export default function UsersPage() {
                           </Avatar>
                           <div className="min-w-0">
                             <p className="font-medium text-sm truncate">
-                              {user.full_name || user.username}
+                              {user.full_name || "No Name"}
                             </p>
                             <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
                               {user.email}

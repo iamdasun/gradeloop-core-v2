@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"time"
@@ -14,22 +12,17 @@ import (
 	"github.com/gradeloop/iam-service/internal/dto"
 	"github.com/gradeloop/iam-service/internal/jwt"
 	"github.com/gradeloop/iam-service/internal/repository"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 var (
-	ErrUsernameTaken          = errors.New("username already exists")
-	ErrEmailTaken             = errors.New("email already exists")
-	ErrRoleNotFound           = errors.New("role not found")
-	ErrInvalidActivationToken = errors.New("invalid activation token")
-	ErrUserAlreadyActive      = errors.New("user is already active")
-	ErrActivationTokenExpired = errors.New("activation token expired")
+	ErrUsernameTaken = errors.New("username already exists")
+	ErrEmailTaken    = errors.New("email already exists")
+	ErrRoleNotFound  = errors.New("role not found")
 )
 
 type UserService interface {
 	CreateUser(ctx context.Context, req *dto.CreateUserRequest, actorPermissions []string) (*dto.CreateUserResponse, error)
-	ActivateUser(ctx context.Context, token, password string) (*dto.ActivateUserResponse, error)
 	GetUsers(ctx context.Context, page, limit int, userType string, roleID string) (*dto.GetUsersResponse, error)
 	UpdateUser(ctx context.Context, id string, req *dto.UpdateUserRequest) (*dto.UpdateUserResponse, error)
 	DeleteUser(ctx context.Context, id string) error
@@ -41,6 +34,7 @@ type UserService interface {
 type userService struct {
 	db                    *gorm.DB
 	userRepo              repository.UserRepository
+	authRepo              repository.AuthRepository
 	secretKey             []byte
 	activationTokenExpiry time.Duration
 	emailClient           *client.EmailClient
@@ -50,6 +44,7 @@ type userService struct {
 func NewUserService(
 	db *gorm.DB,
 	userRepo repository.UserRepository,
+	authRepo repository.AuthRepository,
 	secretKey string,
 	activationTokenExpiryHours int64,
 	emailClient *client.EmailClient,
@@ -58,6 +53,7 @@ func NewUserService(
 	return &userService{
 		db:                    db,
 		userRepo:              userRepo,
+		authRepo:              authRepo,
 		secretKey:             []byte(secretKey),
 		activationTokenExpiry: time.Duration(activationTokenExpiryHours) * time.Hour,
 		emailClient:           emailClient,
@@ -102,17 +98,7 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 		return nil, ErrEmailTaken
 	}
 
-	// Generate random temporary password
-	tempPassword, err := generateTempPassword()
-	if err != nil {
-		return nil, fmt.Errorf("generating temporary password: %w", err)
-	}
-
-	// Hash the temporary password
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, fmt.Errorf("hashing password: %w", err)
-	}
+	// User initial password will be set via password reset link flow
 
 	// Use a transaction for user and profile creation
 	tx := s.db.WithContext(ctx).Begin()
@@ -127,7 +113,7 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 		Username:                req.Email,
 		Email:                   req.Email,
 		FullName:                req.FullName,
-		PasswordHash:            string(passwordHash),
+		PasswordHash:            "", // First-time user flow, password is empty initially
 		RoleID:                  &roleID,
 		IsActive:                false,
 		IsPasswordResetRequired: true,
@@ -171,84 +157,47 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 		return nil, fmt.Errorf("committing transaction: %w", err)
 	}
 
-	// Generate activation token
-	activationToken, expiresAt, err := jwt.GenerateActivationToken(
-		user.ID,
-		user.Username,
-		user.Email,
-		s.secretKey,
-		s.activationTokenExpiry,
-	)
+	// Generate reset token
+	resetToken, err := GenerateResetToken()
 	if err != nil {
-		return nil, fmt.Errorf("generating activation token: %w", err)
+		return nil, fmt.Errorf("generating password reset token: %w", err)
 	}
 
-	// Create activation link
-	activationLink := fmt.Sprintf("%s/auth/activate?token=%s", s.frontendURL, activationToken)
+	// Hash the token for DB
+	tokenHash := jwt.HashToken(resetToken)
 
-	// Send activation email
+	// Create and save the token
+	expiresAt := time.Now().Add(s.activationTokenExpiry)
+	resetTokenEntity := &domain.PasswordResetToken{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		ExpiresAt: expiresAt,
+	}
+
+	if err := s.authRepo.CreatePasswordResetToken(ctx, resetTokenEntity); err != nil {
+		return nil, fmt.Errorf("storing password reset token: %w", err)
+	}
+
+	// Create password reset link
+	resetLink := fmt.Sprintf("%s/reset-password?token=%s", s.frontendURL, resetToken)
+
+	// Send setup email
 	if s.emailClient != nil {
-		if err := s.emailClient.SendActivationEmail(ctx, user.Email, user.Username, activationLink); err != nil {
+		if err := s.emailClient.SendPasswordResetEmail(ctx, user.Email, user.FullName, resetLink); err != nil {
 			// Log the error but don't fail the user creation
-			// In production, you might want to queue this for retry
-			fmt.Printf("Warning: Failed to send activation email to %s: %v\n", user.Email, err)
+			fmt.Printf("Warning: Failed to send setup email to %s: %v\n", user.Email, err)
 		}
 	}
 
 	return &dto.CreateUserResponse{
-		ID:             user.ID,
-		FullName:       user.FullName,
-		Email:          user.Email,
-		RoleID:         roleID,
-		IsActive:       user.IsActive,
-		ActivationLink: activationLink,
-		Message:        fmt.Sprintf("User created successfully. An activation email has been sent to %s. The link expires at %s", user.Email, expiresAt.Format(time.RFC3339)),
-	}, nil
-}
-
-func (s *userService) ActivateUser(ctx context.Context, token, password string) (*dto.ActivateUserResponse, error) {
-	// Validate activation token
-	claims, err := jwt.ValidateActivationToken(token, s.secretKey)
-	if err != nil {
-		if errors.Is(err, jwt.ErrExpiredToken) {
-			return nil, ErrActivationTokenExpired
-		}
-		return nil, ErrInvalidActivationToken
-	}
-
-	// Get user
-	user, err := s.userRepo.GetUserByID(ctx, claims.UserID)
-	if err != nil {
-		return nil, fmt.Errorf("fetching user: %w", err)
-	}
-
-	if user == nil {
-		return nil, ErrUserNotFound
-	}
-
-	// Check if already active
-	if user.IsActive {
-		return nil, ErrUserAlreadyActive
-	}
-
-	// Hash the new password
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, fmt.Errorf("hashing password: %w", err)
-	}
-
-	// Activate user and set password
-	user.IsActive = true
-	user.PasswordHash = string(passwordHash)
-	user.IsPasswordResetRequired = true
-
-	if err := s.userRepo.UpdateUser(ctx, user); err != nil {
-		return nil, fmt.Errorf("activating user: %w", err)
-	}
-
-	return &dto.ActivateUserResponse{
-		Message:  "Account activated successfully. You can now login.",
-		Username: user.Username,
+		ID:        user.ID,
+		FullName:  user.FullName,
+		Email:     user.Email,
+		RoleID:    roleID,
+		IsActive:  user.IsActive,
+		ResetLink: resetLink,
+		Message:   fmt.Sprintf("User created successfully. A setup email has been sent to %s. The link expires at %s", user.Email, expiresAt.Format(time.RFC3339)),
 	}, nil
 }
 
@@ -500,16 +449,4 @@ func (s *userService) UpdateAvatar(ctx context.Context, id string, avatarURL str
 		AvatarURL: user.AvatarURL,
 		Message:   "Avatar updated successfully",
 	}, nil
-}
-
-// generateTempPassword generates a cryptographically secure random password
-func generateTempPassword() (string, error) {
-	bytes := make([]byte, 16)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("generating random bytes: %w", err)
-	}
-
-	// Create a password with mixed case and numbers
-	password := base64.URLEncoding.EncodeToString(bytes)[:24]
-	return password, nil
 }

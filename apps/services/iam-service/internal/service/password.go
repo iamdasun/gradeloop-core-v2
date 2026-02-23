@@ -20,12 +20,13 @@ import (
 )
 
 var (
-	ErrCurrentPasswordInvalid    = errors.New("current password is incorrect")
-	ErrNewPasswordSameAsOld      = errors.New("new password must be different from current password")
-	ErrPasswordTooWeak           = errors.New("password does not meet security requirements")
-	ErrPasswordResetTokenInvalid = errors.New("invalid password reset token")
-	ErrPasswordResetTokenExpired = errors.New("password reset token has expired")
-	ErrPasswordResetTokenUsed    = errors.New("password reset token has already been used")
+	ErrCurrentPasswordInvalid         = errors.New("current password is incorrect")
+	ErrNewPasswordSameAsOld           = errors.New("new password must be different from current password")
+	ErrPasswordTooWeak                = errors.New("password does not meet security requirements")
+	ErrPasswordResetTokenInvalid      = errors.New("invalid password reset token")
+	ErrPasswordResetTokenExpired      = errors.New("password reset token has expired")
+	ErrPasswordResetTokenUsed         = errors.New("password reset token has already been used")
+	ErrPasswordResetLinkExpiredResent = errors.New("Your reset link has expired. A new link has been sent to your email.")
 )
 
 // PasswordStrength requirements:
@@ -147,7 +148,7 @@ func (s *passwordService) ForgotPassword(ctx context.Context, email string) (*dt
 	}
 
 	// Generate reset token
-	resetToken, err := generateResetToken()
+	resetToken, err := GenerateResetToken()
 	if err != nil {
 		return nil, fmt.Errorf("generating reset token: %w", err)
 	}
@@ -168,11 +169,11 @@ func (s *passwordService) ForgotPassword(ctx context.Context, email string) (*dt
 	}
 
 	// Generate reset link
-	resetLink := fmt.Sprintf("%s/auth/reset-password?token=%s", s.frontendURL, resetToken)
+	resetLink := fmt.Sprintf("%s/reset-password?token=%s", s.frontendURL, resetToken)
 
 	// Send password reset email
 	if s.emailClient != nil {
-		if err := s.emailClient.SendPasswordResetEmail(ctx, email, user.Username, resetLink); err != nil {
+		if err := s.emailClient.SendPasswordResetEmail(ctx, email, user.FullName, resetLink); err != nil {
 			// Log the error but don't fail the request (for security, we don't reveal if email exists)
 			// In production, you might want to queue this for retry
 			fmt.Printf("Warning: Failed to send password reset email to %s: %v\n", email, err)
@@ -205,7 +206,27 @@ func (s *passwordService) ResetPassword(ctx context.Context, token, newPassword 
 
 	// Check if expired
 	if resetToken.ExpiresAt.Before(time.Now()) {
-		return nil, ErrPasswordResetTokenExpired
+		// Automatically generate a new reset token and resend email
+		user, uErr := s.userRepo.GetUserByID(ctx, resetToken.UserID)
+		if uErr == nil && user != nil {
+			newToken, tErr := GenerateResetToken()
+			if tErr == nil {
+				newTokenHash := jwt.HashToken(newToken)
+				s.authRepo.CreatePasswordResetToken(ctx, &domain.PasswordResetToken{
+					ID:        uuid.New(),
+					UserID:    user.ID,
+					TokenHash: newTokenHash,
+					ExpiresAt: time.Now().Add(s.resetTokenExpiry),
+				})
+
+				resetLink := fmt.Sprintf("%s/reset-password?token=%s", s.frontendURL, newToken)
+				if s.emailClient != nil {
+					s.emailClient.SendPasswordResetEmail(ctx, user.Email, user.FullName, resetLink)
+				}
+			}
+		}
+
+		return nil, ErrPasswordResetLinkExpiredResent
 	}
 
 	// Get user
@@ -226,9 +247,19 @@ func (s *passwordService) ResetPassword(ctx context.Context, token, newPassword 
 
 	// Use transaction to update password, mark token as used, and invalidate tokens
 	err = repository.WithTxContext(ctx, s.db, func(tx *gorm.DB) error {
+		// If user was created and hasn't set password yet, activate them
+		if !user.IsActive {
+			user.IsActive = true
+			user.EmailVerified = true
+		}
+
 		// Update user password
 		user.PasswordHash = string(newPasswordHash)
 		user.IsPasswordResetRequired = false
+
+		now := time.Now()
+		user.PasswordSetAt = &now
+
 		if err := tx.Save(user).Error; err != nil {
 			return fmt.Errorf("updating password: %w", err)
 		}
@@ -288,8 +319,8 @@ func validatePasswordStrength(password string) error {
 	return nil
 }
 
-// generateResetToken generates a cryptographically secure random token
-func generateResetToken() (string, error) {
+// GenerateResetToken generates a cryptographically secure random token
+func GenerateResetToken() (string, error) {
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", fmt.Errorf("generating random bytes: %w", err)
