@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * Course dialogs: Create + Edit
+ * Course dialogs: Create + Edit (with Prerequisites management)
  */
 import * as React from 'react';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, X, Plus, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,11 +16,20 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { coursesApi } from '@/lib/api/academics';
 import { handleApiError } from '@/lib/api/axios';
 import { toast } from '@/lib/hooks/use-toast';
 import type {
   Course,
+  CoursePrerequisite,
   CreateCourseRequest,
   UpdateCourseRequest,
   AcademicFormErrors,
@@ -58,14 +67,39 @@ export function CreateCourseDialog({
   const [errors, setErrors] = React.useState<AcademicFormErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
 
+  // ── Prerequisites state ─────────────────────────────────────────────
+  const [allCourses, setAllCourses] = React.useState<Course[]>([]);
+  const [selectedPrereqIds, setSelectedPrereqIds] = React.useState<string[]>([]);
+  const [prereqPicker, setPrereqPicker] = React.useState('');
+
   React.useEffect(() => {
-    if (open) { setValues(EMPTY); setErrors({}); }
+    if (open) {
+      setValues(EMPTY);
+      setErrors({});
+      setSelectedPrereqIds([]);
+      setPrereqPicker('');
+      coursesApi.list().then(setAllCourses).catch(() => { });
+    }
   }, [open]);
 
   function set(field: keyof CreateCourseRequest, value: string | number) {
     setValues((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
+
+  function addPrereqToList() {
+    if (!prereqPicker || selectedPrereqIds.includes(prereqPicker)) return;
+    setSelectedPrereqIds((prev) => [...prev, prereqPicker]);
+    setPrereqPicker('');
+  }
+
+  function removePrereqFromList(id: string) {
+    setSelectedPrereqIds((prev) => prev.filter((p) => p !== id));
+  }
+
+  const availableCourses = allCourses.filter(
+    (c) => !selectedPrereqIds.includes(c.id),
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,7 +109,26 @@ export function CreateCourseDialog({
     setSubmitting(true);
     try {
       const course = await coursesApi.create(values);
-      toast.success('Course created', course.title);
+
+      // Add selected prerequisites (best-effort — course is already created)
+      let prereqFailed = 0;
+      for (const prereqId of selectedPrereqIds) {
+        try {
+          await coursesApi.addPrerequisite(course.id, { prerequisite_course_id: prereqId });
+        } catch {
+          prereqFailed++;
+        }
+      }
+
+      if (prereqFailed > 0) {
+        toast.success(
+          'Course created',
+          `${course.title} — ${prereqFailed} prerequisite(s) failed to link`,
+        );
+      } else {
+        toast.success('Course created', course.title);
+      }
+
       onOpenChange(false);
       onSuccess(course);
     } catch (err) {
@@ -87,7 +140,7 @@ export function CreateCourseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-zinc-600" />
@@ -145,6 +198,65 @@ export function CreateCourseDialog({
             />
           </div>
 
+          {/* ── Prerequisites Section ─────────────────────────────────── */}
+          <div className="space-y-2 border-t pt-4">
+            <Label className="text-sm font-medium">Prerequisites <span className="text-zinc-400 font-normal">(optional)</span></Label>
+
+            {selectedPrereqIds.length === 0 ? (
+              <p className="text-xs text-zinc-400">No prerequisites selected.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {selectedPrereqIds.map((id) => {
+                  const prereqCourse = allCourses.find((c) => c.id === id);
+                  return (
+                    <Badge
+                      key={id}
+                      variant="secondary"
+                      className="flex items-center gap-1 pr-1"
+                    >
+                      {prereqCourse ? `${prereqCourse.code} – ${prereqCourse.title}` : id.slice(0, 8)}
+                      <button
+                        type="button"
+                        className="ml-0.5 rounded-full p-0.5 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                        onClick={() => removePrereqFromList(id)}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
+
+            {availableCourses.length > 0 && (
+              <div className="flex items-center gap-2 mt-2">
+                <Select value={prereqPicker} onValueChange={setPrereqPicker}>
+                  <SelectTrigger className="flex-1 h-8 text-xs">
+                    <SelectValue placeholder="Select a prerequisite…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCourses.map((c) => (
+                      <SelectItem key={c.id} value={c.id} className="text-xs">
+                        {c.code} – {c.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1"
+                  disabled={!prereqPicker}
+                  onClick={addPrereqToList}
+                >
+                  <Plus className="h-3 w-3" />
+                  Add
+                </Button>
+              </div>
+            )}
+          </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
@@ -159,7 +271,7 @@ export function CreateCourseDialog({
   );
 }
 
-// ── Edit ──────────────────────────────────────────────────────────────────────
+// ── Edit (with Prerequisites management) ──────────────────────────────────────
 
 interface EditCourseDialogProps {
   open: boolean;
@@ -184,10 +296,28 @@ export function EditCourseDialog({
   const [errors, setErrors] = React.useState<AcademicFormErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
 
+  // ── Prerequisites state ─────────────────────────────────────────────
+  const [prereqs, setPrereqs] = React.useState<CoursePrerequisite[]>([]);
+  const [prereqLoading, setPrereqLoading] = React.useState(false);
+  const [allCourses, setAllCourses] = React.useState<Course[]>([]);
+  const [selectedPrereq, setSelectedPrereq] = React.useState('');
+  const [addingPrereq, setAddingPrereq] = React.useState(false);
+
   React.useEffect(() => {
     if (open) {
       setValues({ title: course.title, description: course.description, credits: course.credits });
       setErrors({});
+      // Load prerequisites + all courses for prerequisite picker
+      setPrereqLoading(true);
+      Promise.all([
+        coursesApi.listPrerequisites(course.id),
+        coursesApi.list(),
+      ]).then(([pList, cList]) => {
+        setPrereqs(pList);
+        setAllCourses(cList);
+      }).catch(() => {
+        // Silently handle — prereqs are supplementary
+      }).finally(() => setPrereqLoading(false));
     }
   }, [open, course]);
 
@@ -214,9 +344,43 @@ export function EditCourseDialog({
     }
   }
 
+  async function addPrerequisite() {
+    if (!selectedPrereq) return;
+    setAddingPrereq(true);
+    try {
+      const p = await coursesApi.addPrerequisite(course.id, {
+        prerequisite_course_id: selectedPrereq,
+      });
+      setPrereqs((prev) => [...prev, p]);
+      setSelectedPrereq('');
+      toast.success('Prerequisite added');
+    } catch (err) {
+      toast.error('Failed to add prerequisite', handleApiError(err));
+    } finally {
+      setAddingPrereq(false);
+    }
+  }
+
+  async function removePrerequisite(prereqCourseId: string) {
+    try {
+      await coursesApi.removePrerequisite(course.id, prereqCourseId);
+      setPrereqs((prev) => prev.filter((p) => p.prerequisite_course_id !== prereqCourseId));
+      toast.success('Prerequisite removed');
+    } catch (err) {
+      toast.error('Failed to remove prerequisite', handleApiError(err));
+    }
+  }
+
+  // Filter out courses that are already prerequisites or are self
+  const availableCourses = allCourses.filter(
+    (c) =>
+      c.id !== course.id &&
+      !prereqs.some((p) => p.prerequisite_course_id === c.id),
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-zinc-600" />
@@ -260,6 +424,86 @@ export function EditCourseDialog({
               value={values.description ?? ''}
               onChange={(e) => set('description', e.target.value)}
             />
+          </div>
+
+          {/* ── Prerequisites Section ─────────────────────────────────── */}
+          <div className="space-y-2 border-t pt-4">
+            <Label className="text-sm font-medium">Prerequisites</Label>
+
+            {prereqLoading ? (
+              <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <Loader2 className="h-3 w-3 animate-spin" /> Loading prerequisites…
+              </div>
+            ) : (
+              <>
+                {/* Current prereqs */}
+                {prereqs.length === 0 ? (
+                  <p className="text-xs text-zinc-400">No prerequisites set.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {prereqs.map((p) => {
+                      const prereqCourse = allCourses.find(
+                        (c) => c.id === p.prerequisite_course_id,
+                      );
+                      return (
+                        <Badge
+                          key={p.prerequisite_course_id}
+                          variant="secondary"
+                          className="flex items-center gap-1 pr-1"
+                        >
+                          {prereqCourse
+                            ? `${prereqCourse.code} – ${prereqCourse.title}`
+                            : p.prerequisite_course_id.slice(0, 8)}
+                          <button
+                            type="button"
+                            className="ml-0.5 rounded-full p-0.5 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                            onClick={() => removePrerequisite(p.prerequisite_course_id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Add prerequisite */}
+                {availableCourses.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Select
+                      value={selectedPrereq}
+                      onValueChange={setSelectedPrereq}
+                    >
+                      <SelectTrigger className="flex-1 h-8 text-xs">
+                        <SelectValue placeholder="Select a course…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableCourses.map((c) => (
+                          <SelectItem key={c.id} value={c.id} className="text-xs">
+                            {c.code} – {c.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 gap-1"
+                      disabled={!selectedPrereq || addingPrereq}
+                      onClick={addPrerequisite}
+                    >
+                      {addingPrereq ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Plus className="h-3 w-3" />
+                      )}
+                      Add
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <DialogFooter>

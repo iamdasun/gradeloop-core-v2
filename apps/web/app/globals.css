@@ -420,6 +420,26 @@
     ::-webkit-scrollbar-thumb:hover {
         background: hsl(var(--muted-foreground) / 0.5);
     }
+
+    /* -----------------------------------------------------------------------
+       NATIVE SELECT / OPTION — Dark Mode Fix
+       Browsers render <option> with their own white background by default,
+       ignoring CSS custom properties. These rules force proper colors.
+       ----------------------------------------------------------------------- */
+    .dark select {
+        background-color: hsl(var(--popover));
+        color: hsl(var(--popover-foreground));
+    }
+
+    .dark select option {
+        background-color: hsl(var(--popover));
+        color: hsl(var(--popover-foreground));
+    }
+
+    .dark select option:checked {
+        background-color: hsl(var(--accent));
+        color: hsl(var(--accent-foreground));
+    }
 }
 
 /* ==========================================================================

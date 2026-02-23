@@ -20,6 +20,8 @@ import {
   Building2,
   Award,
   Landmark,
+  Users2,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -82,10 +84,13 @@ const navItems: NavItem[] = [
     icon: School,
     baseHref: "/admin/academics",
     children: [
-      { title: "Faculties",   href: "/admin/academics/faculties",   icon: Landmark },
+      { title: "Faculties", href: "/admin/academics/faculties", icon: Landmark },
       { title: "Departments", href: "/admin/academics/departments", icon: Building2 },
-      { title: "Degrees",     href: "/admin/academics/degrees",     icon: Award },
-      { title: "Courses",     href: "/admin/academics/courses",     icon: BookOpen },
+      { title: "Degrees", href: "/admin/academics/degrees", icon: Award },
+      { title: "Courses", href: "/admin/academics/courses", icon: BookOpen },
+      { title: "Semesters", href: "/admin/academics/semesters", icon: Calendar },
+      { title: "Groups", href: "/admin/academics/groups", icon: Users2 },
+      { title: "Enrollment", href: "/admin/academics/enrollment", icon: ClipboardList },
     ],
   },
   {
@@ -234,7 +239,7 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
                   <div
                     className={cn(
                       "overflow-hidden transition-all duration-200",
-                      isOpen ? "max-h-52 opacity-100" : "max-h-0 opacity-0",
+                      isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0",
                     )}
                   >
                     <div className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-zinc-200 pl-2 dark:border-zinc-800">

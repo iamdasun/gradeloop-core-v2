@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils/cn';
 
 export interface SelectNativeProps
-  extends React.SelectHTMLAttributes<HTMLSelectElement> {}
+  extends React.SelectHTMLAttributes<HTMLSelectElement> { }
 
 /**
  * Accessible native `<select>` styled to match the shadcn input family.
@@ -14,7 +14,7 @@ const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProps>(
     <select
       ref={ref}
       className={cn(
-        'flex h-9 w-full appearance-none rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus-visible:ring-zinc-300',
+        'flex h-9 w-full appearance-none rounded-md border border-zinc-200 bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:focus-visible:ring-zinc-300 [&_option]:bg-popover [&_option]:text-popover-foreground',
         className,
       )}
       {...props}

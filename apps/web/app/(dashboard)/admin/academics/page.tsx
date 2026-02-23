@@ -3,11 +3,11 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Building2, Award, BookOpen, Landmark, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Building2, Award, BookOpen, Landmark, ArrowRight, AlertTriangle, Calendar, Users2, ClipboardList } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { departmentsApi, degreesApi, coursesApi, facultiesApi } from '@/lib/api/academics';
+import { departmentsApi, degreesApi, coursesApi, facultiesApi, semestersApi, batchesApi } from '@/lib/api/academics';
 import { useAcademicsAccess } from '@/lib/hooks/useAcademicsAccess';
 
 interface SectionStats {
@@ -27,6 +27,8 @@ export default function AcademicsOverviewPage() {
   const [depts, setDepts] = React.useState<SectionStats>(DEFAULT_STATS);
   const [degrees, setDegrees] = React.useState<SectionStats>(DEFAULT_STATS);
   const [courses, setCourses] = React.useState<SectionStats>(DEFAULT_STATS);
+  const [semesters, setSemesters] = React.useState<SectionStats>(DEFAULT_STATS);
+  const [groups, setGroups] = React.useState<SectionStats>(DEFAULT_STATS);
 
   React.useEffect(() => {
     if (!canAccess) { router.replace('/admin'); return; }
@@ -37,7 +39,9 @@ export default function AcademicsOverviewPage() {
       departmentsApi.list(true),
       degreesApi.list(true),
       coursesApi.list(true),
-    ]).then(([fac, d, deg, c]) => {
+      semestersApi.list(true),
+      batchesApi.list(true),
+    ]).then(([fac, d, deg, c, sem, grp]) => {
       if (fac.status === 'fulfilled') {
         const all = fac.value;
         setFaculties({ total: all.length, active: all.filter((x) => x.is_active).length });
@@ -53,6 +57,14 @@ export default function AcademicsOverviewPage() {
       if (c.status === 'fulfilled') {
         const all = c.value;
         setCourses({ total: all.length, active: all.filter((x) => x.is_active).length });
+      }
+      if (sem.status === 'fulfilled') {
+        const all = sem.value;
+        setSemesters({ total: all.length, active: all.filter((x) => x.is_active).length });
+      }
+      if (grp.status === 'fulfilled') {
+        const all = grp.value;
+        setGroups({ total: all.length, active: all.filter((x) => x.is_active).length });
       }
       if (d.status === 'rejected' && deg.status === 'rejected' && c.status === 'rejected') {
         setError('Could not load academics data. The service may be unavailable.');
@@ -102,6 +114,36 @@ export default function AcademicsOverviewPage() {
       iconColor: 'text-sky-600 dark:text-sky-400',
       accentColor: 'bg-sky-500',
       stats: courses,
+    },
+    {
+      title: 'Semesters',
+      description: 'Define academic terms, set dates and manage semester lifecycle.',
+      href: '/admin/academics/semesters',
+      icon: Calendar,
+      iconBg: 'bg-orange-50 dark:bg-orange-950/30',
+      iconColor: 'text-orange-600 dark:text-orange-400',
+      accentColor: 'bg-orange-500',
+      stats: semesters,
+    },
+    {
+      title: 'Groups',
+      description: 'Organise students into hierarchical batches.',
+      href: '/admin/academics/groups',
+      icon: Users2,
+      iconBg: 'bg-pink-50 dark:bg-pink-950/30',
+      iconColor: 'text-pink-600 dark:text-pink-400',
+      accentColor: 'bg-pink-500',
+      stats: groups,
+    },
+    {
+      title: 'Enrollment',
+      description: 'Manage course instances, instructors and student enrollments.',
+      href: '/admin/academics/enrollment',
+      icon: ClipboardList,
+      iconBg: 'bg-teal-50 dark:bg-teal-950/30',
+      iconColor: 'text-teal-600 dark:text-teal-400',
+      accentColor: 'bg-teal-500',
+      stats: DEFAULT_STATS,
     },
   ];
 

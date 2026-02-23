@@ -90,9 +90,8 @@ function CourseCard({ course, canWrite, onEdit, onToggleActive }: CourseCardProp
     >
       {/* Accent stripe */}
       <div
-        className={`absolute left-0 top-0 h-full w-1 rounded-l-xl ${
-          course.is_active ? 'bg-sky-500' : 'bg-zinc-300 dark:bg-zinc-700'
-        }`}
+        className={`absolute left-0 top-0 h-full w-1 rounded-l-xl ${course.is_active ? 'bg-sky-500' : 'bg-zinc-300 dark:bg-zinc-700'
+          }`}
       />
 
       <div className="p-5 pl-6 flex flex-col gap-3 flex-1">
@@ -189,23 +188,35 @@ export default function CoursesPage() {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showInactive]);
 
   React.useEffect(() => { load(); }, [load]);
 
+  const [togglingIds, setTogglingIds] = React.useState<Set<string>>(new Set());
+
   async function handleToggleActive(course: Course) {
     try {
-      let updated: Course;
       if (course.is_active) {
         await coursesApi.deactivate(course.id);
-        updated = { ...course, is_active: false };
+        setCourses((prev) => prev.map((c) => (c.id === course.id ? { ...c, is_active: false } : c)));
         toast.success('Course deactivated', course.title);
+
+        if (!showInactive) {
+          setTogglingIds((prev) => new Set(prev).add(course.id));
+          setTimeout(() => {
+            setTogglingIds((prev) => {
+              const next = new Set(prev);
+              next.delete(course.id);
+              return next;
+            });
+          }, 1500);
+        }
       } else {
-        updated = await coursesApi.reactivate(course.id);
+        const updated = await coursesApi.reactivate(course.id);
+        setCourses((prev) => prev.map((c) => (c.id === course.id ? updated : c)));
         toast.success('Course reactivated', course.title);
       }
-      setCourses((prev) => prev.map((c) => (c.id === course.id ? updated : c)));
     } catch (err) {
       toast.error('Action failed', handleApiError(err));
     }
@@ -215,7 +226,7 @@ export default function CoursesPage() {
 
   const q = search.toLowerCase().trim();
   const visible = courses.filter((c) => {
-    if (!showInactive && !c.is_active) return false;
+    if (!showInactive && !c.is_active && !togglingIds.has(c.id)) return false;
     if (!q) return true;
     return (
       c.title.toLowerCase().includes(q) ||
