@@ -1,85 +1,196 @@
 [tool.poetry]
 name = "cipas-service"
-version = "0.1.0"
-description = "CIPAS — Code Integrity Analysis Service (async-first FastAPI microservice)"
-authors = ["Your Name <you@example.com>"]
+version = "0.2.0"
+description = "CIPAS — Code Integrity Analysis & Plagiarism-detection Service (async-first FastAPI microservice)"
+authors = ["Platform Engineering <platform-team@gradeloop.internal>"]
 license = "MIT"
 readme = "README.md"
 packages = [
   { include = "cipas", from = "src" }
 ]
-keywords = ["fastapi", "async", "minio", "redis", "observability", "prometheus", "opentelemetry"]
+keywords = [
+  "fastapi",
+  "async",
+  "tree-sitter",
+  "code-clone-detection",
+  "pgvector",
+  "asyncpg",
+  "observability",
+  "prometheus",
+  "opentelemetry",
+]
 
+# ---------------------------------------------------------------------------
+# Production dependencies
+# ---------------------------------------------------------------------------
 [tool.poetry.dependencies]
 python = ">=3.11,<4.0"
 
-# Web framework + ASGI server
+# ── Web framework + ASGI server ────────────────────────────────────────────
+# fastapi: async-native, OpenAPI generation, DI container.
 fastapi = "^0.111.0"
-uvicorn = {extras = ["standard"], version = "^0.22.0"}
+# uvicorn[standard] pulls in uvloop (faster event loop) and httptools
+# (faster HTTP/1.1 parser). Both are critical for high-throughput async I/O.
+uvicorn = { extras = ["standard"], version = "^0.29.0" }
 
-# Settings / config
+# ── Configuration ──────────────────────────────────────────────────────────
+# pydantic-settings: type-safe env-var parsing with fail-fast validation.
 pydantic-settings = "^2.2.0"
 
-# Observability & logging
+# ── Observability & logging ────────────────────────────────────────────────
+# loguru: structured JSON logging with zero-config sink setup.
 loguru = "^0.7.0"
+# prometheus-fastapi-instrumentator: zero-config Prometheus metrics on /metrics.
 prometheus-fastapi-instrumentator = "^6.0.0"
-opentelemetry-api = "^1.17.0"
+# opentelemetry-api: distributed tracing instrumentation hooks (SDK injected
+# at runtime by the platform observability layer).
+opentelemetry-api = "^1.24.0"
+opentelemetry-sdk = "^1.24.0"
+opentelemetry-instrumentation-fastapi = "^0.45b0"
 
-# HTTP client (async)
-httpx = "^0.24.0"
+# ── Database ───────────────────────────────────────────────────────────────
+# asyncpg: fastest async PostgreSQL driver; binary protocol; built-in
+# connection pooling. Chosen over psycopg3 for its more mature pool
+# implementation and better write-heavy throughput benchmarks.
+asyncpg = "^0.29.0"
+# pgvector: registers the vector type codec with asyncpg/psycopg so the
+# driver can encode/decode vector columns. Required for Phase 2 embedding
+# queries; schema-created in Phase 1.
+pgvector = "^0.3.0"
 
-# Utilities
+# ── Parsing ────────────────────────────────────────────────────────────────
+# tree-sitter: C-extension parser frontend. Pinned to ~0.20.4 because
+# tree-sitter-languages 1.x targets this exact ABI. The 0.21/0.22 APIs
+# changed the Language constructor and query.captures() return type;
+# upgrading requires coordinated version bumps of both packages.
+tree-sitter = "~0.20.4"
+# tree-sitter-languages: pre-compiled shared-library grammars for 100+
+# languages (including Java, C, Python). Ships as a platform wheel —
+# eliminates Node.js and the tree-sitter CLI from the build chain entirely.
+# The trade-off is a larger wheel (~15 MB) which is acceptable.
+tree-sitter-languages = "^1.10.2"
+
+# ── Utilities ─────────────────────────────────────────────────────────────
+# python-dotenv: .env file loading for local development only.
 python-dotenv = "^1.0.0"
+# httpx: async HTTP client for inter-service calls (e.g. IAM token validation).
+httpx = "^0.27.0"
 
+# ---------------------------------------------------------------------------
+# Development dependencies
+# ---------------------------------------------------------------------------
 [tool.poetry.group.dev.dependencies]
+# Test runner
 pytest = "^7.4.0"
+# async def test support
 pytest-asyncio = "^0.21.0"
-httpx = {version = "^0.24.0", extras = ["http2"]}
+# TestClient for async FastAPI routes + HTTP/2 support
+httpx = { version = "^0.27.0", extras = ["http2"] }
+# Linting + import sorting (replaces flake8/isort)
 ruff = "^0.12.0"
-mypy = "^1.5.0"
+# Static type checking — strict mode enforced via pyproject config below
+mypy = "^1.10.0"
+# Deterministic code formatting
 black = "^24.3.0"
+# asyncpg type stubs
+asyncpg-stubs = "^0.29.1"
 
+# ---------------------------------------------------------------------------
+# Build system
+# ---------------------------------------------------------------------------
 [build-system]
 requires = ["poetry-core>=1.5.0"]
 build-backend = "poetry.core.masonry.api"
 
-# Tooling configs -------------------------------------------------------------
-
+# ---------------------------------------------------------------------------
+# Ruff — linting + import sorting
+# ---------------------------------------------------------------------------
 [tool.ruff]
 line-length = 88
 target-version = "py311"
-extend-select = ["E", "F"]
-# Enable common strict rules; tune as needed
-ignore = ["E501"]
-exclude = ["src/cipas/__pycache__", "build", ".venv", "dist", "tests"]
+extend-select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # isort
+  "UP",  # pyupgrade
+  "B",   # flake8-bugbear
+  "C4",  # flake8-comprehensions
+  "SIM", # flake8-simplify
+]
+ignore = [
+  "E501",   # line too long — handled by black
+  "B008",   # do not perform function calls in default arguments (FastAPI Depends pattern)
+  "SIM108", # ternary operator — sometimes less readable
+]
+exclude = [
+  "src/cipas/__pycache__",
+  "build",
+  ".venv",
+  "dist",
+  "tests/__pycache__",
+]
 
+[tool.ruff.isort]
+known-first-party = ["cipas"]
+force-sort-within-sections = true
+
+# ---------------------------------------------------------------------------
+# Mypy — strict type checking
+# ---------------------------------------------------------------------------
 [tool.mypy]
-python_version = 3.11
-check_untyped_defs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-disallow_untyped_calls = true
+python_version = "3.11"
+# Strict mode flags
+check_untyped_defs          = true
+disallow_untyped_defs       = true
+disallow_incomplete_defs    = true
+disallow_untyped_calls      = true
 disallow_untyped_decorators = true
-no_implicit_optional = true
-strict_equality = true
-warn_unused_ignores = true
-warn_redundant_casts = true
-warn_unused_configs = true
-show_error_codes = true
-plugins = []
+no_implicit_optional        = true
+strict_equality             = true
+warn_unused_ignores         = true
+warn_redundant_casts        = true
+warn_unused_configs         = true
+warn_return_any             = true
+warn_unreachable            = true
+show_error_codes            = true
+# tree-sitter and tree-sitter-languages ship no type stubs; ignore missing
+# imports for these packages only.
+[[tool.mypy.overrides]]
+module = [
+  "tree_sitter",
+  "tree_sitter_languages",
+  "prometheus_fastapi_instrumentator",
+  "opentelemetry.*",
+  "pgvector.*",
+]
+ignore_missing_imports = true
 
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-q -ra"
-testpaths = ["tests"]
+minversion   = "7.0"
+addopts      = "-q -ra --strict-markers"
+testpaths    = ["tests"]
+asyncio_mode = "auto"
 
-# Optional convenience scripts for local development
+# ---------------------------------------------------------------------------
+# Black
+# ---------------------------------------------------------------------------
+[tool.black]
+line-length    = 88
+target-version = ["py311"]
+skip-magic-trailing-comma = false
+
+# ---------------------------------------------------------------------------
+# Convenience scripts
+# ---------------------------------------------------------------------------
 [tool.poetry.scripts]
 cipas = "cipas.main:app"
 
-# Recommendations / metadata for maintainers
+# ---------------------------------------------------------------------------
+# Maintainer metadata
+# ---------------------------------------------------------------------------
 [tool.metadata]
-maintainers = ["platform-team@example.com"]
-repository = "https://example.com/your-org/gradeloop-core-v2"
-
-# End of file
+maintainers = ["platform-team@gradeloop.internal"]
+repository  = "https://github.com/gradeloop/gradeloop-core-v2"

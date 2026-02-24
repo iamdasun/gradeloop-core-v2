@@ -42,8 +42,14 @@ type SMTPConfig struct {
 }
 
 func LoadConfig() *Config {
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using system environment variables")
+	// Only attempt to load a .env file in local/development mode.
+	// In Docker/production, environment variables are injected by the
+	// orchestrator, so godotenv.Load() will always fail and the warning
+	// is noise. APP_ENV=production is set in docker-compose.yaml.
+	if os.Getenv("APP_ENV") != "production" {
+		if err := godotenv.Load(); err != nil {
+			log.Println("No .env file found, using system environment variables")
+		}
 	}
 
 	return &Config{
