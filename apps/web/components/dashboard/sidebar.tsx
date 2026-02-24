@@ -192,12 +192,12 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
   return (
     <div
       className={cn(
-        "relative flex h-screen flex-col border-r bg-white dark:bg-zinc-950 shadow-sm transition-all duration-300",
+        "relative flex h-screen flex-col border-r bg-sidebar-background text-sidebar-foreground shadow-sm transition-all duration-300",
         collapsed ? "w-16" : "w-64",
       )}
     >
       {/* Logo Area */}
-      <div className="flex h-16 items-center border-b bg-zinc-50/50 dark:bg-zinc-900/50 px-4">
+      <div className="flex h-16 items-center border-b bg-sidebar-background/50 backdrop-blur-sm px-4">
         {!collapsed ? (
           <Link href={homeHref} className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-900 dark:bg-zinc-50">
@@ -231,8 +231,8 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
                       className={cn(
                         "w-full justify-start gap-3 px-2",
                         isGroupActive
-                          ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 dark:bg-zinc-50 dark:text-zinc-900"
-                          : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                          : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       )}
                       title={item.title}
                     >
@@ -249,8 +249,8 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
                     className={cn(
                       "w-full justify-start gap-3 px-3",
                       isGroupActive && !isOpen
-                        ? "bg-zinc-100 dark:bg-zinc-800"
-                        : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                     )}
                     onClick={() => toggleGroup(item.title)}
                   >
@@ -284,8 +284,8 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
                               className={cn(
                                 "h-8 w-full justify-start gap-2 px-3 text-sm",
                                 isChildActive
-                                  ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 dark:bg-zinc-50 dark:text-zinc-900"
-                                  : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                               )}
                             >
                               <ChildIcon className="h-4 w-4 shrink-0" />
@@ -313,8 +313,8 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
                     "w-full justify-start gap-3",
                     collapsed ? "px-2" : "px-3",
                     isActive
-                      ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-50/90"
-                      : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                   )}
                   title={collapsed ? navLink.title : undefined}
                 >
@@ -335,7 +335,7 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
       </ScrollArea>
 
       {/* User Profile Section */}
-      <div className="border-t bg-zinc-50/50 dark:bg-zinc-900/50 p-3">
+      <div className="border-t bg-sidebar-background/50 p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -381,7 +381,7 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
       <Button
         variant="ghost"
         size="icon"
-        className="absolute -right-3 top-20 z-10 h-6 w-6 rounded-full border bg-white dark:bg-zinc-950 shadow-md hover:shadow-lg hover:scale-110 transition-all"
+        className="absolute -right-3 top-20 z-10 h-6 w-6 rounded-full border bg-sidebar-background shadow-md hover:shadow-lg hover:scale-110 transition-all"
         onClick={() => onCollapsedChange(!collapsed)}
       >
         {collapsed ? (

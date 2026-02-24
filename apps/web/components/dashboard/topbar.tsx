@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { Search, Bell, Menu, Moon, Sun } from "lucide-react";
+import { Search, Bell, Menu } from "lucide-react";
+import { ThemeToggle } from "./theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,33 +29,6 @@ interface TopbarProps {
 
 export function Topbar({ onMenuClick, className }: TopbarProps) {
   const pathname = usePathname();
-  const [theme, setTheme] = React.useState<"light" | "dark">("light");
-  const [mounted, setMounted] = React.useState(false);
-
-  const applyTheme = React.useCallback((newTheme: "light" | "dark") => {
-    const root = window.document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(newTheme);
-  }, []);
-
-  React.useEffect(() => {
-    setMounted(true);
-    // Check for saved theme preference or default to light
-    const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
-    const initialTheme = savedTheme || (prefersDark ? "dark" : "light");
-    setTheme(initialTheme);
-    applyTheme(initialTheme);
-  }, [applyTheme]);
-
-  const toggleTheme = () => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-    applyTheme(newTheme);
-  };
 
   // Generate breadcrumbs from pathname
   const generateBreadcrumbs = () => {
@@ -72,7 +46,7 @@ export function Topbar({ onMenuClick, className }: TopbarProps) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 px-6 shadow-sm dark:bg-zinc-950/95 dark:supports-[backdrop-filter]:bg-zinc-950/60",
+        "sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-md px-6 shadow-sm transition-colors duration-300",
         className,
       )}
     >
@@ -126,24 +100,7 @@ export function Topbar({ onMenuClick, className }: TopbarProps) {
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        {/* Dark Mode Toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleTheme}
-          className="h-9 w-9 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-        >
-          {mounted && (
-            <>
-              {theme === "light" ? (
-                <Moon className="h-5 w-5" />
-              ) : (
-                <Sun className="h-5 w-5" />
-              )}
-            </>
-          )}
-          <span className="sr-only">Toggle theme</span>
-        </Button>
+        <ThemeToggle />
 
         {/* Notifications */}
         <DropdownMenu>
@@ -151,7 +108,7 @@ export function Topbar({ onMenuClick, className }: TopbarProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="relative h-9 w-9 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              className="relative h-9 w-9 hover:bg-accent transition-colors"
             >
               <Bell className="h-5 w-5" />
               <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
