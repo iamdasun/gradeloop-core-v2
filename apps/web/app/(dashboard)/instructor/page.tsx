@@ -8,11 +8,15 @@ import {
     GraduationCap,
     Users,
     AlertCircle,
+    Loader2,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { instructorCoursesApi } from "@/lib/api/academics";
+import { instructorAssessmentsApi } from "@/lib/api/assessments";
+import { handleApiError } from "@/lib/api/axios";
 
 // ── Stat card ────────────────────────────────────────────────────────────────
 
@@ -25,7 +29,7 @@ function StatCard({
 }: {
     title: string;
     icon: React.ComponentType<{ className?: string }>;
-    value: string;
+    value: React.ReactNode;
     sub: string;
     locked?: boolean;
 }) {
@@ -45,7 +49,7 @@ function StatCard({
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                     {title}
                 </p>
-                <p className="text-2xl font-black tracking-tight">{value}</p>
+                <div className="text-2xl font-black tracking-tight">{value}</div>
                 <p className="text-xs text-muted-foreground mt-1">{sub}</p>
             </CardContent>
         </Card>
@@ -58,6 +62,53 @@ export default function InstructorDashboardPage() {
     const user = useAuthStore((s) => s.user);
     const displayName = user?.full_name || user?.username || "Instructor";
 
+    const [stats, setStats] = React.useState({
+        coursesCount: 0,
+        studentsCount: 0,
+        assignmentsCount: 0,
+    });
+    const [isLoading, setIsLoading] = React.useState(true);
+    const [error, setError] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        let mounted = true;
+
+        async function fetchDashboardStats() {
+            try {
+                setIsLoading(true);
+
+                // Fetch assigned courses
+                const courses = await instructorCoursesApi.listMyCourses();
+
+                // Fetch assignments created by the instructor cross-courses
+                const assignments = await instructorAssessmentsApi.listMyAssignments();
+
+                // Fetch student count for each course (in parallel)
+                const enrollmentsPromises = courses.map(c => instructorCoursesApi.listMyStudents(c.course_instance_id));
+                const allEnrollments = await Promise.all(enrollmentsPromises);
+
+                // Deduplicate students across all courses to get unique active students.
+                const uniqueStudents = new Set<string>();
+                allEnrollments.flat().forEach(e => uniqueStudents.add(e.user_id));
+
+                if (mounted) {
+                    setStats({
+                        coursesCount: courses.length,
+                        studentsCount: uniqueStudents.size,
+                        assignmentsCount: assignments.length,
+                    });
+                }
+            } catch (err) {
+                if (mounted) setError(handleApiError(err));
+            } finally {
+                if (mounted) setIsLoading(false);
+            }
+        }
+
+        fetchDashboardStats();
+        return () => { mounted = false; };
+    }, []);
+
     return (
         <div className="flex flex-col gap-8 pb-8">
             {/* Header */}
@@ -69,6 +120,12 @@ export default function InstructorDashboardPage() {
                     This is your instructor workspace. Course and enrollment data is managed by administrators.
                 </p>
             </div>
+
+            {error && (
+                <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-800 text-sm">
+                    {error}
+                </div>
+            )}
 
             {/* Backend access notice */}
             <div className="flex gap-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-4">
@@ -88,30 +145,30 @@ export default function InstructorDashboardPage() {
                 <StatCard
                     title="Assigned Courses"
                     icon={BookOpen}
-                    value="—"
-                    sub="Awaiting admin assignment"
-                    locked
+                    value={isLoading ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /> : stats.coursesCount.toString()}
+                    sub={stats.coursesCount > 0 ? "Active semester assignments" : "Awaiting admin assignment"}
+                    locked={false}
                 />
                 <StatCard
-                    title="Active Students"
+                    title="Unique Students"
                     icon={GraduationCap}
-                    value="—"
-                    sub="Requires course assignment"
-                    locked
+                    value={isLoading ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /> : stats.studentsCount.toString()}
+                    sub={stats.coursesCount > 0 ? "Across all assigned courses" : "Requires course assignment"}
+                    locked={false}
                 />
                 <StatCard
                     title="Assignments"
                     icon={FileText}
-                    value="—"
-                    sub="Created by administrators"
-                    locked
+                    value={isLoading ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /> : stats.assignmentsCount.toString()}
+                    sub="Created for your courses"
+                    locked={false}
                 />
                 <StatCard
                     title="Peer Groups"
                     icon={Users}
                     value="—"
-                    sub="Populated after assignment"
-                    locked
+                    sub="Coming soon"
+                    locked={true}
                 />
             </div>
 
