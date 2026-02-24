@@ -39,12 +39,9 @@ FROM python:3.11-slim AS builder
 ARG POETRY_VERSION=1.8.3
 
 ENV POETRY_VERSION=${POETRY_VERSION} \
-    # All pip/poetry installs land inside this venv — never the system Python.
     VENV_PATH=/opt/venv \
-    # Prevent pip from writing bytecode caches to the image layer.
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    # Poetry must not try to create its own virtualenv; we provide one.
     POETRY_VIRTUALENVS_CREATE=false \
     POETRY_NO_INTERACTION=1 \
     POETRY_NO_ANSI=1
@@ -73,7 +70,13 @@ RUN set -eux; \
 RUN python -m venv ${VENV_PATH} && \
     ${VENV_PATH}/bin/pip install --upgrade pip setuptools wheel
 
-ENV PATH="${VENV_PATH}/bin:${PATH}"
+# VIRTUAL_ENV must be set explicitly so that Poetry (running with
+# POETRY_VIRTUALENVS_CREATE=false) recognises /opt/venv as the active
+# environment and installs packages there — not into system site-packages.
+# Without this, `poetry install` silently targets /usr/local/lib/pythonX.Y
+# and the COPY in the runtime stage picks up an empty /opt/venv.
+ENV PATH="/opt/venv/bin:$PATH" \
+    VIRTUAL_ENV=/opt/venv
 
 # ── Poetry ───────────────────────────────────────────────────────────────────
 RUN pip install "poetry==${POETRY_VERSION}"
@@ -150,21 +153,18 @@ COPY --chown=${APP_USER}:${APP_GROUP} pyproject.toml /app/pyproject.toml
 WORKDIR /app
 
 # ── Environment ───────────────────────────────────────────────────────────────
-ENV PATH="${VENV_PATH}/bin:${PATH}" \
-    # src/ layout: cipas package lives under /app/src
-    PYTHONPATH=/app/src \
-    # Disable output buffering so logs appear immediately in Docker / k8s log streams.
+# PATH is set in its own instruction — no variable indirection, no inline
+# comments — to guarantee the venv bin dir is always resolved correctly by
+# both BuildKit's layer cache and the OCI runtime at container startup.
+ENV PATH="/opt/venv/bin:$PATH"
+
+ENV PYTHONPATH=/app/src \
     PYTHONUNBUFFERED=1 \
-    # Disable Python's .pyc write-back in the container (no persistent FS for it).
     PYTHONDONTWRITEBYTECODE=1 \
-    # Default runtime config — override via environment at container launch.
     CIPAS_ENV=production \
     CIPAS_LOG_LEVEL=INFO \
     CIPAS_PORT=8085 \
     CIPAS_HOST=0.0.0.0 \
-    # One Uvicorn worker per container.
-    # Scale horizontally (more replicas) rather than vertically (more workers)
-    # so each replica gets its own clean ProcessPoolExecutor state and memory budget.
     UVICORN_WORKERS=1
 
 # ── Ownership ─────────────────────────────────────────────────────────────────
@@ -193,7 +193,10 @@ HEALTHCHECK \
 # workers 1:  single worker per container; replicas handle horizontal scale.
 # access-log: disabled in production to reduce log volume and I/O pressure.
 #             Structured request logs are emitted by the FastAPI middleware instead.
-CMD ["uvicorn", "cipas.main:app", \
+# Use the absolute path to the venv's uvicorn binary so the OCI runtime
+# never needs to consult PATH for the entrypoint executable. This is the
+# safest form and works even if PATH lookup is unavailable at container init.
+CMD ["/opt/venv/bin/uvicorn", "cipas.main:app", \
     "--host", "0.0.0.0", \
     "--port", "8085", \
     "--loop", "uvloop", \

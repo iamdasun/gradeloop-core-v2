@@ -175,13 +175,17 @@ services:
       - "traefik.http.routers.email.rule=PathPrefix(`/api/v1/emails`)"
       - "traefik.http.routers.email.entrypoints=web"
       - "traefik.http.services.email-service.loadbalancer.server.port=8082"
-      # Apply middlewares (sharing the same limits as others if desired, or none)
+      # Define the limit middleware locally so it is registered regardless of
+      # iam-service startup order. Must match the type defined in iam-service.
+      - "traefik.http.middlewares.limit.buffering.maxRequestBodyBytes=5242880"
+      # Apply middlewares
       - "traefik.http.routers.email.middlewares=limit"
 
     env_file:
       - .env
 
     environment:
+      - APP_ENV=production
       - APP_PORT=${EMAIL_SVC_PORT}
       - DB_HOST=${GRA_DB_HOST}
       - DB_PORT=${GRA_DB_PORT}
