@@ -1,114 +1,202 @@
-# gradeloop-core-v2/apps/services/cipas-service/Dockerfile
+# =============================================================================
+# CIPAS — Code Integrity Analysis Service
+# Multi-stage Dockerfile
 #
-# Multi-stage build for CIPAS (async-first FastAPI service)
-# - Builder stage creates a virtualenv and installs dependencies with Poetry.
-# - Final stage copies the venv and application code and runs as a non-root user.
+# Stage 1 (builder): installs system build tools, creates /opt/venv,
+#                    installs Poetry, installs production dependencies,
+#                    copies application source.
 #
-# Notes:
-# - This Dockerfile expects `pyproject.toml` (and optionally `poetry.lock`) at the build context root.
-# - The application package is located under `src/` and exposes `cipas.main:app`.
-# - The container runs Uvicorn (uvicorn[standard]) in the foreground.
-# - Environment variables for runtime configuration (CIPAS_*) should be provided by the orchestrator.
+# Stage 2 (runtime): minimal image, non-root user, copies venv + source,
+#                    runs Uvicorn with uvloop + httptools.
 #
-# Example build:
-#   docker build -t cipas-service:latest -f Dockerfile .
+# Key notes:
+#   • tree-sitter-languages ships as a platform-specific wheel that bundles
+#     pre-compiled grammar shared libraries (.so). The wheel links against
+#     libstdc++ which is present in python:3.11-slim (Debian Bookworm).
+#     No Node.js or tree-sitter CLI is needed at build or runtime.
+#   • asyncpg contains a C extension; build-essential / gcc are required in
+#     the builder stage only — they are NOT copied to the runtime image.
+#   • The service listens on port 8085 to avoid collision with other services
+#     in the Compose network (Uvicorn default 8000 is taken by Traefik).
+#   • UVICORN_WORKERS is intentionally 1. Scale via container replicas, not
+#     in-process forking, so each replica gets a clean ProcessPoolExecutor.
 #
-# Example run:
-#   docker run --rm -p 8000:8000 cipas-service:latest
+# Build:
+#   docker build -t cipas-service:local -f Dockerfile .
+#
+# Run (minimal):
+#   docker run --rm -p 8085:8085 \
+#     -e CIPAS_DATABASE_URL=postgresql://cipas:secret@host:5432/cipas_db \
+#     cipas-service:local
+# =============================================================================
 
-################################################################################
-# Builder: install system deps, create venv, install project dependencies
-################################################################################
+# -----------------------------------------------------------------------------
+# Stage 1 — builder
+# -----------------------------------------------------------------------------
 FROM python:3.11-slim AS builder
 
-# Keep image lean and reproducible
-ARG POETRY_VERSION=1.5.1
-ENV POETRY_VERSION=${POETRY_VERSION}
-ENV VENV_PATH=/opt/venv
-ENV PATH="${VENV_PATH}/bin:$PATH"
+# Propagate build-time Poetry version arg so it can be overridden in CI.
+ARG POETRY_VERSION=1.8.3
 
-# Install minimal build dependencies for wheels and git if needed.
-# Use --no-install-recommends to limit package bloat.
+ENV POETRY_VERSION=${POETRY_VERSION} \
+    # All pip/poetry installs land inside this venv — never the system Python.
+    VENV_PATH=/opt/venv \
+    # Prevent pip from writing bytecode caches to the image layer.
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    # Poetry must not try to create its own virtualenv; we provide one.
+    POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_NO_ANSI=1
+
+# ── System build dependencies ────────────────────────────────────────────────
+# build-essential / gcc:  needed to compile asyncpg's C extension.
+# libpq-dev:              asyncpg links against libpq at runtime for SSL;
+#                         the shared lib is copied into the venv by pip.
+# ca-certificates, curl:  for downloading wheels and verifying TLS.
+# git:                    some Poetry VCS sources require it.
+#
+# NOT included: nodejs, npm, tree-sitter CLI — not required because
+# tree-sitter-languages ships pre-compiled grammar .so files in its wheel.
 RUN set -eux; \
     apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
+    gcc \
+    libpq-dev \
     ca-certificates \
     curl \
     git \
-    gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Create an isolated virtual environment for predictable runtime artifacts.
+# ── Virtual environment ───────────────────────────────────────────────────────
 RUN python -m venv ${VENV_PATH} && \
-    ${VENV_PATH}/bin/python -m pip install --upgrade pip setuptools wheel
+    ${VENV_PATH}/bin/pip install --upgrade pip setuptools wheel
 
-# Install Poetry into the venv so we can reliably install dependencies.
+ENV PATH="${VENV_PATH}/bin:${PATH}"
+
+# ── Poetry ───────────────────────────────────────────────────────────────────
 RUN pip install "poetry==${POETRY_VERSION}"
 
-WORKDIR /app
+WORKDIR /build
 
-# Copy pyproject (and lock file if present) before installing dependencies
-# to leverage Docker layer caching when dependencies do not change.
-COPY pyproject.toml poetry.lock* /app/
+# ── Dependency installation ───────────────────────────────────────────────────
+# Copy lock files first to maximise Docker layer cache reuse.
+# When only source code changes (not deps), this layer is not invalidated.
+COPY pyproject.toml poetry.lock* /build/
 
-# Configure Poetry to install into the pre-created venv and avoid creating another venv.
-# Then install only production dependencies.
-RUN set -eux; \
-    poetry config virtualenvs.create false --local; \
-    # Install without dev deps, no-interaction, no-ansi for CI friendliness
-    poetry install --no-root --no-dev --no-interaction --no-ansi
+# Install only production deps into the venv.
+# --only main       → skip dev group (pytest, ruff, mypy, etc.)
+# --no-root         → do not install the cipas package itself yet
+#                     (we copy src/ separately to keep the layer clean)
+RUN poetry install --only main --no-root --no-interaction --no-ansi
 
-# Copy application source code after deps to take advantage of layer caching.
-COPY src /app/src
-COPY README.md /app/README.md
+# ── Application source ────────────────────────────────────────────────────────
+# Copied after dependency installation so that source-only changes do not
+# invalidate the (expensive) dependency layer above.
+COPY src/ /build/src/
+COPY README.md /build/README.md
 
-################################################################################
-# Runtime: minimal image, non-root user, copy venv + app
-################################################################################
+# Install the cipas package itself (editable-equivalent for the venv).
+# This registers the `cipas` package so `from cipas.xxx import yyy` resolves.
+RUN poetry install --only main --no-interaction --no-ansi
+
+# -----------------------------------------------------------------------------
+# Stage 2 — runtime
+# -----------------------------------------------------------------------------
 FROM python:3.11-slim AS runtime
 
-# Create a dedicated user to run the service (non-root).
-# Use system user/group to keep the image small.
+# ── Labels ────────────────────────────────────────────────────────────────────
+LABEL org.opencontainers.image.title="cipas-service" \
+    org.opencontainers.image.description="CIPAS — Code Integrity Analysis Service" \
+    org.opencontainers.image.vendor="GradeLoop" \
+    org.opencontainers.image.source="https://github.com/gradeloop/gradeloop-core-v2"
+
+# ── Runtime system dependencies ───────────────────────────────────────────────
+# libpq5:       asyncpg runtime dependency (PostgreSQL client library).
+# libstdc++6:   tree-sitter-languages pre-compiled .so files link against it.
+#               Present in python:3.11-slim (Debian Bookworm libstdc++6 ≥ 12).
+# ca-certificates: TLS verification for outbound HTTPS (healthchecks, OTel).
+RUN set -eux; \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libpq5 \
+    libstdc++6 \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Non-root user ─────────────────────────────────────────────────────────────
 ARG APP_USER=cipas
 ARG APP_GROUP=cipas
 ARG APP_HOME=/app
-ENV VENV_PATH=/opt/venv
-ENV PATH="${VENV_PATH}/bin:$PATH"
-ENV PYTHONPATH=/app/src
-ENV PYTHONUNBUFFERED=1
 
-# Create group and user (system account, no password)
 RUN set -eux; \
-    groupadd --system ${APP_GROUP} || true && \
-    useradd --system --gid ${APP_GROUP} --home-dir ${APP_HOME} --create-home --shell /usr/sbin/nologin ${APP_USER} || true
+    groupadd --system ${APP_GROUP} && \
+    useradd  --system \
+    --gid ${APP_GROUP} \
+    --home-dir ${APP_HOME} \
+    --create-home \
+    --shell /usr/sbin/nologin \
+    ${APP_USER}
 
-# Copy venv from builder for all installed dependencies
-COPY --from=builder /opt/venv /opt/venv
-
-# Copy application code
-COPY --from=builder /app/src /app/src
-COPY --from=builder /app/README.md /app/README.md
-COPY pyproject.toml /app/pyproject.toml
+# ── Copy venv and application from builder ────────────────────────────────────
+ENV VENV_PATH=/opt/venv
+COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /opt/venv     /opt/venv
+COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /build/src    /app/src
+COPY --from=builder --chown=${APP_USER}:${APP_GROUP} /build/README.md /app/README.md
+COPY --chown=${APP_USER}:${APP_GROUP} pyproject.toml /app/pyproject.toml
 
 WORKDIR /app
 
-# Ensure the non-root user owns the application files and venv
-RUN set -eux; \
-    chown -R ${APP_USER}:${APP_GROUP} /app /opt/venv
+# ── Environment ───────────────────────────────────────────────────────────────
+ENV PATH="${VENV_PATH}/bin:${PATH}" \
+    # src/ layout: cipas package lives under /app/src
+    PYTHONPATH=/app/src \
+    # Disable output buffering so logs appear immediately in Docker / k8s log streams.
+    PYTHONUNBUFFERED=1 \
+    # Disable Python's .pyc write-back in the container (no persistent FS for it).
+    PYTHONDONTWRITEBYTECODE=1 \
+    # Default runtime config — override via environment at container launch.
+    CIPAS_ENV=production \
+    CIPAS_LOG_LEVEL=INFO \
+    CIPAS_PORT=8085 \
+    CIPAS_HOST=0.0.0.0 \
+    # One Uvicorn worker per container.
+    # Scale horizontally (more replicas) rather than vertically (more workers)
+    # so each replica gets its own clean ProcessPoolExecutor state and memory budget.
+    UVICORN_WORKERS=1
 
-# Switch to unprivileged user
+# ── Ownership ─────────────────────────────────────────────────────────────────
+RUN chown -R ${APP_USER}:${APP_GROUP} /app /opt/venv
+
 USER ${APP_USER}
 
-# Expose the HTTP port used by Uvicorn
-EXPOSE 8000
+# ── Port ──────────────────────────────────────────────────────────────────────
+# 8085: CIPAS HTTP port.
+# Port 8000 is reserved for Traefik in the Compose network.
+EXPOSE 8085
 
-# Default environment variables (override at runtime)
-ENV HOST=0.0.0.0
-ENV PORT=8000
-ENV UVICORN_WORKERS=1
+# ── Healthcheck ───────────────────────────────────────────────────────────────
+# Performed by Docker / Compose before the service is declared healthy.
+# Uses curl against the liveness endpoint; tolerates 5s startup grace.
+HEALTHCHECK \
+    --interval=15s \
+    --timeout=5s \
+    --retries=5 \
+    --start-period=20s \
+    CMD curl -f http://localhost:8085/api/v1/cipas/health || exit 1
 
-# Run Uvicorn with the app. Use uvloop/httptools (installed via uvicorn[standard]) when available.
-# We deliberately avoid running with many workers to keep resource usage predictable in small containers;
-# orchestration can scale using multiple replicas.
-CMD ["uvicorn", "cipas.main:app", "--host", "0.0.0.0", "--port", "8000", "--loop", "uvloop", "--http", "httptools", "--workers", "1"]
+# ── Entrypoint ────────────────────────────────────────────────────────────────
+# uvloop:     faster event loop (C implementation of asyncio).
+# httptools:  faster HTTP/1.1 request parser (C implementation).
+# workers 1:  single worker per container; replicas handle horizontal scale.
+# access-log: disabled in production to reduce log volume and I/O pressure.
+#             Structured request logs are emitted by the FastAPI middleware instead.
+CMD ["uvicorn", "cipas.main:app", \
+    "--host", "0.0.0.0", \
+    "--port", "8085", \
+    "--loop", "uvloop", \
+    "--http", "httptools", \
+    "--workers", "1", \
+    "--no-access-log"]
