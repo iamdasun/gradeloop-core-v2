@@ -1,8 +1,34 @@
-from __future__ import annotations
+# gradeloop-core-v2/apps/services/cipas-service/src/cipas/api/v1/deps/__init__.py
+"""
+CIPAS API v1 dependency providers.
 
-from cipas.core.config import get_settings
+Re-exports all FastAPI dependency provider functions and Annotated type aliases
+from cipas.api.v1.deps.db so that route handlers can import from a single
+location:
 
-# This file is intentionally minimal.
-# Dependency providers for external services (Redis, S3, AI models) have been removed.
+    from cipas.api.v1.deps import RepositoryDep, PipelineDep, SettingsDep
 
-__all__ = []
+rather than reaching into the sub-module directly.
+"""
+
+from cipas.api.v1.deps.db import (
+    PipelineDep,
+    RepositoryDep,
+    SettingsDep,
+    get_db_pool,
+    get_pipeline,
+    get_repository,
+    get_settings_dep,
+)
+
+__all__ = [
+    # Dependency provider functions
+    "get_db_pool",
+    "get_repository",
+    "get_pipeline",
+    "get_settings_dep",
+    # Annotated type aliases (preferred usage in route handlers)
+    "RepositoryDep",
+    "PipelineDep",
+    "SettingsDep",
+]

@@ -1,5 +1,58 @@
 services:
   # =============================================================================
+  # PostgreSQL 16 + pgvector  (CIPAS dedicated database)
+  # =============================================================================
+  cipas-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: cipas-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: cipas_db
+      POSTGRES_USER: cipas
+      POSTGRES_PASSWORD: ${CIPAS_DB_PASSWORD:-cipas_secret}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      # Tuning: raise shared_buffers and work_mem for bulk INSERT workloads.
+      # These are conservative values suitable for a Compose dev environment.
+      # In production, tune via postgresql.conf or environment overrides.
+      POSTGRES_SHARED_BUFFERS: "256MB"
+
+    ports:
+      # Exposed on host port 5435 to avoid colliding with any existing
+      # PostgreSQL instance on the default 5432 port.
+      - "5435:5432"
+
+    volumes:
+      - cipas-pg-data:/var/lib/postgresql/data
+
+    command: >
+      postgres
+        -c shared_buffers=256MB
+        -c work_mem=16MB
+        -c maintenance_work_mem=128MB
+        -c max_connections=100
+        -c log_min_duration_statement=500
+        -c log_statement=none
+        -c timezone=UTC
+
+    networks:
+      - gradeloop-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cipas -d cipas_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # =============================================================================
   # Traefik API Gateway
   # =============================================================================
   traefik:
@@ -21,7 +74,7 @@ services:
     networks:
       - gradeloop-network
     healthcheck:
-      test: [ "CMD", "traefik", "healthcheck" ]
+      test: ["CMD", "traefik", "healthcheck"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -95,7 +148,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081/health" ]
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -122,13 +175,17 @@ services:
       - "traefik.http.routers.email.rule=PathPrefix(`/api/v1/emails`)"
       - "traefik.http.routers.email.entrypoints=web"
       - "traefik.http.services.email-service.loadbalancer.server.port=8082"
-      # Apply middlewares (sharing the same limits as others if desired, or none)
+      # Define the limit middleware locally so it is registered regardless of
+      # iam-service startup order. Must match the type defined in iam-service.
+      - "traefik.http.middlewares.limit.buffering.maxRequestBodyBytes=5242880"
+      # Apply middlewares
       - "traefik.http.routers.email.middlewares=limit"
 
     env_file:
       - .env
 
     environment:
+      - APP_ENV=production
       - APP_PORT=${EMAIL_SVC_PORT}
       - DB_HOST=${GRA_DB_HOST}
       - DB_PORT=${GRA_DB_PORT}
@@ -210,7 +267,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8083/health" ]
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -291,7 +348,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8084/health" ]
+      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -305,7 +362,7 @@ services:
         compress: "true"
 
   # =============================================================================
-  # CIPAS Service (Python FastAPI)
+  # CIPAS Service (Python FastAPI — Code Integrity Analysis & Plagiarism-detection)
   # =============================================================================
   cipas-service:
     build:
@@ -315,39 +372,81 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.cipas.rule=PathPrefix(`/api/v1/cipas`) || PathPrefix(`/api/v1/analysis`) || PathPrefix(`/metrics`)"
+      # Route all /api/v1/cipas/* traffic to this service.
+      # Also exposes /metrics for Prometheus scraping.
+      - "traefik.http.routers.cipas.rule=PathPrefix(`/api/v1/cipas`) || PathPrefix(`/metrics`)"
       - "traefik.http.routers.cipas.entrypoints=web"
-      - "traefik.http.services.cipas-service.loadbalancer.server.port=8000"
-      # Request Size Limiting (2MB)
-      - "traefik.http.middlewares.cipas-limit.buffering.maxRequestBodyBytes=2097152"
-      # Apply global middlewares
-      - "traefik.http.routers.cipas.middlewares=limit,global-ratelimit"
+      - "traefik.http.services.cipas-service.loadbalancer.server.port=8085"
+      # Request Size Limiting: 50 MB to accommodate batches of up to 200 × 1 MB files.
+      # This is enforced at the proxy layer BEFORE bytes reach the service.
+      # The service enforces its own per-file (1 MB) and batch (50 MB) limits too.
+      - "traefik.http.middlewares.cipas-limit.buffering.maxRequestBodyBytes=52428800"
+      # Rate Limiting: 200 batch submissions per minute with burst of 20.
+      # Adjust per-deployment based on observed traffic patterns.
+      - "traefik.http.middlewares.cipas-ratelimit.ratelimit.average=200"
+      - "traefik.http.middlewares.cipas-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.cipas-ratelimit.ratelimit.burst=20"
+      # Apply both middlewares to all CIPAS routes.
+      - "traefik.http.routers.cipas.middlewares=cipas-limit,cipas-ratelimit"
 
     env_file:
       - .env
 
     environment:
+      # ── Runtime ──────────────────────────────────────────────────────────────
       - CIPAS_ENV=${CIPAS_ENV:-development}
       - CIPAS_LOG_LEVEL=${CIPAS_LOG_LEVEL:-INFO}
+      - CIPAS_PORT=8085
+      - CIPAS_HOST=0.0.0.0
+
+      # ── Database ─────────────────────────────────────────────────────────────
+      # Connects to the cipas-postgres service on the internal Compose network.
+      # Uses the service name as the hostname (Docker DNS resolution).
+      - CIPAS_DATABASE_URL=postgresql://cipas:${CIPAS_DB_PASSWORD:-cipas_secret}@cipas-postgres:5432/cipas_db
+      - CIPAS_DB_MIN_POOL_SIZE=${CIPAS_DB_MIN_POOL_SIZE:-5}
+      - CIPAS_DB_MAX_POOL_SIZE=${CIPAS_DB_MAX_POOL_SIZE:-20}
+      - CIPAS_DB_COMMAND_TIMEOUT=30.0
+
+      # ── Process pool ─────────────────────────────────────────────────────────
+      # 0 = os.cpu_count() — auto-detects the number of available CPU cores.
+      # Override explicitly in resource-constrained environments (e.g. 2 for a
+      # 2-core container) to prevent over-subscription.
+      - CIPAS_PARSER_WORKERS=${CIPAS_PARSER_WORKERS:-0}
+      - CIPAS_MAX_CONCURRENT_BATCHES=${CIPAS_MAX_CONCURRENT_BATCHES:-4}
+      - CIPAS_BATCH_SEMAPHORE_TIMEOUT=30.0
+      - CIPAS_PARSE_TASK_TIMEOUT=30.0
+      - CIPAS_WORKER_MAX_TASKS_PER_CHILD=500
+
+      # ── File limits ───────────────────────────────────────────────────────────
+      - CIPAS_MAX_FILES_PER_BATCH=200
+      - CIPAS_MAX_FILE_SIZE_BYTES=1048576
+      - CIPAS_MAX_TOTAL_BATCH_BYTES=52428800
+      - CIPAS_MAX_GRANULE_AST_NODES=10000
 
     expose:
-      - "8000"
+      # Port 8085 is the CIPAS HTTP port (avoids collision with Traefik's 8000).
+      # Only exposed internally; Traefik proxies external traffic.
+      - "8085"
 
-    # depends_on:
-    #   minio:
-    #     condition: service_healthy
-    #   redis:
-    #     condition: service_healthy
+    depends_on:
+      cipas-postgres:
+        condition: service_healthy
 
     networks:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/health" ]
-      interval: 10s
+      # Uses the /ready endpoint (readiness probe) which checks both the
+      # process liveness AND the DB connectivity.  If the DB is unreachable
+      # at container start, this probe will fail and Compose will restart.
+      test: ["CMD", "curl", "-f", "http://localhost:8085/api/v1/cipas/ready"]
+      interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      # Allow 60s for the service to start: poetry env activate + tree-sitter
+      # grammar loading + ProcessPoolExecutor worker warm-up take ~10-30s
+      # on first cold start.
+      start_period: 60s
 
     logging:
       driver: "json-file"
@@ -381,7 +480,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -414,7 +513,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -469,6 +568,12 @@ networks:
 # =============================================================================
 volumes:
   minio-data:
+    driver: local
+
+  # Persistent volume for CIPAS PostgreSQL data.
+  # Data survives container restarts and re-deployments.
+  # To reset the DB (e.g. during development): docker volume rm cipas-pg-data
+  cipas-pg-data:
     driver: local
 
 #  redis-data:
