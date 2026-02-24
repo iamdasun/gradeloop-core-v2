@@ -595,6 +595,151 @@ class SimilarityRepository:
         return [dict(r) for r in rows]
 
     # ------------------------------------------------------------------
+    # Clone evidence methods (E15/US10)
+    # ------------------------------------------------------------------
+
+    async def get_matches_by_assignment(
+        self,
+        assignment_id: uuid.UUID,
+        min_score: float = 0.0,
+        limit: int = 1000,
+    ) -> list[dict[str, Any]]:
+        """
+        Fetch all clone matches for an assignment.
+
+        Used by the evidence service to build graphs and clusters.
+
+        Args:
+            assignment_id: The assignment UUID.
+            min_score: Minimum similarity score to include.
+            limit: Maximum number of matches to return.
+
+        Returns:
+            List of match dicts with submission IDs, scores, and clone types.
+        """
+        query = """
+            SELECT DISTINCT ON (cm.submission_id, cm.matched_submission_id)
+                cm.submission_id,
+                cm.matched_submission_id,
+                cm.similarity_score,
+                cm.clone_type,
+                cm.granule_a_id,
+                cm.granule_b_id,
+                cm.snippet_match
+            FROM clone_matches cm
+            JOIN similarity_reports sr ON cm.report_id = sr.id
+            WHERE sr.assignment_id = $1
+              AND cm.similarity_score >= $2
+            ORDER BY cm.submission_id, cm.matched_submission_id, cm.similarity_score DESC
+            LIMIT $3
+        """
+
+        try:
+            async with self._pool.acquire() as conn:
+                rows = await conn.fetch(query, str(assignment_id), min_score, limit)
+        except asyncpg.PostgresConnectionError as exc:
+            raise DBConnectionError(timeout=0, cause=exc) from exc
+
+        return [dict(r) for r in rows]
+
+    async def get_best_match(
+        self,
+        submission_id: uuid.UUID,
+        matched_submission_id: uuid.UUID,
+        min_score: float = 0.0,
+    ) -> dict[str, Any] | None:
+        """
+        Get the highest-scoring clone match between two submissions.
+
+        Args:
+            submission_id: The subject submission UUID.
+            matched_submission_id: The matched submission UUID.
+            min_score: Minimum similarity score filter.
+
+        Returns:
+            Match dict with highest score, or None if no match found.
+        """
+        query = """
+            SELECT
+                cm.submission_id,
+                cm.matched_submission_id,
+                cm.similarity_score,
+                cm.clone_type,
+                cm.granule_a_id,
+                cm.granule_b_id,
+                cm.snippet_match
+            FROM clone_matches cm
+            JOIN similarity_reports sr ON cm.report_id = sr.id
+            WHERE (
+                (cm.submission_id = $1 AND cm.matched_submission_id = $2)
+                OR (cm.submission_id = $2 AND cm.matched_submission_id = $1)
+            )
+              AND cm.similarity_score >= $3
+            ORDER BY cm.similarity_score DESC
+            LIMIT 1
+        """
+
+        try:
+            async with self._pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    query, str(submission_id), str(matched_submission_id), min_score
+                )
+        except asyncpg.PostgresConnectionError as exc:
+            raise DBConnectionError(timeout=0, cause=exc) from exc
+
+        return dict(row) if row else None
+
+    async def get_granule_by_id(
+        self,
+        granule_id: uuid.UUID,
+    ) -> dict[str, Any] | None:
+        """
+        Fetch a single granule by ID.
+
+        Args:
+            granule_id: The granule UUID.
+
+        Returns:
+            Granule dict with normalized_source and line numbers, or None.
+        """
+        query = """
+            SELECT
+                id AS granule_id,
+                submission_id,
+                granule_hash,
+                granule_type,
+                language,
+                normalized_source,
+                start_line,
+                end_line,
+                name
+            FROM granules
+            WHERE id = $1
+        """
+
+        try:
+            async with self._pool.acquire() as conn:
+                row = await conn.fetchrow(query, str(granule_id))
+        except asyncpg.PostgresConnectionError as exc:
+            raise DBConnectionError(timeout=0, cause=exc) from exc
+
+        return dict(row) if row else None
+
+    async def gather_tasks(self, tasks: list) -> list:
+        """
+        Gather multiple async tasks and return their results.
+
+        Wrapper around asyncio.gather for convenience.
+
+        Args:
+            tasks: List of awaitable tasks.
+
+        Returns:
+            List of task results.
+        """
+        return await asyncio.gather(*tasks)
+
+    # ------------------------------------------------------------------
     # Retry helpers (mirrors StorageRepository pattern)
     # ------------------------------------------------------------------
 

@@ -73,6 +73,7 @@ from loguru import logger
 from prometheus_fastapi_instrumentator import Instrumentator
 import uvicorn
 
+from cipas.api.v1.routes.evidence import router as evidence_router
 from cipas.api.v1.routes.health import router as health_router
 from cipas.api.v1.routes.ingestion import router as ingestion_router
 from cipas.api.v1.routes.similarity import router as similarity_router
@@ -323,6 +324,8 @@ def _register_routes(app: FastAPI) -> None:
     Route prefix hierarchy:
         /api/v1/cipas/...   → health_router (health, ready, metrics/pool)
         /api/v1/cipas/...   → ingestion_router (submissions, clones)
+        /api/v1/cipas/...   → similarity_router (similarity analysis)
+        /api/v1/cipas/...   → evidence_router (clone evidence, graph, classes)
 
     Both routers use prefix="/cipas" internally; we mount them under
     /api/v1 so the full paths are /api/v1/cipas/health, etc.
@@ -332,6 +335,7 @@ def _register_routes(app: FastAPI) -> None:
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(ingestion_router, prefix="/api/v1")
     app.include_router(similarity_router, prefix="/api/v1")
+    app.include_router(evidence_router, prefix="/api/v1")
 
 
 # ---------------------------------------------------------------------------
