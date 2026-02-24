@@ -114,3 +114,62 @@ func (c *AcademicClient) IsEnrolled(userID, courseInstanceID string) (bool, erro
 	// slightly (e.g. count field absent).
 	return len(body.Enrollments) > 0, nil
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Instructor course assignments
+// ─────────────────────────────────────────────────────────────────────────────
+
+// CourseInstructorItem represents a single instructor ↔ course instance assignment.
+type CourseInstructorItem struct {
+	CourseInstanceID string `json:"course_instance_id"`
+	UserID           string `json:"user_id"`
+	Role             string `json:"role"`
+}
+
+// instructorCoursesResponse mirrors the response from
+// GET /api/v1/instructor-courses/me
+type instructorCoursesResponse struct {
+	Courses []CourseInstructorItem `json:"courses"`
+	Count   int                    `json:"count"`
+}
+
+// GetInstructorCourses calls GET /api/v1/instructor-courses/me on the Academic
+// Service with the given auth token and returns the list of course instance
+// assignments for the authenticated user.
+func (c *AcademicClient) GetInstructorCourses(token string) ([]CourseInstructorItem, error) {
+	url := fmt.Sprintf("%s/api/v1/instructor-courses/me", c.baseURL)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		c.logger.Error("academic client: failed to build instructor courses request",
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("building instructor courses request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		c.logger.Warn("academic client: instructor courses request failed",
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("instructor courses request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		c.logger.Warn("academic client: unexpected status on instructor courses",
+			zap.Int("status", resp.StatusCode),
+		)
+		return nil, fmt.Errorf("instructor courses returned status %d", resp.StatusCode)
+	}
+
+	var body instructorCoursesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		c.logger.Error("academic client: failed to decode instructor courses response", zap.Error(err))
+		return nil, fmt.Errorf("decoding instructor courses response: %w", err)
+	}
+
+	return body.Courses, nil
+}
