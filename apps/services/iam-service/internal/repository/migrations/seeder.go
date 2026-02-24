@@ -101,6 +101,10 @@ func (s *Seeder) seedPermissions() error {
 		{Name: "students:write", Description: "Manage student profiles"},
 		{Name: "employees:read", Description: "View employee profiles"},
 		{Name: "employees:write", Description: "Manage employee profiles"},
+		// Instructor-scoped permissions
+		{Name: "courses:read", Description: "View assigned courses and course instances"},
+		{Name: "assignments:read", Description: "View assignments for assigned courses"},
+		{Name: "submissions:read", Description: "View submissions for assigned courses"},
 	}
 
 	for _, permData := range permissions {
@@ -116,13 +120,14 @@ func (s *Seeder) seedPermissions() error {
 }
 
 func (s *Seeder) seedRolePermissions() error {
+	// ── Super Admin: gets ALL permissions ────────────────────────────────────
 	var superAdminRole domain.Role
 	if err := s.db.Where("name = ?", "super_admin").First(&superAdminRole).Error; err != nil {
 		return err
 	}
 
-	var permissions []domain.Permission
-	if err := s.db.Find(&permissions).Error; err != nil {
+	var allPermissions []domain.Permission
+	if err := s.db.Find(&allPermissions).Error; err != nil {
 		return err
 	}
 
@@ -131,7 +136,7 @@ func (s *Seeder) seedRolePermissions() error {
 		PermissionID uuid.UUID `gorm:"type:uuid;primaryKey"`
 	}
 
-	for _, perm := range permissions {
+	for _, perm := range allPermissions {
 		rp := RolePermission{
 			RoleID:       superAdminRole.ID,
 			PermissionID: perm.ID,
@@ -140,6 +145,32 @@ func (s *Seeder) seedRolePermissions() error {
 			return err
 		}
 	}
+
+	// ── Employee: instructor-scoped permissions ──────────────────────────────
+	var employeeRole domain.Role
+	if err := s.db.Where("name = ?", "employee").First(&employeeRole).Error; err != nil {
+		s.logger.Warn("employee role not found, skipping employee permissions")
+		return nil
+	}
+
+	employeePermNames := []string{"courses:read", "students:read", "assignments:read", "submissions:read"}
+	var employeePerms []domain.Permission
+	if err := s.db.Where("name IN ?", employeePermNames).Find(&employeePerms).Error; err != nil {
+		return err
+	}
+
+	for _, perm := range employeePerms {
+		rp := RolePermission{
+			RoleID:       employeeRole.ID,
+			PermissionID: perm.ID,
+		}
+		if err := s.db.FirstOrCreate(&rp).Error; err != nil {
+			return err
+		}
+	}
+
+	s.logger.Info("assigned instructor permissions to employee role",
+		zap.Int("count", len(employeePerms)))
 
 	return nil
 }
