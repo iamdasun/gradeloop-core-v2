@@ -137,7 +137,6 @@ func Seed(db *gorm.DB) error {
 
 			user = domain.User{
 				ID:           uuid.New(),
-				Username:     "superadmin",
 				Email:        superAdminEmail,
 				PasswordHash: string(hashedPassword),
 				RoleID:       &superAdminRole.ID,

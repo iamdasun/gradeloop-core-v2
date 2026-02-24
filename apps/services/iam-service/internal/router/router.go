@@ -38,6 +38,7 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	// User routes with authentication middleware (admin-only operations)
 	users := api.Group("/users", middleware.AuthMiddleware(cfg.JWTSecretKey))
 	users.Get("/", middleware.RequirePermission("users:read"), cfg.UserHandler.GetUsers)
+	users.Get("/:id", cfg.UserHandler.GetUserByID)
 	users.Post("/", middleware.RequirePermission("users:write"), cfg.UserHandler.CreateUser)
 	users.Put("/:id", middleware.RequirePermission("users:write"), cfg.UserHandler.UpdateUser)
 	users.Delete("/:id", middleware.RequirePermission("users:delete"), cfg.UserHandler.DeleteUser)

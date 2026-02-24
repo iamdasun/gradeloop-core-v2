@@ -121,6 +121,18 @@ func (h *UserHandler) GetProfile(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+// GetUserByID returns the profile of a specific user by ID
+func (h *UserHandler) GetUserByID(c fiber.Ctx) error {
+	id := c.Params("id")
+
+	response, err := h.userService.GetUserByID(c.RequestCtx(), id)
+	if err != nil {
+		return handleUserError(err)
+	}
+
+	return c.JSON(response)
+}
+
 // UpdateAvatar uploads a new avatar image to MinIO and updates the user record.
 // Accepted formats: JPEG, PNG, GIF, WebP — max 5 MB.
 func (h *UserHandler) UpdateAvatar(c fiber.Ctx) error {
@@ -157,8 +169,6 @@ func handleUserError(err error) error {
 	switch err {
 	case service.ErrUnauthorized:
 		return fiber.NewError(fiber.StatusUnauthorized, "Unauthorized")
-	case service.ErrUsernameTaken:
-		return fiber.NewError(fiber.StatusConflict, "Username already exists")
 	case service.ErrEmailTaken:
 		return fiber.NewError(fiber.StatusConflict, "Email already exists")
 	case service.ErrRoleNotFound:

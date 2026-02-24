@@ -113,7 +113,7 @@ type PageState =
   | { status: "no-token" }
   | { status: "ready"; token: string }
   | { status: "activating" }
-  | { status: "success"; email: string; username: string }
+  | { status: "success"; email: string }
   | { status: "error"; message: string; type: "expired" | "used" | "generic" };
 
 /* ─────────────────────────────────────────────
@@ -312,7 +312,6 @@ function ActivateContent() {
       setState({
         status: "success",
         email: res.email,
-        username: res.username,
       });
     } catch (err) {
       const msg = handleApiError(err);
@@ -527,7 +526,6 @@ function ActivateContent() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <CredentialRow label="Email" value={state.email} />
-                  <CredentialRow label="Username" value={state.username} />
                 </div>
               </div>
 

@@ -207,11 +207,8 @@ func (s *Seeder) seedSuperAdmin() error {
 			"is_active":                  true,
 			"is_password_reset_required": false,
 			"role_id":                    superAdminRole.ID,
+			"email":                      email,
 		}
-
-		// Update username and email to match the email
-		updates["username"] = email
-		updates["email"] = email
 
 		if err := s.db.Model(&existingUser).Updates(updates).Error; err != nil {
 			return fmt.Errorf("updating super admin user: %w", err)
@@ -225,8 +222,8 @@ func (s *Seeder) seedSuperAdmin() error {
 	// User doesn't exist, create new one
 	user := domain.User{
 		ID:                      uuid.New(),
-		Username:                email,
 		Email:                   email,
+		FullName:                "Super Admin",
 		PasswordHash:            string(hashedPassword),
 		RoleID:                  &superAdminRole.ID,
 		IsActive:                true,

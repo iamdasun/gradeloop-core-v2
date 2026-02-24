@@ -17,6 +17,7 @@ type CourseInstructorService interface {
 	GetInstructors(instanceID uuid.UUID) ([]domain.CourseInstructor, error)
 	RemoveInstructor(instanceID, userID uuid.UUID, username, ipAddress, userAgent string) error
 	GetMyInstances(userID uuid.UUID) ([]domain.CourseInstructor, error)
+	GetCourseInstance(id uuid.UUID) (*domain.CourseInstance, error)
 }
 
 // courseInstructorService is the concrete implementation.
@@ -214,4 +215,25 @@ func (s *courseInstructorService) GetMyInstances(userID uuid.UUID) ([]domain.Cou
 	}
 
 	return instructors, nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GetCourseInstance
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (s *courseInstructorService) GetCourseInstance(id uuid.UUID) (*domain.CourseInstance, error) {
+	if id == uuid.Nil {
+		return nil, utils.ErrBadRequest("invalid course instance id")
+	}
+
+	instance, err := s.courseInstanceRepo.GetByID(id)
+	if err != nil {
+		s.logger.Error("failed to fetch course instance", zap.Error(err))
+		return nil, utils.ErrInternal("failed to fetch course instance", err)
+	}
+	if instance == nil {
+		return nil, utils.ErrNotFound("course instance not found")
+	}
+
+	return instance, nil
 }

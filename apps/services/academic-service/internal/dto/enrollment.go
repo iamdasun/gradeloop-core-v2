@@ -70,7 +70,12 @@ type AssignInstructorRequest struct {
 // CourseInstructorResponse is returned for course-instructor endpoints
 type CourseInstructorResponse struct {
 	CourseInstanceID uuid.UUID `json:"course_instance_id"`
+	CourseCode       string    `json:"course_code"`
+	CourseTitle      string    `json:"course_title"`
 	UserID           uuid.UUID `json:"user_id"`
+	Designation      string    `json:"designation"`
+	FullName         string    `json:"full_name"`
+	Email            string    `json:"email"`
 	Role             string    `json:"role"`
 }
 
@@ -95,6 +100,9 @@ type UpdateEnrollmentRequest struct {
 type EnrollmentResponse struct {
 	CourseInstanceID uuid.UUID `json:"course_instance_id"`
 	UserID           uuid.UUID `json:"user_id"`
+	StudentID        string    `json:"student_id"`
+	FullName         string    `json:"full_name"`
+	Email            string    `json:"email"`
 	Status           string    `json:"status"`
 	FinalGrade       string    `json:"final_grade,omitempty"`
 	EnrolledAt       time.Time `json:"enrolled_at"`

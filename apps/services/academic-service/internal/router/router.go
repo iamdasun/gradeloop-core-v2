@@ -129,6 +129,7 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	courseInstances := protected.Group("/course-instances", requireAdminRole())
 	courseInstances.Post("/", cfg.CourseInstanceHandler.CreateCourseInstance)
 	courseInstances.Put("/:id", cfg.CourseInstanceHandler.UpdateCourseInstance)
+	courseInstances.Get("/:id", cfg.CourseInstanceHandler.GetCourseInstanceByID)
 	// Nested reads under course-instances (instructors & enrollments)
 	courseInstances.Get("/:id/instructors", cfg.CourseInstructorHandler.GetInstructors)
 	courseInstances.Get("/:id/enrollments", cfg.EnrollmentHandler.GetEnrollments)

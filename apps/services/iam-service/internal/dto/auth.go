@@ -3,7 +3,7 @@ package dto
 import "github.com/google/uuid"
 
 type LoginRequest struct {
-	Username string `json:"username" validate:"required"`
+	Email    string `json:"email" validate:"required"`
 	Password string `json:"password" validate:"required"`
 }
 
@@ -25,7 +25,6 @@ type RefreshTokenResponse struct {
 
 type UserWithRole struct {
 	ID                      uuid.UUID
-	Username                string
 	Email                   string
 	FullName                string
 	PasswordHash            string

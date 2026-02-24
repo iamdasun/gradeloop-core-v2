@@ -29,7 +29,6 @@ type Permission struct {
 
 type User struct {
 	ID                      uuid.UUID      `gorm:"type:uuid;primarykey" json:"id"`
-	Username                string         `gorm:"uniqueIndex:idx_users_username,where:deleted_at IS NULL;not null;size:100" json:"username"`
 	Email                   string         `gorm:"uniqueIndex:idx_users_email,where:deleted_at IS NULL;not null;size:255" json:"email"`
 	FullName                string         `gorm:"size:255" json:"full_name"`
 	AvatarURL               string         `gorm:"size:512" json:"avatar_url"`

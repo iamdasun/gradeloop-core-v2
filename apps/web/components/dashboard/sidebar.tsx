@@ -84,13 +84,29 @@ const adminNavItems: NavItem[] = [
     icon: School,
     baseHref: "/admin/academics",
     children: [
-      { title: "Faculties", href: "/admin/academics/faculties", icon: Landmark },
-      { title: "Departments", href: "/admin/academics/departments", icon: Building2 },
+      {
+        title: "Faculties",
+        href: "/admin/academics/faculties",
+        icon: Landmark,
+      },
+      {
+        title: "Departments",
+        href: "/admin/academics/departments",
+        icon: Building2,
+      },
       { title: "Degrees", href: "/admin/academics/degrees", icon: Award },
       { title: "Courses", href: "/admin/academics/courses", icon: BookOpen },
-      { title: "Semesters", href: "/admin/academics/semesters", icon: Calendar },
+      {
+        title: "Semesters",
+        href: "/admin/academics/semesters",
+        icon: Calendar,
+      },
       { title: "Groups", href: "/admin/academics/groups", icon: Users2 },
-      { title: "Enrollment", href: "/admin/academics/enrollment", icon: ClipboardList },
+      {
+        title: "Enrollment",
+        href: "/admin/academics/enrollment",
+        icon: ClipboardList,
+      },
     ],
   },
   {
@@ -162,10 +178,15 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
   const navItems = isEmployee ? instructorNavItems : adminNavItems;
   const homeHref = isEmployee ? "/instructor" : "/admin";
 
-  const displayName = user?.full_name || user?.username || '—';
+  const displayName = user?.full_name || user?.email || "—";
   const initials = user?.full_name
-    ? user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-    : user?.username?.slice(0, 2).toUpperCase() || '??';
+    ? user.full_name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : user?.email?.slice(0, 2).toUpperCase() || "??";
 
   // Auto-open any group whose child is active on mount
   const [openGroups, setOpenGroups] = React.useState<Set<string>>(() => {
@@ -275,7 +296,9 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
                   >
                     <div className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-zinc-200 pl-2 dark:border-zinc-800">
                       {item.children.map((child) => {
-                        const isChildActive = pathname === child.href || pathname.startsWith(child.href + "/");
+                        const isChildActive =
+                          pathname === child.href ||
+                          pathname.startsWith(child.href + "/");
                         const ChildIcon = child.icon;
                         return (
                           <Link key={child.href} href={child.href}>
@@ -350,7 +373,9 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
               </Avatar>
               {!collapsed && (
                 <div className="flex flex-1 items-center text-left text-sm">
-                  <span className="font-medium truncate max-w-[150px]">{displayName}</span>
+                  <span className="font-medium truncate max-w-[150px]">
+                    {displayName}
+                  </span>
                 </div>
               )}
             </Button>
@@ -359,7 +384,10 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/profile" className="flex w-full cursor-pointer items-center">
+              <Link
+                href="/profile"
+                className="flex w-full cursor-pointer items-center"
+              >
                 Profile
               </Link>
             </DropdownMenuItem>

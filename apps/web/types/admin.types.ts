@@ -4,7 +4,7 @@
  * Re-exports shared types from auth.types so consumers only need one import.
  */
 
-export type { UserListItem, Role, Permission } from '@/types/auth.types';
+export type { UserListItem, Role, Permission } from "@/types/auth.types";
 
 // ── Pagination ───────────────────────────────────────────────────────────────
 
@@ -62,7 +62,6 @@ export interface UpdateUserRequest {
 /** Matches the backend UpdateUserResponse DTO. */
 export interface UpdateUserResponse {
   id: string;
-  username: string;
   email: string;
   role_id: string;
   is_active: boolean;

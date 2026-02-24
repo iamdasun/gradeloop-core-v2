@@ -50,8 +50,8 @@ import type { UserListItem } from "@/types/auth.types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function getInitials(fullName: string, username: string) {
-  const name = fullName || username;
+function getInitials(fullName: string, email: string) {
+  const name = fullName || email;
   return name
     .split(/[.\-_\s@]/)
     .map((p) => p[0]?.toUpperCase() ?? "")
@@ -371,7 +371,7 @@ export default function UsersPage() {
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9 shrink-0">
                             <AvatarFallback className="bg-zinc-100 dark:bg-zinc-800 text-sm">
-                              {getInitials(user.full_name, user.username)}
+                              {getInitials(user.full_name, user.email)}
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
@@ -400,9 +400,9 @@ export default function UsersPage() {
                       <TableCell className="hidden lg:table-cell text-sm text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                         {user.last_login_at
                           ? new Date(user.last_login_at).toLocaleDateString(
-                            "en-US",
-                            { dateStyle: "medium" },
-                          )
+                              "en-US",
+                              { dateStyle: "medium" },
+                            )
                           : "—"}
                       </TableCell>
                       <TableCell>

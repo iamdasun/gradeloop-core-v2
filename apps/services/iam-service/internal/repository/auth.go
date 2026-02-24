@@ -11,7 +11,7 @@ import (
 )
 
 type AuthRepository interface {
-	GetUserByUsername(ctx context.Context, username string) (*dto.UserWithRole, error)
+	GetUserByEmail(ctx context.Context, email string) (*dto.UserWithRole, error)
 	CreateRefreshToken(ctx context.Context, refreshToken *domain.RefreshToken) error
 	GetRefreshToken(ctx context.Context, tokenHash string) (*domain.RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, tokenID uuid.UUID) error
@@ -31,14 +31,13 @@ func NewAuthRepository(db *gorm.DB) AuthRepository {
 	return &authRepository{db: db}
 }
 
-func (r *authRepository) GetUserByUsername(ctx context.Context, username string) (*dto.UserWithRole, error) {
+func (r *authRepository) GetUserByEmail(ctx context.Context, email string) (*dto.UserWithRole, error) {
 	var user dto.UserWithRole
 
 	query := r.db.WithContext(ctx).
 		Table("users").
 		Select(`
 			users.id,
-			users.username,
 			users.email,
 			users.full_name,
 			users.password_hash,
@@ -48,7 +47,7 @@ func (r *authRepository) GetUserByUsername(ctx context.Context, username string)
 			users.is_password_reset_required
 		`).
 		Joins("LEFT JOIN roles ON roles.id = users.role_id AND roles.deleted_at IS NULL").
-		Where("(users.username = ? OR users.email = ?) AND users.deleted_at IS NULL", username, username).
+		Where("users.email = ? AND users.deleted_at IS NULL", email).
 		First(&user)
 
 	if query.Error != nil {

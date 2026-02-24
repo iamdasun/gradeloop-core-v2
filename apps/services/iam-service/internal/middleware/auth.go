@@ -35,7 +35,7 @@ func AuthMiddleware(secretKey []byte) fiber.Handler {
 
 		// Store claims in context for handlers to access
 		c.Locals("user_id", claims.UserID.String())
-		c.Locals("username", claims.Username)
+		c.Locals("email", claims.Email)
 		c.Locals("role_name", claims.RoleName)
 		c.Locals("permissions", claims.Permissions)
 

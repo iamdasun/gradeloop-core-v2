@@ -32,12 +32,14 @@ type ValidateTokenResponse struct {
 
 // UserInfoResponse represents user information from IAM service
 type UserInfoResponse struct {
-	ID        uint     `json:"id"`
-	Email     string   `json:"email"`
-	FirstName string   `json:"first_name"`
-	LastName  string   `json:"last_name"`
-	IsActive  bool     `json:"is_active"`
-	Roles     []string `json:"roles"`
+	ID          string `json:"id"`
+	Email       string `json:"email"`
+	FullName    string `json:"full_name"`
+	AvatarURL   string `json:"avatar_url"`
+	UserType    string `json:"user_type"`
+	StudentID   string `json:"student_id"`
+	Designation string `json:"designation"`
+	IsActive    bool   `json:"is_active"`
 }
 
 // IAMErrorResponse represents an error response from IAM service
@@ -102,44 +104,6 @@ func (c *IAMClient) ValidateToken(ctx context.Context, token string) (*ValidateT
 	return &validateResp, nil
 }
 
-// GetUserInfo retrieves user information from IAM service
-func (c *IAMClient) GetUserInfo(ctx context.Context, token string, userID uint) (*UserInfoResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/users/%d", c.baseURL, userID)
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
-	}
-
-	httpReq.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("sending request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		var errResp IAMErrorResponse
-		if err := json.Unmarshal(respBody, &errResp); err != nil {
-			return nil, fmt.Errorf("IAM service returned status %d: %s", resp.StatusCode, string(respBody))
-		}
-		return nil, fmt.Errorf("IAM service error: %s", errResp.Message)
-	}
-
-	var userResp UserInfoResponse
-	if err := json.Unmarshal(respBody, &userResp); err != nil {
-		return nil, fmt.Errorf("unmarshaling response: %w", err)
-	}
-
-	return &userResp, nil
-}
-
 // VerifyPermission checks if a user has a specific permission
 func (c *IAMClient) VerifyPermission(ctx context.Context, token string, permission string) (bool, error) {
 	validateResp, err := c.ValidateToken(ctx, token)
@@ -178,4 +142,45 @@ func (c *IAMClient) VerifyRole(ctx context.Context, token string, role string) (
 	}
 
 	return false, nil
+}
+
+// GetUserInfo retrieves user information by user ID
+func (c *IAMClient) GetUserInfo(ctx context.Context, token, userID string) (*UserInfoResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/users/%s", c.baseURL, userID)
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	// Forward the authorization token
+	if token != "" {
+		httpReq.Header.Set("Authorization", token)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errResp IAMErrorResponse
+		if err := json.Unmarshal(respBody, &errResp); err != nil {
+			return nil, fmt.Errorf("IAM service returned status %d: %s", resp.StatusCode, string(respBody))
+		}
+		return nil, fmt.Errorf("IAM service error: %s", errResp.Message)
+	}
+
+	var userResp UserInfoResponse
+	if err := json.Unmarshal(respBody, &userResp); err != nil {
+		return nil, fmt.Errorf("unmarshaling response: %w", err)
+	}
+
+	return &userResp, nil
 }

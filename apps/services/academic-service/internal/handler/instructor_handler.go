@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/gradeloop/academic-service/internal/client"
 	"github.com/gradeloop/academic-service/internal/dto"
 	"github.com/gradeloop/academic-service/internal/service"
 	"github.com/gradeloop/academic-service/internal/utils"
@@ -14,6 +16,8 @@ import (
 type InstructorHandler struct {
 	courseInstructorService service.CourseInstructorService
 	enrollmentService       service.EnrollmentService
+	courseService           service.CourseService
+	iamClient               *client.IAMClient
 	logger                  *zap.Logger
 }
 
@@ -21,11 +25,15 @@ type InstructorHandler struct {
 func NewInstructorHandler(
 	courseInstructorService service.CourseInstructorService,
 	enrollmentService service.EnrollmentService,
+	courseService service.CourseService,
+	iamClient *client.IAMClient,
 	logger *zap.Logger,
 ) *InstructorHandler {
 	return &InstructorHandler{
 		courseInstructorService: courseInstructorService,
 		enrollmentService:       enrollmentService,
+		courseService:           courseService,
+		iamClient:               iamClient,
 		logger:                  logger,
 	}
 }
@@ -48,7 +56,7 @@ func instructorUserID(c fiber.Ctx) (uuid.UUID, error) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GetMyCourses returns all course instance assignments for the authenticated
-// instructor.
+// instructor, including course details (code and title).
 func (h *InstructorHandler) GetMyCourses(c fiber.Ctx) error {
 	userID, err := instructorUserID(c)
 	if err != nil {
@@ -62,8 +70,36 @@ func (h *InstructorHandler) GetMyCourses(c fiber.Ctx) error {
 
 	responses := make([]dto.CourseInstructorResponse, len(assignments))
 	for i, a := range assignments {
+		// Fetch course instance to get the course_id
+		courseInstance, err := h.courseInstructorService.GetCourseInstance(a.CourseInstanceID)
+		if err != nil {
+			h.logger.Warn("failed to fetch course instance", zap.Error(err), zap.String("instance_id", a.CourseInstanceID.String()))
+			// Continue without course details if fetch fails
+			responses[i] = dto.CourseInstructorResponse{
+				CourseInstanceID: a.CourseInstanceID,
+				UserID:           a.UserID,
+				Role:             a.Role,
+			}
+			continue
+		}
+
+		// Fetch course details
+		course, err := h.courseService.GetCourse(courseInstance.CourseID)
+		if err != nil {
+			h.logger.Warn("failed to fetch course details", zap.Error(err), zap.String("course_id", courseInstance.CourseID.String()))
+			// Continue without course details if fetch fails
+			responses[i] = dto.CourseInstructorResponse{
+				CourseInstanceID: a.CourseInstanceID,
+				UserID:           a.UserID,
+				Role:             a.Role,
+			}
+			continue
+		}
+
 		responses[i] = dto.CourseInstructorResponse{
 			CourseInstanceID: a.CourseInstanceID,
+			CourseCode:       course.Code,
+			CourseTitle:      course.Title,
 			UserID:           a.UserID,
 			Role:             a.Role,
 		}
@@ -80,7 +116,7 @@ func (h *InstructorHandler) GetMyCourses(c fiber.Ctx) error {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GetMyStudents returns all enrolled students for a specific course instance
-// that the authenticated instructor is assigned to.
+// that the authenticated instructor is assigned to, including student profile details.
 func (h *InstructorHandler) GetMyStudents(c fiber.Ctx) error {
 	userID, err := instructorUserID(c)
 	if err != nil {
@@ -117,9 +153,28 @@ func (h *InstructorHandler) GetMyStudents(c fiber.Ctx) error {
 
 	responses := make([]dto.EnrollmentResponse, len(enrollments))
 	for i, e := range enrollments {
+		// Fetch user info
+		token := c.Get("Authorization")
+		userInfo, err := h.iamClient.GetUserInfo(context.Background(), token, e.UserID.String())
+		if err != nil {
+			h.logger.Warn("failed to fetch user info", zap.Error(err), zap.String("user_id", e.UserID.String()))
+			// Continue without profile details if fetch fails
+			responses[i] = dto.EnrollmentResponse{
+				CourseInstanceID: e.CourseInstanceID,
+				UserID:           e.UserID,
+				Status:           e.Status,
+				FinalGrade:       e.FinalGrade,
+				EnrolledAt:       e.EnrolledAt,
+			}
+			continue
+		}
+
 		responses[i] = dto.EnrollmentResponse{
 			CourseInstanceID: e.CourseInstanceID,
 			UserID:           e.UserID,
+			StudentID:        userInfo.StudentID,
+			FullName:         userInfo.FullName,
+			Email:            userInfo.Email,
 			Status:           e.Status,
 			FinalGrade:       e.FinalGrade,
 			EnrolledAt:       e.EnrolledAt,
@@ -137,7 +192,7 @@ func (h *InstructorHandler) GetMyStudents(c fiber.Ctx) error {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GetMyInstructors returns all co-instructors for a specific course instance
-// that the authenticated instructor is assigned to.
+// that the authenticated instructor is assigned to, including employee profile details.
 func (h *InstructorHandler) GetMyInstructors(c fiber.Ctx) error {
 	userID, err := instructorUserID(c)
 	if err != nil {
@@ -168,9 +223,53 @@ func (h *InstructorHandler) GetMyInstructors(c fiber.Ctx) error {
 
 	responses := make([]dto.CourseInstructorResponse, len(instructors))
 	for i, inst := range instructors {
+		// Fetch course details for course code and title
+		courseInstance, err := h.courseInstructorService.GetCourseInstance(inst.CourseInstanceID)
+		if err != nil {
+			h.logger.Warn("failed to fetch course instance", zap.Error(err), zap.String("instance_id", inst.CourseInstanceID.String()))
+			responses[i] = dto.CourseInstructorResponse{
+				CourseInstanceID: inst.CourseInstanceID,
+				UserID:           inst.UserID,
+				Role:             inst.Role,
+			}
+			continue
+		}
+
+		course, err := h.courseService.GetCourse(courseInstance.CourseID)
+		if err != nil {
+			h.logger.Warn("failed to fetch course details", zap.Error(err), zap.String("course_id", courseInstance.CourseID.String()))
+			responses[i] = dto.CourseInstructorResponse{
+				CourseInstanceID: inst.CourseInstanceID,
+				UserID:           inst.UserID,
+				Role:             inst.Role,
+			}
+			continue
+		}
+
+		// Fetch employee profile
+		token := c.Get("Authorization")
+		userInfo, err := h.iamClient.GetUserInfo(context.Background(), token, inst.UserID.String())
+		if err != nil {
+			h.logger.Warn("failed to fetch user info", zap.Error(err), zap.String("user_id", inst.UserID.String()))
+			// Continue without profile details if fetch fails
+			responses[i] = dto.CourseInstructorResponse{
+				CourseInstanceID: inst.CourseInstanceID,
+				CourseCode:       course.Code,
+				CourseTitle:      course.Title,
+				UserID:           inst.UserID,
+				Role:             inst.Role,
+			}
+			continue
+		}
+
 		responses[i] = dto.CourseInstructorResponse{
 			CourseInstanceID: inst.CourseInstanceID,
+			CourseCode:       course.Code,
+			CourseTitle:      course.Title,
 			UserID:           inst.UserID,
+			Designation:      userInfo.Designation,
+			FullName:         userInfo.FullName,
+			Email:            userInfo.Email,
 			Role:             inst.Role,
 		}
 	}

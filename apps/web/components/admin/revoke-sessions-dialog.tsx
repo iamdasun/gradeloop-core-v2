@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { usersApi, handleApiError } from '@/lib/api/users';
-import { toast } from '@/lib/hooks/use-toast';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import type { UserListItem } from '@/types/auth.types';
+import * as React from "react";
+import { usersApi, handleApiError } from "@/lib/api/users";
+import { toast } from "@/lib/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import type { UserListItem } from "@/types/auth.types";
 
 interface Props {
   user: UserListItem | null;
@@ -27,13 +27,13 @@ export function RevokeSessionsDialog({
     try {
       await usersApi.revokeSessions(user.id);
       toast.success(
-        'Sessions revoked',
-        `All active sessions for ${user.username} have been terminated.`,
+        "Sessions revoked",
+        `All active sessions for ${user.email} have been terminated.`,
       );
       onSuccess();
       onOpenChange(false);
     } catch (err) {
-      toast.error('Failed to revoke sessions', handleApiError(err));
+      toast.error("Failed to revoke sessions", handleApiError(err));
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ export function RevokeSessionsDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Revoke Sessions"
-      description={`This will immediately terminate all active sessions for ${user?.username ?? 'this user'}. They will need to log in again on all devices.`}
+      description={`This will immediately terminate all active sessions for ${user?.username ?? "this user"}. They will need to log in again on all devices.`}
       confirmLabel="Revoke All Sessions"
       onConfirm={handleConfirm}
       loading={loading}

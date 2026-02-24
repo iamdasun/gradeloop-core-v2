@@ -281,7 +281,7 @@ services:
         compress: "true"
 
   # =============================================================================
-  # Assessment Service (Go Fiber) — under development, excluded from build
+  # Assessment Service (Go Fiber)
   # =============================================================================
   assessment-service:
     build:
@@ -289,8 +289,6 @@ services:
       dockerfile: Dockerfile
     container_name: assessment-service
     restart: unless-stopped
-    profiles:
-      - dev-assessment
     labels:
       - "traefik.enable=true"
       # Route assignments, submissions, groups, and instructor-scoped endpoints through the assessment service

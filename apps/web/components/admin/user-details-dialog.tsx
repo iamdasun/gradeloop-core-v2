@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import * as React from 'react';
+import * as React from "react";
 import {
   User,
   Mail,
@@ -11,18 +11,18 @@ import {
   Edit,
   ShieldOff,
   Trash2,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import type { UserListItem } from '@/types/auth.types';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import type { UserListItem } from "@/types/auth.types";
 
 interface Props {
   user: UserListItem | null;
@@ -33,29 +33,29 @@ interface Props {
   onDelete: (user: UserListItem) => void;
 }
 
-function getInitials(fullName: string, username: string) {
-  const name = fullName || username;
+function getInitials(fullName: string, email: string) {
+  const name = fullName || email;
   return name
     .split(/[.\-_\s]/)
-    .map((p) => p[0]?.toUpperCase() ?? '')
+    .map((p) => p[0]?.toUpperCase() ?? "")
     .slice(0, 2)
-    .join('');
+    .join("");
 }
 
 function formatDate(iso: string | null) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
   });
 }
 
 function roleBadgeVariant(roleName: string) {
   const lower = roleName.toLowerCase();
-  if (lower.includes('admin')) return 'purple' as const;
-  if (lower.includes('instructor') || lower.includes('teacher'))
-    return 'info' as const;
-  return 'secondary' as const;
+  if (lower.includes("admin")) return "purple" as const;
+  if (lower.includes("instructor") || lower.includes("teacher"))
+    return "info" as const;
+  return "secondary" as const;
 }
 
 export function UserDetailsDialog({
@@ -79,17 +79,19 @@ export function UserDetailsDialog({
         <div className="flex items-center gap-4 py-2">
           <Avatar className="h-14 w-14 text-lg">
             <AvatarFallback className="bg-zinc-100 dark:bg-zinc-800">
-              {getInitials(user.full_name, user.username)}
+              {getInitials(user.full_name, user.email)}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold">{user.full_name || "No Name"}</h3>
+            <h3 className="text-base font-semibold">
+              {user.full_name || "No Name"}
+            </h3>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
               {user.email}
             </p>
             <div className="flex items-center gap-2 mt-1">
-              <Badge variant={user.is_active ? 'success' : 'destructive'}>
-                {user.is_active ? 'Active' : 'Inactive'}
+              <Badge variant={user.is_active ? "success" : "destructive"}>
+                {user.is_active ? "Active" : "Inactive"}
               </Badge>
               <Badge variant={roleBadgeVariant(user.role_name)}>
                 {user.role_name}
@@ -118,7 +120,7 @@ export function UserDetailsDialog({
               <dt className="text-zinc-500 dark:text-zinc-400 text-xs">
                 Full Name
               </dt>
-              <dd>{user.full_name || '—'}</dd>
+              <dd>{user.full_name || "—"}</dd>
             </div>
           </div>
 
@@ -135,9 +137,7 @@ export function UserDetailsDialog({
           <div className="flex items-start gap-3">
             <Shield className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
             <div>
-              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">
-                Role
-              </dt>
+              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">Role</dt>
               <dd>{user.role_name}</dd>
             </div>
           </div>

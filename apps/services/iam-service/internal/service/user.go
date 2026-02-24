@@ -16,9 +16,8 @@ import (
 )
 
 var (
-	ErrUsernameTaken = errors.New("username already exists")
-	ErrEmailTaken    = errors.New("email already exists")
-	ErrRoleNotFound  = errors.New("role not found")
+	ErrEmailTaken   = errors.New("email already exists")
+	ErrRoleNotFound = errors.New("role not found")
 )
 
 type UserService interface {
@@ -28,6 +27,7 @@ type UserService interface {
 	DeleteUser(ctx context.Context, id string) error
 	RestoreUser(ctx context.Context, id string) error
 	GetProfile(ctx context.Context, userID string) (*dto.UserResponse, error)
+	GetUserByID(ctx context.Context, userID string) (*dto.UserResponse, error)
 	UpdateAvatar(ctx context.Context, userID string, avatarURL string) (*dto.UpdateAvatarResponse, error)
 }
 
@@ -110,7 +110,6 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 
 	user := &domain.User{
 		ID:                      uuid.New(),
-		Username:                req.Email,
 		Email:                   req.Email,
 		FullName:                req.FullName,
 		PasswordHash:            "", // First-time user flow, password is empty initially
@@ -251,7 +250,6 @@ func (s *userService) GetUsers(ctx context.Context, page, limit int, userType st
 
 		userResponses = append(userResponses, dto.UserResponse{
 			ID:          user.ID,
-			Username:    user.Username,
 			Email:       user.Email,
 			FullName:    user.FullName,
 			AvatarURL:   user.AvatarURL,
@@ -320,7 +318,6 @@ func (s *userService) UpdateUser(ctx context.Context, id string, req *dto.Update
 
 	return &dto.UpdateUserResponse{
 		ID:       user.ID,
-		Username: user.Username,
 		Email:    user.Email,
 		RoleID:   roleID,
 		IsActive: user.IsActive,
@@ -410,7 +407,64 @@ func (s *userService) GetProfile(ctx context.Context, id string) (*dto.UserRespo
 
 	return &dto.UserResponse{
 		ID:          user.ID,
-		Username:    user.Username,
+		Email:       user.Email,
+		FullName:    user.FullName,
+		AvatarURL:   user.AvatarURL,
+		RoleID:      roleID,
+		RoleName:    roleName,
+		UserType:    resolvedUserType,
+		Faculty:     user.Faculty,
+		Department:  user.Department,
+		StudentID:   studentID,
+		Designation: designation,
+		IsActive:    user.IsActive,
+		CreatedAt:   user.CreatedAt.Format(time.RFC3339),
+	}, nil
+}
+
+func (s *userService) GetUserByID(ctx context.Context, userID string) (*dto.UserResponse, error) {
+	id, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID: %w", err)
+	}
+
+	user, err := s.userRepo.GetUserByID(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("fetching user: %w", err)
+	}
+	if user == nil {
+		return nil, ErrUserNotFound
+	}
+
+	roleName := ""
+	if user.Role != nil {
+		roleName = user.Role.Name
+	}
+
+	var roleID uuid.UUID
+	if user.RoleID != nil {
+		roleID = *user.RoleID
+	}
+
+	resolvedUserType := "all"
+	studentID := ""
+	designation := ""
+
+	// Check for profiles
+	var student domain.UserProfileStudent
+	if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
+		resolvedUserType = "student"
+		studentID = student.StudentID
+	} else {
+		var employee domain.UserProfileEmployee
+		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&employee).Error; err == nil {
+			resolvedUserType = "employee"
+			designation = employee.Designation
+		}
+	}
+
+	return &dto.UserResponse{
+		ID:          user.ID,
 		Email:       user.Email,
 		FullName:    user.FullName,
 		AvatarURL:   user.AvatarURL,

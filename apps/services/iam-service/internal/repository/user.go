@@ -11,7 +11,6 @@ import (
 type UserRepository interface {
 	CreateUser(ctx context.Context, user *domain.User) error
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error)
-	GetUserByUsername(ctx context.Context, username string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	UpdateUser(ctx context.Context, user *domain.User) error
 	SoftDeleteUser(ctx context.Context, userID uuid.UUID) error
@@ -57,24 +56,6 @@ func (r *userRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*do
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	return &user, nil
-}
-
-func (r *userRepository) GetUserByUsername(ctx context.Context, username string) (*domain.User, error) {
-	var user domain.User
-
-	query := r.db.WithContext(ctx).
-		Preload("Role").
-		Where("username = ? AND deleted_at IS NULL", username).
-		First(&user)
-
-	if query.Error != nil {
-		if query.Error == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, query.Error
 	}
 
 	return &user, nil
