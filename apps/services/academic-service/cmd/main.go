@@ -130,6 +130,9 @@ func run() error {
 	courseHandler := handler.NewCourseHandler(courseService, logger)
 	semesterHandler := handler.NewSemesterHandler(semesterService, logger)
 
+	// Initialize handler for instructor-scoped endpoints
+	instructorHandler := handler.NewInstructorHandler(courseInstructorService, enrollmentService, logger)
+
 	app := fiber.New(fiber.Config{
 		AppName:      "academic-service",
 		ErrorHandler: utils.ErrorHandler,
@@ -157,6 +160,7 @@ func run() error {
 		EnrollmentHandler:       enrollmentHandler,
 		CourseHandler:           courseHandler,
 		SemesterHandler:         semesterHandler,
+		InstructorHandler:       instructorHandler,
 		JWTSecretKey:            []byte(cfg.JWT.SecretKey),
 	})
 

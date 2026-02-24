@@ -11,7 +11,7 @@ export default function ProfilePage() {
     const [profile, setProfile] = React.useState<UserProfile | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
-    const { user, isHydrated } = useAuthStore();
+    const { isHydrated } = useAuthStore();
 
     React.useEffect(() => {
         async function fetchProfile() {
@@ -22,6 +22,7 @@ export default function ProfilePage() {
                 const data = await profileApi.getProfile();
                 setProfile(data);
                 setError(null);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } catch (err: any) {
                 console.error("Failed to fetch profile:", err);
                 setError(err.response?.data?.message || "Failed to load profile data. Please try again later.");

@@ -8,8 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/client"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/config"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/handler"
@@ -21,6 +19,8 @@ import (
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/service"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/storage"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/utils"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"go.uber.org/zap"
 )
 
@@ -145,6 +145,7 @@ func run() error {
 	assignmentHandler := handler.NewAssignmentHandler(assignmentService, logger)
 	submissionHandler := handler.NewSubmissionHandler(submissionService, logger)
 	groupHandler := handler.NewGroupHandler(groupService, logger)
+	instructorHandler := handler.NewInstructorHandler(assignmentService, submissionService, academicClient, logger)
 
 	// ── Fiber app ────────────────────────────────────────────────────────────
 	app := fiber.New(fiber.Config{
@@ -167,6 +168,7 @@ func run() error {
 		AssignmentHandler: assignmentHandler,
 		SubmissionHandler: submissionHandler,
 		GroupHandler:      groupHandler,
+		InstructorHandler: instructorHandler,
 		JWTSecretKey:      []byte(cfg.JWT.SecretKey),
 	})
 

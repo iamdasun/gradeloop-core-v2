@@ -1,0 +1,53 @@
+meta {
+  name: Get My Courses
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{INSTRUCTOR_COURSES_URL_V1}}/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Instructor courses fetched successfully");
+    console.log("   Count:", res.body.count);
+    if (res.body.courses && res.body.courses.length > 0) {
+      const first = res.body.courses[0];
+      bru.setEnvVar("COURSE_INSTANCE_ID", first.course_instance_id);
+      console.log("   First course_instance_id saved:", first.course_instance_id);
+    }
+  }
+}
+
+docs {
+  # Get My Courses
+
+  Returns all course instances assigned to the authenticated instructor.
+
+  ## Endpoint
+  GET /api/v1/instructor-courses/me
+
+  ## Authentication
+  Requires Employee, Admin, or Super Admin role.
+
+  ## Response (200 OK)
+  ```json
+  {
+    "courses": [
+      {
+        "course_instance_id": "uuid",
+        "user_id": "uuid",
+        "role": "Lead Instructor"
+      }
+    ],
+    "count": 1
+  }
+  ```
+}

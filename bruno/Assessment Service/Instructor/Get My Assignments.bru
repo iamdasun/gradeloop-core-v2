@@ -1,0 +1,55 @@
+meta {
+  name: Get My Assignments
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{INSTRUCTOR_ASSIGNMENTS_URL_V1}}/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Instructor assignments fetched successfully");
+    console.log("   Count:", res.body.count);
+    if (res.body.assignments && res.body.assignments.length > 0) {
+      const first = res.body.assignments[0];
+      bru.setEnvVar("ASSIGNMENT_ID", first.id);
+      console.log("   First assignment_id saved:", first.id);
+    }
+  }
+}
+
+docs {
+  # Get My Assignments
+
+  Returns all assignments across the instructor's assigned course instances.
+
+  ## Endpoint
+  GET /api/v1/instructor-assignments/me
+
+  ## Authentication
+  Requires Employee, Admin, or Super Admin role.
+
+  ## Response (200 OK)
+  ```json
+  {
+    "assignments": [
+      {
+        "id": "uuid",
+        "course_instance_id": "uuid",
+        "title": "Assignment 1",
+        "is_active": true,
+        "created_at": "2025-01-01T00:00:00Z"
+      }
+    ],
+    "count": 1
+  }
+  ```
+}

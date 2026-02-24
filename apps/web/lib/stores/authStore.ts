@@ -11,7 +11,7 @@ const ROLE_DASHBOARD_MAP: Record<string, string> = {
   admin: '/admin',
   administrator: '/admin',
   superadmin: '/admin',
-  employee: '/admin',
+  employee: '/instructor',
   instructor: '/instructor',
   teacher: '/instructor',
   student: '/student',

@@ -63,6 +63,9 @@ func AuthMiddleware(secretKey []byte) fiber.Handler {
 		c.Locals("role_name", claims.RoleName)
 		c.Locals("permissions", claims.Permissions)
 
+		fmt.Printf("[DEBUG AuthMiddleware] path=%s role_name='%s' username='%s'\n",
+			c.Path(), claims.RoleName, claims.Username)
+
 		return c.Next()
 	}
 }

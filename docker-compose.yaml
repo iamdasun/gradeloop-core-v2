@@ -226,7 +226,7 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/departments`) || PathPrefix(`/api/v1/faculties`) || PathPrefix(`/api/v1/degrees`) || PathPrefix(`/api/v1/specializations`) || PathPrefix(`/api/v1/batches`) || PathPrefix(`/api/v1/batch-members`) || PathPrefix(`/api/v1/course-instances`) || PathPrefix(`/api/v1/course-instructors`) || PathPrefix(`/api/v1/enrollments`) || PathPrefix(`/api/v1/courses`) || PathPrefix(`/api/v1/semesters`) || PathPrefix(`/api/v1/debug`)"
+      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/departments`) || PathPrefix(`/api/v1/faculties`) || PathPrefix(`/api/v1/degrees`) || PathPrefix(`/api/v1/specializations`) || PathPrefix(`/api/v1/batches`) || PathPrefix(`/api/v1/batch-members`) || PathPrefix(`/api/v1/course-instances`) || PathPrefix(`/api/v1/course-instructors`) || PathPrefix(`/api/v1/enrollments`) || PathPrefix(`/api/v1/courses`) || PathPrefix(`/api/v1/semesters`) || PathPrefix(`/api/v1/instructor-courses`) || PathPrefix(`/api/v1/debug`)"
       - "traefik.http.routers.academic.priority=100"
       - "traefik.http.routers.academic.entrypoints=web"
       - "traefik.http.services.academic-service.loadbalancer.server.port=8083"
@@ -293,8 +293,8 @@ services:
       - dev-assessment
     labels:
       - "traefik.enable=true"
-      # Route assignments, submissions, and groups through the assessment service
-      - "traefik.http.routers.assessment.rule=PathPrefix(`/api/v1/assignments`) || PathPrefix(`/api/v1/submissions`) || PathPrefix(`/api/v1/groups`)"
+      # Route assignments, submissions, groups, and instructor-scoped endpoints through the assessment service
+      - "traefik.http.routers.assessment.rule=PathPrefix(`/api/v1/assignments`) || PathPrefix(`/api/v1/submissions`) || PathPrefix(`/api/v1/groups`) || PathPrefix(`/api/v1/instructor-assignments`) || PathPrefix(`/api/v1/instructor-submissions`)"
       - "traefik.http.routers.assessment.priority=100"
       - "traefik.http.routers.assessment.entrypoints=web"
       - "traefik.http.services.assessment-service.loadbalancer.server.port=8084"

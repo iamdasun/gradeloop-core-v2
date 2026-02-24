@@ -18,6 +18,8 @@ import {
   Award,
   Landmark,
   ChevronDown,
+  ClipboardList,
+  Users2,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { useLogoutMutation } from "@/lib/hooks/useAuthMutation";
@@ -65,7 +67,7 @@ interface NavGroup {
 
 type NavItem = NavLink | NavGroup;
 
-const navItems: NavItem[] = [
+const adminNavItems: NavItem[] = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { title: "Users", href: "/admin/users", icon: Users },
   {
@@ -78,6 +80,9 @@ const navItems: NavItem[] = [
       { title: "Departments", href: "/admin/academics/departments", icon: Building2 },
       { title: "Degrees", href: "/admin/academics/degrees", icon: Award },
       { title: "Courses", href: "/admin/academics/courses", icon: BookOpen },
+      { title: "Semesters", href: "/admin/academics/semesters", icon: Calendar },
+      { title: "Groups", href: "/admin/academics/groups", icon: Users2 },
+      { title: "Enrollment", href: "/admin/academics/enrollment", icon: ClipboardList },
     ],
   },
   { title: "Assignments", href: "/admin/assignments", icon: FileText },
@@ -85,6 +90,14 @@ const navItems: NavItem[] = [
   { title: "Analytics", href: "/admin/analytics", icon: BarChart3 },
   { title: "Calendar", href: "/admin/calendar", icon: Calendar },
   { title: "Settings", href: "/admin/settings", icon: Settings },
+];
+
+const instructorNavItems: NavItem[] = [
+  { title: "Dashboard", href: "/instructor", icon: LayoutDashboard },
+  { title: "My Courses", href: "/instructor/courses", icon: BookOpen },
+  { title: "Assessments", href: "/instructor/assessments", icon: FileText },
+  { title: "Students", href: "/instructor/students", icon: GraduationCap },
+  { title: "Settings", href: "/instructor/settings", icon: Settings },
 ];
 
 interface MobileSidebarProps {
@@ -96,6 +109,10 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
+
+  const isEmployee = user?.role_name?.toLowerCase().trim() === "employee";
+  const navItems = isEmployee ? instructorNavItems : adminNavItems;
+  const homeHref = isEmployee ? "/instructor" : "/admin";
 
   const displayName = user?.full_name || user?.username || '—';
   const initials = user?.full_name
@@ -130,7 +147,7 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
           {/* Logo Area */}
           <SheetHeader className="h-16 flex-row items-center border-b bg-zinc-50/50 dark:bg-zinc-900/50 px-4">
             <Link
-              href="/admin"
+              href={homeHref}
               className="flex items-center gap-2"
               onClick={() => onOpenChange(false)}
             >

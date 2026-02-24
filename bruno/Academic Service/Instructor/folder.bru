@@ -1,0 +1,20 @@
+meta {
+  name: Instructor
+}
+
+docs {
+  # Instructor-Scoped Academic Endpoints
+
+  These endpoints allow instructors (Employee role) to access their assigned
+  course instances, enrolled students, and co-instructors.
+
+  ## Authentication
+  Requires a valid Bearer token. Caller must have Employee, Admin, or Super Admin role.
+
+  ## Available Endpoints
+  | Method | Path                                       | Description                    |
+  |--------|--------------------------------------------|--------------------------------|
+  | GET    | /api/v1/instructor-courses/me              | My assigned course instances   |
+  | GET    | /api/v1/instructor-courses/:id/students    | Enrolled students for a course |
+  | GET    | /api/v1/instructor-courses/:id/instructors | Co-instructors for a course    |
+}

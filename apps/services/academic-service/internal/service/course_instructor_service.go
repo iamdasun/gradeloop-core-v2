@@ -16,6 +16,7 @@ type CourseInstructorService interface {
 	AssignInstructor(req *dto.AssignInstructorRequest, username, ipAddress, userAgent string) (*domain.CourseInstructor, error)
 	GetInstructors(instanceID uuid.UUID) ([]domain.CourseInstructor, error)
 	RemoveInstructor(instanceID, userID uuid.UUID, username, ipAddress, userAgent string) error
+	GetMyInstances(userID uuid.UUID) ([]domain.CourseInstructor, error)
 }
 
 // courseInstructorService is the concrete implementation.
@@ -195,4 +196,22 @@ func (s *courseInstructorService) RemoveInstructor(
 		zap.String("user_id", userID.String()),
 	)
 	return nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GetMyInstances
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (s *courseInstructorService) GetMyInstances(userID uuid.UUID) ([]domain.CourseInstructor, error) {
+	if userID == uuid.Nil {
+		return nil, utils.ErrBadRequest("user_id is required")
+	}
+
+	instructors, err := s.courseInstructorRepo.GetByUserID(userID)
+	if err != nil {
+		s.logger.Error("failed to list instructor assignments", zap.Error(err))
+		return nil, utils.ErrInternal("failed to list instructor assignments", err)
+	}
+
+	return instructors, nil
 }

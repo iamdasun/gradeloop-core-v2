@@ -469,3 +469,28 @@ export const enrollmentsApi = {
     return data;
   },
 };
+
+// ── Instructor Courses ────────────────────────────────────────────────────────
+
+export const instructorCoursesApi = {
+  listMyCourses: async (): Promise<CourseInstructor[]> => {
+    const { data } = await axiosInstance.get('/instructor-courses/me');
+    if (Array.isArray(data)) return data as CourseInstructor[];
+    if (Array.isArray(data?.courses)) return data.courses as CourseInstructor[];
+    return [];
+  },
+
+  listMyStudents: async (instanceId: string): Promise<Enrollment[]> => {
+    const { data } = await axiosInstance.get(`/instructor-courses/${instanceId}/students`);
+    if (Array.isArray(data)) return data as Enrollment[];
+    if (Array.isArray(data?.enrollments)) return data.enrollments as Enrollment[];
+    return [];
+  },
+
+  listMyInstructors: async (instanceId: string): Promise<CourseInstructor[]> => {
+    const { data } = await axiosInstance.get(`/instructor-courses/${instanceId}/instructors`);
+    if (Array.isArray(data)) return data as CourseInstructor[];
+    if (Array.isArray(data?.instructors)) return data.instructors as CourseInstructor[];
+    return [];
+  },
+};

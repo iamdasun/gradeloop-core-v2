@@ -67,7 +67,7 @@ type NavItem = NavLink | NavGroup;
 
 // ── Nav configuration ─────────────────────────────────────────────────────────
 
-const navItems: NavItem[] = [
+const adminNavItems: NavItem[] = [
   {
     title: "Dashboard",
     href: "/admin",
@@ -120,6 +120,34 @@ const navItems: NavItem[] = [
   },
 ];
 
+const instructorNavItems: NavItem[] = [
+  {
+    title: "Dashboard",
+    href: "/instructor",
+    icon: LayoutDashboard,
+  },
+  {
+    title: "My Courses",
+    href: "/instructor/courses",
+    icon: BookOpen,
+  },
+  {
+    title: "Assessments",
+    href: "/instructor/assessments",
+    icon: FileText,
+  },
+  {
+    title: "Students",
+    href: "/instructor/students",
+    icon: GraduationCap,
+  },
+  {
+    title: "Settings",
+    href: "/instructor/settings",
+    icon: Settings,
+  },
+];
+
 interface SidebarProps {
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
@@ -129,6 +157,10 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
+
+  const isEmployee = user?.role_name?.toLowerCase().trim() === "employee";
+  const navItems = isEmployee ? instructorNavItems : adminNavItems;
+  const homeHref = isEmployee ? "/instructor" : "/admin";
 
   const displayName = user?.full_name || user?.username || '—';
   const initials = user?.full_name
@@ -167,7 +199,7 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
       {/* Logo Area */}
       <div className="flex h-16 items-center border-b bg-zinc-50/50 dark:bg-zinc-900/50 px-4">
         {!collapsed ? (
-          <Link href="/admin" className="flex items-center gap-2">
+          <Link href={homeHref} className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-900 dark:bg-zinc-50">
               <GraduationCap className="h-5 w-5 text-zinc-50 dark:text-zinc-900" />
             </div>

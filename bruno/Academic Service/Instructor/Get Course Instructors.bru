@@ -1,0 +1,49 @@
+meta {
+  name: Get Course Instructors
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{INSTRUCTOR_COURSES_URL_V1}}/{{COURSE_INSTANCE_ID}}/instructors
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Co-instructors fetched successfully");
+    console.log("   Count:", res.body.count);
+  }
+}
+
+docs {
+  # Get Course Instructors
+
+  Returns all instructors assigned to a course instance (co-instructors).
+
+  ## Endpoint
+  GET /api/v1/instructor-courses/:id/instructors
+
+  ## Authentication
+  Requires Employee, Admin, or Super Admin role.
+  The instructor must be assigned to the specified course instance.
+
+  ## Response (200 OK)
+  ```json
+  {
+    "instructors": [
+      {
+        "course_instance_id": "uuid",
+        "user_id": "uuid",
+        "role": "Instructor"
+      }
+    ],
+    "count": 1
+  }
+  ```
+}
