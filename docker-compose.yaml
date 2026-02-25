@@ -38,13 +38,6 @@ services:
     networks:
       - gradeloop-network
 
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U cipas -d cipas_db" ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
     logging:
       driver: "json-file"
       options:
@@ -73,11 +66,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - gradeloop-network
-    healthcheck:
-      test: [ "CMD", "traefik", "healthcheck" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+  # =============================================================================
 
   # =============================================================================
   # IAM Service (Go Fiber)
@@ -144,18 +133,10 @@ services:
       - "8081"
 
     depends_on:
-      minio:
-        condition: service_healthy
+      - minio
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
 
     logging:
       driver: "json-file"
@@ -206,10 +187,8 @@ services:
       - "8082"
 
     depends_on:
-      minio:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - minio
+      - rabbitmq
 
     networks:
       - gradeloop-network
@@ -269,18 +248,10 @@ services:
       - "8083"
 
     depends_on:
-      iam-service:
-        condition: service_healthy
+      - iam-service
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8083/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
 
     logging:
       driver: "json-file"
@@ -347,22 +318,12 @@ services:
       - "8084"
 
     depends_on:
-      iam-service:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - iam-service
+      - minio
+      - rabbitmq
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8084/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
 
     logging:
       driver: "json-file"
@@ -442,24 +403,10 @@ services:
       - "8085"
 
     depends_on:
-      cipas-postgres:
-        condition: service_healthy
+      - cipas-postgres
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      # Uses the /ready endpoint (readiness probe) which checks both the
-      # process liveness AND the DB connectivity.  If the DB is unreachable
-      # at container start, this probe will fail and Compose will restart.
-      test: [ "CMD", "curl", "-f", "http://localhost:8085/api/v1/cipas/ready" ]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      # Allow 60s for the service to start: poetry env activate + tree-sitter
-      # grammar loading + ProcessPoolExecutor worker warm-up take ~10-30s
-      # on first cold start.
-      start_period: 60s
 
     logging:
       driver: "json-file"
@@ -492,13 +439,6 @@ services:
     networks:
       - gradeloop-network
 
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
     logging:
       driver: "json-file"
       options:
@@ -524,13 +464,6 @@ services:
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
 
     logging:
       driver: "json-file"
