@@ -392,6 +392,11 @@ services:
     env_file:
       - .env
 
+    ports:
+      # Expose CIPAS service on port 8085 for direct access (Bruno, direct API calls)
+      # Also accessible via Traefik on port 8000 at /api/v1/cipas/*
+      - "8085:8085"
+
     environment:
       # ── Runtime ──────────────────────────────────────────────────────────────
       - CIPAS_ENV=${CIPAS_ENV:-development}
