@@ -15,6 +15,7 @@ import {
   Users,
   UserCheck,
   UserX,
+  FileUp,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CreateUserDialog } from "@/components/admin/create-user-dialog";
+import { BulkImportDialog } from "@/components/admin/bulk-import-dialog";
 import { EditUserDialog } from "@/components/admin/edit-user-dialog";
 import { UserDetailsDialog } from "@/components/admin/user-details-dialog";
 import { RevokeSessionsDialog } from "@/components/admin/revoke-sessions-dialog";
@@ -127,6 +129,7 @@ export default function UsersPage() {
 
   // ── Dialog state ────────────────────────────────────────────────────────
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(false);
   const [editUser, setEditUser] = React.useState<UserListItem | null>(null);
   const [detailsUser, setDetailsUser] = React.useState<UserListItem | null>(
     null,
@@ -217,10 +220,23 @@ export default function UsersPage() {
             Manage accounts, roles, and access.
           </p>
         </div>
-        <Button className="gap-2 shadow-sm" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Add User
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="gap-2 shadow-sm"
+            onClick={() => setImportOpen(true)}
+          >
+            <FileUp className="h-4 w-4" />
+            Bulk Import
+          </Button>
+          <Button
+            className="gap-2 shadow-sm"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Add User
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -507,6 +523,11 @@ export default function UsersPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSuccess={handleUserCreated}
+      />
+      <BulkImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onSuccess={fetchUsers}
       />
       <EditUserDialog
         user={editUser}

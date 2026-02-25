@@ -14,8 +14,9 @@
 
 SHELL := /bin/sh
 ROOT := $(shell pwd)
-GO_IMAGE ?= golang:1.21
-GO_BUILD_TARGET ?= cmd/main.go
+GO_IMAGE ?= golang:1.26
+GO_BUILD_TARGET ?= ./cmd/main.go
+GO_BUILD_ENV := GOTOOLCHAIN=auto
 OUT_DIR ?= bin
 
 # Discover service directories under apps/services (takes the immediate children)
@@ -86,20 +87,32 @@ build:
 	@printf " -> ensuring output directory exists: apps/services/%s/$(OUT_DIR)\n" "$(SERVICE)"
 	@mkdir -p "apps/services/$(SERVICE)/$(OUT_DIR)"
 	@echo " -> checking for host 'go' tool..."
-	@if command -v go >/dev/null 2>&1; then \
+	@entry_point=$(GO_BUILD_TARGET); \
+	if [ ! -f "apps/services/$(SERVICE)/$$entry_point" ]; then \
+		echo " -> $(GO_BUILD_TARGET) not found, searching in cmd/..."; \
+		found=$$(find "apps/services/$(SERVICE)/cmd" -name "main.go" | head -n 1); \
+		if [ -n "$$found" ]; then \
+			entry_point="./$${found#apps/services/$(SERVICE)/}"; \
+			echo " -> found entry point: $$entry_point"; \
+		else \
+			echo "ERROR: could not find main.go in apps/services/$(SERVICE)/cmd"; \
+			exit 1; \
+		fi; \
+	fi; \
+	if command -v go >/dev/null 2>&1; then \
 		echo " -> attempting build with host go"; \
-		cd "apps/services/$(SERVICE)" && go build -o "$(OUT_DIR)/$(SERVICE)" "$(GO_BUILD_TARGET)"; \
+		cd "apps/services/$(SERVICE)" && $(GO_BUILD_ENV) go build -o "$(OUT_DIR)/$(SERVICE)" "$$entry_point"; \
 		exit_code=$$?; \
 		if [ $$exit_code -ne 0 ]; then \
 			echo " -> host 'go' build failed (exit $$exit_code). Falling back to Docker ($(GO_IMAGE))..."; \
 			docker pull $(GO_IMAGE) >/dev/null || true; \
-			docker run --rm -v "$(ROOT)":/work -w /work/apps/services/$(SERVICE) $(GO_IMAGE) sh -c 'mkdir -p "$(OUT_DIR)" && go build -o "$(OUT_DIR)/$(SERVICE)" "$(GO_BUILD_TARGET)"'; \
+			docker run --rm -v "$(ROOT)":/work -w /work/apps/services/$(SERVICE) $(GO_IMAGE) sh -c 'mkdir -p "$(OUT_DIR)" && $(GO_BUILD_ENV) go build -o "$(OUT_DIR)/$(SERVICE)" "'"$$entry_point"'"'; \
 			exit_code=$$?; \
 		fi; \
 	else \
 		echo " -> host 'go' not found, building inside Docker ($(GO_IMAGE))"; \
 		docker pull $(GO_IMAGE) >/dev/null || true; \
-		docker run --rm -v "$(ROOT)":/work -w /work/apps/services/$(SERVICE) $(GO_IMAGE) sh -c 'mkdir -p "$(OUT_DIR)" && go build -o "$(OUT_DIR)/$(SERVICE)" "$(GO_BUILD_TARGET)"'; \
+		docker run --rm -v "$(ROOT)":/work -w /work/apps/services/$(SERVICE) $(GO_IMAGE) sh -c 'mkdir -p "$(OUT_DIR)" && $(GO_BUILD_ENV) go build -o "$(OUT_DIR)/$(SERVICE)" "'"$$entry_point"'"'; \
 		exit_code=$$?; \
 	fi; \
 	if [ $$exit_code -ne 0 ]; then \
