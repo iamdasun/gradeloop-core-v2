@@ -99,17 +99,29 @@ Structurally identical code snippets where identifiers, literals, types, or vari
 ### Type-3: Near-Miss/Modified Clones
 Clones with further modifications, such as added, removed, or changed statements, alongside identifier and literal changes.
 
-- **Detection Method:** **Phase Two** of the Automatic Cascade using TOMA (Token-based) approach:
-  - Token Frequency Vector with cosine similarity
-  - Token Sequence Stream for structural comparison
-  - Random Forest model trained on 6 core syntactic features:
+- **Detection Method:** **Phase Two** of the Automatic Cascade using **Hybrid Syntactic + Structural** approach:
+  - **6 Syntactic Features** (TOMA-based):
     - Jaccard Similarity (Set overlap)
     - Dice Coefficient (Weighted overlap)
     - Levenshtein Distance & Ratio (Edit distance)
     - Jaro & Jaro-Winkler Similarity (Character matching)
+  - **4 Structural AST Features**:
+    - Structural Jaccard Similarity (intersection over union of AST node types)
+    - AST Depth Difference (normalized maximum tree depth difference)
+    - AST Node Count Difference (normalized complexity difference)
+    - AST Node Count Ratio (size similarity indicator)
+  - **38 Node Type Distribution Features** (optional, per Java AST node type):
+    - Control flow: `if_statement`, `for_statement`, `while_statement`, `switch_statement`, `try_statement`, etc.
+    - Declarations: `method_declaration`, `field_declaration`, `local_variable_declaration`
+    - Expressions: `binary_expression`, `assignment_expression`, `method_invocation`, `ternary_expression`
+    - Each feature measures normalized difference in node type frequencies
+  - **Random Forest model** trained on **10 features** (basic) or **48 features** (with node types)
 - **Confidence Score:** Random Forest probability
 - **Normalization Level:** `Token-based`
-- **Performance:** Achieves an expected F1 score of 90%+.
+- **Performance:** Expected F1 score improvement from 54% recall to 75%+ with structural features
+- **Training Script:** `train_model.py` with `--include-node-types` flag for full 48-feature model
+- **Model File:** `type3_hybrid_rf.pkl`
+- **Location:** `apps/services/cipas-services/cipas-syntactics/clone_detection/models/`
 
 ### Type-4: Semantic Clones
 Code snippets that perform the same computational function but implement different syntactic structures or algorithms.
@@ -262,10 +274,29 @@ The clone detection system is now deployed as two independent microservices:
 
 **CIPAS Syntactics (Random Forest):**
 - Highly parallelized (`n_jobs=-1`)
-- 6 syntactic features (Jaccard, Dice, Levenshtein distance/ratio, Jaro, Jaro-Winkler)
+- **Hybrid Feature Set:**
+  - **6 Syntactic Features:** Jaccard, Dice, Levenshtein distance/ratio, Jaro, Jaro-Winkler
+  - **4 Structural Features:** AST Jaccard, AST Depth Diff, AST Node Count Diff, AST Node Count Ratio
+  - **38 Node Type Distribution Features:** Per-node-type frequency differences (optional)
+  - **Total:** 10 features (basic) or 48 features (full model with node types)
+- **Explainability (GRADELOOP-83):** Feature names saved with model for importance visualization
+- **Parsing Safety:** Graceful handling of malformed student code with fallback to zero features
 - ~65x faster than neural approaches
-- Model file: `type3_rf.pkl`
-- Location: `apps/services/cipas-services/cipas-syntactics/models/`
+- Model file: `type3_hybrid_rf.pkl`
+- Location: `apps/services/cipas-services/cipas-syntactics/clone_detection/models/`
+- Training command:
+  ```bash
+  # Full model with node types (48 features)
+  poetry run python train_model.py \
+      --dataset /path/to/dataset \
+      --language java \
+      --model-name type3_hybrid_rf.pkl
+  
+  # Basic model without node types (10 features)
+  poetry run python train_model.py \
+      --dataset /path/to/dataset \
+      --no-node-types
+  ```
 
 **CIPAS Semantics (XGBoost):**
 - Optimized for high-dimensional feature spaces (204 fused features per pair)
@@ -281,13 +312,14 @@ The clone detection system is now deployed as two independent microservices:
 1. **Type-2 Logic Leak Prevention:** Prevents misclassification of structurally modified code as Type-2 by enforcing a token count delta constraint (≤5%)
 2. **Automatic Cascade:** No pipeline selection required - the system automatically determines the appropriate clone type
 3. **Early Exit Optimization:** Confirmed clones at any stage immediately return, skipping subsequent phases
-4. **102+ Semantic Features:** Comprehensive feature extraction for Type-4 detection including CST frequencies, PDG-like relationships, structural depth, type signatures, and API fingerprinting
+4. **Hybrid Syntactic + Structural Features:** 48 features combining TOMA metrics with AST-based structural analysis for improved Type-3 recall (54% → 75%+)
+5. **102+ Semantic Features:** Comprehensive feature extraction for Type-4 detection including CST frequencies, PDG-like relationships, structural depth, type signatures, and API fingerprinting
 
 | Phase | Method | Features | Threshold | Clone Type | Confidence | Early Exit |
 |-------|--------|----------|-----------|------------|------------|------------|
 | Pass A | Literal comparison | Normalized CST tokens | Jaccard ≥ 0.98, Lev ≥ 0.98 | Type-1 | 1.0 | ✓ |
 | Pass B | Blinded comparison | Blinded CST tokens | max(J, L) ≥ 0.95 **AND** δ ≤ 5% | Type-2 | ~0.95-0.99 | ✓ |
-| Phase Two | TOMA + Random Forest | 6 syntactic features | RF probability | Type-3 | RF score | ✓ |
+| Phase Two | Hybrid + Random Forest | 48 features (6 syntactic + 4 structural + 38 node type) | RF probability | Type-3 | RF score | ✓ |
 | Phase Three | XGBoost + Semantic Features | 204 fused features (102 per code) | XGB probability | Type-4 | XGB score | ✓ |
 
 **Optimization:** The cascade automatically breaks when a clone type is confirmed, reducing computational overhead by up to 80% for Type-1/Type-2 clones. Type-4 detection uses the full 204-feature vector only when earlier phases fail to confirm a clone.
@@ -307,19 +339,31 @@ After migration, each service has its own dedicated API endpoints:
 {
   "is_clone": true,
   "confidence": 0.955,
-  "clone_type": "Type-2",
+  "clone_type": "Type-3",
   "pipeline_used": "Syntactic Cascade (Type-1/2/3)",
-  "normalization_level": "Blinded",
+  "normalization_level": "Token-based",
   "syntactic_features": {
-    "jaccard_similarity": 0.96,
-    "dice_coefficient": 0.98,
-    "levenshtein_distance": 2,
-    "levenshtein_ratio": 0.97,
-    "jaro_similarity": 0.98,
-    "jaro_winkler_similarity": 0.99
+    "jaccard_similarity": 0.85,
+    "dice_coefficient": 0.92,
+    "levenshtein_distance": 15,
+    "levenshtein_ratio": 0.88,
+    "jaro_similarity": 0.91,
+    "jaro_winkler_similarity": 0.94
   },
-  "tokens1_count": 14,
-  "tokens2_count": 14
+  "structural_features": {
+    "ast_jaccard": 0.92,
+    "ast_depth_diff": 0.95,
+    "ast_node_count_diff": 0.88,
+    "ast_node_count_ratio": 0.90
+  },
+  "node_type_features": {
+    "if_statement_diff": 1.0,
+    "for_statement_diff": 0.85,
+    "method_invocation_diff": 0.92
+  },
+  "tokens1_count": 120,
+  "tokens2_count": 128,
+  "feature_importance_available": true
 }
 ```
 
@@ -348,3 +392,32 @@ After migration, each service has its own dedicated API endpoints:
 **Pipeline Used Values:**
 - `Syntactic Cascade (Type-1/2/3)` - CIPAS Syntactics service
 - `Semantic XGBoost (Type-4)` - CIPAS Semantics service
+
+**Feature Importance (GRADELOOP-83):**
+
+The hybrid model provides explainability through feature importance analysis:
+
+```json
+{
+  "feature_importance": [
+    {"feature": "feat_jaro_similarity", "importance": 0.082},
+    {"feature": "feat_ast_jaccard", "importance": 0.076},
+    {"feature": "feat_dice_coefficient", "importance": 0.071},
+    {"feature": "feat_node_if_statement_diff", "importance": 0.065},
+    {"feature": "feat_node_for_statement_diff", "importance": 0.058},
+    {"feature": "feat_levenshtein_ratio", "importance": 0.054},
+    {"feature": "feat_ast_depth_diff", "importance": 0.049},
+    {"feature": "feat_node_method_invocation_diff", "importance": 0.045}
+  ],
+  "total_features": 48,
+  "model_type": "Random Forest",
+  "n_estimators": 100
+}
+```
+
+**Top Feature Categories:**
+1. **Syntactic Similarity** (6 features): Jaccard, Dice, Levenshtein, Jaro, Jaro-Winkler
+2. **Structural AST** (4 features): AST Jaccard, Depth Diff, Node Count Diff, Node Count Ratio
+3. **Node Type Distribution** (38 features): Per-node-type frequency differences
+
+**Instructor Dashboard Integration:** Feature importances can be visualized to show which code characteristics contributed most to clone detection decisions.

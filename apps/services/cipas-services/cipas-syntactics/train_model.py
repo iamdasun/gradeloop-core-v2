@@ -1,8 +1,12 @@
 """
-Training Script for Syntactic Clone Detection Model (Type-3).
+Training Script for Syntactic + Structural Clone Detection Model (Type-3).
 
 This script trains a Random Forest classifier on labeled code pair datasets.
 Supports TOMA dataset format (CSV with function IDs) and JSON format (with inline code).
+
+Uses hybrid features:
+- 6 syntactic similarity metrics (Jaccard, Dice, Levenshtein, Jaro, Jaro-Winkler)
+- 4+ structural AST features (Structural Jaccard, AST Depth, Node Count, Node Type Distribution)
 
 Usage:
     # Train with TOMA dataset
@@ -10,14 +14,16 @@ Usage:
         --dataset /path/to/toma-dataset \
         --dataset-format toma \
         --language java \
-        --model-name type3_rf.pkl
+        --model-name type3_hybrid_rf.pkl \
+        --include-node-types
 
     # Train with JSON dataset
     poetry run python train_model.py \
         --dataset /path/to/dataset.json \
         --dataset-format json \
         --language java \
-        --model-name type3_rf.pkl
+        --model-name type3_hybrid_rf.pkl \
+        --include-node-types
 """
 
 import json
@@ -184,56 +190,61 @@ def extract_features_for_dataset(
     code1_list: list[str],
     code2_list: list[str],
     language: str = "java",
-) -> np.ndarray:
+    include_node_types: bool = True,
+) -> tuple[np.ndarray, list[str]]:
     """
-    Extract syntactic features for all code pairs.
+    Extract hybrid syntactic + structural features for all code pairs.
 
     Args:
         code1_list: List of first code snippets
         code2_list: List of second code snippets
         language: Programming language
+        include_node_types: Whether to include node type distribution features
 
     Returns:
-        Feature matrix of shape (n_pairs, 6)
+        Tuple of (feature matrix, feature names list)
     """
-    tokenizer = TreeSitterTokenizer()
-    extractor = SyntacticFeatureExtractor()
+    extractor = SyntacticFeatureExtractor(
+        language=language, include_node_types=include_node_types
+    )
     features = []
 
     for code1, code2 in tqdm(
-        zip(code1_list, code2_list), total=len(code1_list), desc="Extracting features"
+        zip(code1_list, code2_list),
+        total=len(code1_list),
+        desc="Extracting hybrid features",
     ):
         try:
-            tokens1 = tokenizer.tokenize(code1, language, abstract_identifiers=True)
-            tokens2 = tokenizer.tokenize(code2, language, abstract_identifiers=True)
-            feat = extractor.extract_features(tokens1, tokens2)
+            feat = extractor.extract_features_from_code(code1, code2, language)
             features.append(feat)
         except Exception as e:
             logger.warning(f"Failed to extract features: {e}")
-            features.append(np.zeros(6))
+            # Create zero features as fallback
+            features.append(np.zeros(len(extractor.feature_names)))
 
-    return np.array(features)
+    return np.array(features), extractor.get_feature_names()
 
 
 def train_syntactic_model(
     dataset_path: str,
     dataset_format: str = "toma",
     language: str = "java",
-    model_name: str = "type3_rf.pkl",
+    model_name: str = "type3_hybrid_rf.pkl",
     test_size: float = 0.2,
     cross_validation: bool = True,
     n_estimators: int = 100,
     max_depth: int = 10,
     sample_size: int | None = None,
     clone_types: list[int] | None = None,
+    include_node_types: bool = True,
 ) -> dict:
     """
-    Train the syntactic clone detection model.
+    Train the hybrid syntactic + structural clone detection model.
 
     Args:
         dataset_path: Path to labeled dataset (directory for TOMA, file for JSON)
         dataset_format: Dataset format ('toma' or 'json')
-        language: Programming language of code snippets
+        language: Programming language
         model_name: Name for saved model
         test_size: Fraction of data for testing
         cross_validation: Whether to use cross-validation
@@ -241,6 +252,7 @@ def train_syntactic_model(
         max_depth: Maximum tree depth
         sample_size: Optional sample size per class (for TOMA dataset)
         clone_types: Optional list of clone types to include (for TOMA dataset)
+        include_node_types: Whether to include node type distribution features
 
     Returns:
         Training metrics dictionary
@@ -261,16 +273,21 @@ def train_syntactic_model(
         f"Class distribution: {sum(labels)} clones, {len(labels) - sum(labels)} non-clones"
     )
 
-    logger.info("Extracting syntactic features...")
-    X = extract_features_for_dataset(code1_list, code2_list, language)
+    logger.info("Extracting hybrid syntactic + structural features...")
+    X, feature_names = extract_features_for_dataset(
+        code1_list, code2_list, language, include_node_types
+    )
     y = np.array(labels)
 
     logger.info(f"Feature matrix shape: {X.shape}")
+    logger.info(f"Number of features: {len(feature_names)}")
+    logger.info(f"Features: {feature_names}")
 
-    # Create and train classifier
+    # Create and train classifier with feature names
     classifier = SyntacticClassifier(
         n_estimators=n_estimators,
         max_depth=max_depth,
+        feature_names=feature_names,
     )
 
     logger.info("Training Random Forest classifier...")
@@ -282,6 +299,14 @@ def train_syntactic_model(
     model_path = classifier.save(model_name)
     logger.info(f"Model saved to {model_path}")
 
+    # Log feature importances
+    logger.info("\n" + "=" * 60)
+    logger.info("Feature Importances (Top 20):")
+    logger.info("=" * 60)
+    importance_sorted = classifier.get_feature_importance_sorted()
+    for feat_name, importance in importance_sorted[:20]:
+        logger.info(f"  {feat_name}: {importance:.4f}")
+
     return metrics
 
 
@@ -289,7 +314,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Train syntactic clone detection model"
+        description="Train hybrid syntactic + structural clone detection model"
     )
     parser.add_argument(
         "--dataset",
@@ -314,7 +339,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model-name",
         type=str,
-        default="type3_rf.pkl",
+        default="type3_hybrid_rf.pkl",
         help="Output model filename",
     )
     parser.add_argument(
@@ -353,6 +378,11 @@ if __name__ == "__main__":
         default=None,
         help="Clone types to include (1-5, for TOMA dataset, optional)",
     )
+    parser.add_argument(
+        "--no-node-types",
+        action="store_true",
+        help="Disable node type distribution features (use only 10 basic features)",
+    )
 
     args = parser.parse_args()
 
@@ -367,6 +397,7 @@ if __name__ == "__main__":
         max_depth=args.max_depth,
         sample_size=args.sample_size,
         clone_types=args.clone_types,
+        include_node_types=not args.no_node_types,
     )
 
     logger.info("\n" + "=" * 60)

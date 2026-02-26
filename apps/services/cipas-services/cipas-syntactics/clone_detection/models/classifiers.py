@@ -8,7 +8,7 @@ This module implements:
 
 import pickle
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
@@ -34,6 +34,7 @@ class SyntacticClassifier:
         max_depth: int = 10,
         min_samples_split: int = 2,
         random_state: int = 42,
+        feature_names: Optional[list[str]] = None,
     ):
         """
         Initialize the Random Forest classifier.
@@ -43,6 +44,7 @@ class SyntacticClassifier:
             max_depth: Maximum depth of each tree
             min_samples_split: Minimum samples required to split a node
             random_state: Random seed for reproducibility
+            feature_names: Optional list of feature names for explainability
         """
         self.model = RandomForestClassifier(
             n_estimators=n_estimators,
@@ -52,7 +54,7 @@ class SyntacticClassifier:
             n_jobs=-1,  # Use all CPU cores
         )
         self.is_trained = False
-        self.feature_names = [
+        self.feature_names = feature_names or [
             "jaccard_similarity",
             "dice_coefficient",
             "levenshtein_distance",
@@ -199,6 +201,40 @@ class SyntacticClassifier:
         importances = self.model.feature_importances_
 
         return dict(zip(self.feature_names, importances))
+
+    def get_feature_importance_sorted(self) -> list[tuple[str, float]]:
+        """
+        Get feature importance scores sorted by importance (descending).
+
+        Useful for explainability and feature importance visualization (GRADELOOP-83).
+
+        Returns:
+            List of (feature_name, importance) tuples sorted by importance
+        """
+        if not self.is_trained:
+            raise RuntimeError("Model must be trained to get feature importance")
+
+        importances = self.model.feature_importances_
+        importance_dict = list(zip(self.feature_names, importances))
+        return sorted(importance_dict, key=lambda x: x[1], reverse=True)
+
+    def get_feature_importance_dataframe(self):
+        """
+        Get feature importance as a pandas DataFrame.
+
+        Useful for visualization and reporting (GRADELOOP-83).
+
+        Returns:
+            pandas DataFrame with feature names and importance scores
+        """
+        if not self.is_trained:
+            raise RuntimeError("Model must be trained to get feature importance")
+
+        import pandas as pd
+
+        importances = self.model.feature_importances_
+        df = pd.DataFrame({"feature": self.feature_names, "importance": importances})
+        return df.sort_values("importance", ascending=False)
 
 
 def create_syntactic_classifier() -> SyntacticClassifier:
