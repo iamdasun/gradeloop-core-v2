@@ -1,0 +1,35 @@
+meta {
+  name: Compare Batch
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{CIPAS_URL_V1}}/compare/batch
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "pairs": [
+      {
+        "code1": "int x = 1;",
+        "code2": "int y = 1;",
+        "language": "java",
+        "pipeline": "syntactic"
+      },
+      {
+        "code1": "return a + b;",
+        "code2": "return a - b;",
+        "language": "java",
+        "pipeline": "syntactic"
+      }
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

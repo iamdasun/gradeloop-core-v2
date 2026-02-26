@@ -210,6 +210,54 @@ scripts/thresholds.json
 2. **Review results**: Check `EVALUATION_RESULTS.md`
 3. **Calibrate for your data**: `python scripts/calibrate_thresholds.py`
 4. **Integrate with your LMS**: See `CLONE_DETECTION_README.md`
+5. **Use the REST API**: See `API_DOCUMENTATION.md`
+
+---
+
+## REST API Usage
+
+The service provides a FastAPI-based REST API for real-time code comparison.
+
+### Start the API Server
+
+```bash
+cd apps/services/cipas-service
+source .venv/bin/activate
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### Access Interactive Docs
+
+Open your browser:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+### Quick API Examples
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Compare two code snippets
+curl -X POST http://localhost:8000/compare \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code1": "public int foo(int x) { return x + 1; }",
+    "code2": "public int bar(int y) { return y + 1; }",
+    "language": "java",
+    "pipeline": "syntactic"
+  }'
+
+# Tokenize code
+curl -X POST http://localhost:8000/tokenize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "int x = calculate(a, b);",
+    "language": "java"
+  }'
+```
+
+For complete API documentation, see `API_DOCUMENTATION.md`.
 
 ---
 

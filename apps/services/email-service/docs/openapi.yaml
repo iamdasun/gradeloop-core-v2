@@ -1,0 +1,190 @@
+openapi: 3.0.0
+info:
+  title: GradeLoop Email Service API
+  description: Event-driven Email Microservice for GradeLoop
+  version: 1.0.0
+servers:
+  - url: http://localhost:8082/api/v1/emails
+    description: Local Development Server
+
+paths:
+  /send:
+    post:
+      summary: Send a single email
+      operationId: sendEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendEmailRequest'
+      responses:
+        '202':
+          description: Email accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Email queued for sending"
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+
+  /templates:
+    post:
+      summary: Create a new email template
+      operationId: createTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplateRequest'
+      responses:
+        '201':
+          description: Template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailTemplate'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+
+  /templates/{id}:
+    get:
+      summary: Get a template by ID
+      operationId: getTemplate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailTemplate'
+        '404':
+          description: Template not found
+
+  /status/{id}:
+    get:
+      summary: Get email message status
+      operationId: getEmailStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Email status details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailMessage'
+        '404':
+          description: Message not found
+
+components:
+  schemas:
+    SendEmailRequest:
+      type: object
+      properties:
+        template_name:
+          type: string
+          description: Name of the template to use (optional)
+        subject:
+          type: string
+          description: Subject of the email (required if no template)
+        recipients:
+          type: array
+          items:
+            type: string
+            format: email
+        variables:
+          type: object
+          additionalProperties: true
+          description: Key-value pairs for template interpolation
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachmentDTO'
+
+    CreateTemplateRequest:
+      type: object
+      required:
+        - name
+        - body_html
+        - body_text
+      properties:
+        name:
+          type: string
+        subject:
+          type: string
+        body_html:
+          type: string
+        body_text:
+          type: string
+
+    AttachmentDTO:
+      type: object
+      properties:
+        filename:
+          type: string
+        url:
+          type: string
+        mime_type:
+          type: string
+        size:
+          type: integer
+          format: int64
+
+    EmailTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        subject:
+          type: string
+        body_html:
+          type: string
+        body_text:
+          type: string
+        is_active:
+          type: boolean
+        version:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    EmailMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, processing, sent, failed, dead_letter]
+        retry_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time

@@ -374,7 +374,7 @@ services:
       - "traefik.enable=true"
       # Route all /api/v1/cipas/* traffic to this service.
       # Also exposes /metrics for Prometheus scraping.
-      - "traefik.http.routers.cipas.rule=PathPrefix(`/api/v1/cipas`) || PathPrefix(`/metrics`)"
+      - "traefik.http.routers.cipas.rule=PathPrefix(`/api/v1/cipas`) || PathPrefix(`/health`) || PathPrefix(`/ready`)"
       - "traefik.http.routers.cipas.entrypoints=web"
       - "traefik.http.services.cipas-service.loadbalancer.server.port=8085"
       # Request Size Limiting: 50 MB to accommodate batches of up to 200 × 1 MB files.

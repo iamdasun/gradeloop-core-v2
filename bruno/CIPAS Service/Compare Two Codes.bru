@@ -1,0 +1,25 @@
+meta {
+  name: Compare Two Codes
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{CIPAS_URL_V1}}/compare
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "code1": "public int foo(int x) { return x + 1; }",
+    "code2": "public int bar(int y) { return y + 1; }",
+    "language": "java",
+    "pipeline": "both"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
