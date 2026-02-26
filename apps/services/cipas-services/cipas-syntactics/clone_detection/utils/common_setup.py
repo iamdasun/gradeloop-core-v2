@@ -32,7 +32,7 @@ def get_project_root() -> Path:
 
 def get_models_dir() -> Path:
     """Get the directory for storing trained models."""
-    return get_project_root() / "models"
+    return get_project_root() / "clone_detection" / "models"
 
 
 def get_parsers_dir() -> Path:
