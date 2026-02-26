@@ -9,8 +9,13 @@ This module implements six similarity metrics for token sequences:
 - Jaro-Winkler Similarity
 
 These features are used for detecting Type-1, Type-2, and Type-3 clones.
+
+TOMA (Token-based) Approach:
+- Token Frequency Vector for Type-3 detection
+- Token Sequence Stream for structural comparison
 """
 
+from collections import Counter
 from typing import Optional
 
 import numpy as np
@@ -23,7 +28,7 @@ class SyntacticFeatureExtractor:
     Extract syntactic similarity features from token sequences.
 
     Implements the TOMA approach for Type-1/2/3 clone detection using
-    six string/token similarity metrics.
+    six string/token similarity metrics and token frequency vectors.
     """
 
     def __init__(self):
@@ -164,6 +169,98 @@ class SyntacticFeatureExtractor:
     def get_feature_names(self) -> list[str]:
         """Get the names of the extracted features."""
         return self.feature_names.copy()
+
+    def get_token_frequency_vector(self, tokens: list[str]) -> np.ndarray:
+        """
+        Generate Token Frequency Vector for TOMA approach.
+
+        Args:
+            tokens: Token sequence
+
+        Returns:
+            Numpy array of token frequencies
+        """
+        counter = Counter(tokens)
+        return counter
+
+    def get_token_sequence_stream(self, tokens: list[str]) -> str:
+        """
+        Generate Token Sequence Stream for TOMA approach.
+
+        Args:
+            tokens: Token sequence
+
+        Returns:
+            Space-separated token sequence string
+        """
+        return " ".join(tokens)
+
+    def extract_toma_features(
+        self, tokens1: list[str], tokens2: list[str]
+    ) -> dict[str, float]:
+        """
+        Extract TOMA-style features for Type-3 clone detection.
+
+        This includes:
+        - Token frequency vector similarity (cosine similarity)
+        - Token sequence stream similarity
+
+        Args:
+            tokens1: Token sequence from code snippet 1
+            tokens2: Token sequence from code snippet 2
+
+        Returns:
+            Dictionary of TOMA features
+        """
+        # Token frequency vectors
+        freq1 = Counter(tokens1)
+        freq2 = Counter(tokens2)
+
+        # Cosine similarity of frequency vectors
+        cosine_sim = self._cosine_similarity(freq1, freq2)
+
+        # Token sequence stream
+        stream1 = self.get_token_sequence_stream(tokens1)
+        stream2 = self.get_token_sequence_stream(tokens2)
+
+        # Sequence similarity using Levenshtein
+        seq_similarity = fuzz.ratio(stream1, stream2) / 100.0
+
+        return {
+            "token_frequency_cosine": cosine_sim,
+            "token_sequence_similarity": seq_similarity,
+        }
+
+    def _cosine_similarity(self, counter1: Counter, counter2: Counter) -> float:
+        """
+        Calculate cosine similarity between two token frequency counters.
+
+        Args:
+            counter1: Token frequency counter 1
+            counter2: Token frequency counter 2
+
+        Returns:
+            Cosine similarity in [0, 1]
+        """
+        # Get all unique tokens
+        all_tokens = set(counter1.keys()) | set(counter2.keys())
+
+        if not all_tokens:
+            return 1.0
+
+        # Create vectors
+        vec1 = np.array([counter1.get(token, 0) for token in all_tokens])
+        vec2 = np.array([counter2.get(token, 0) for token in all_tokens])
+
+        # Calculate cosine similarity
+        dot_product = np.dot(vec1, vec2)
+        norm1 = np.linalg.norm(vec1)
+        norm2 = np.linalg.norm(vec2)
+
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+
+        return dot_product / (norm1 * norm2)
 
 
 def calculate_pairwise_features(tokens_list: list[list[str]]) -> np.ndarray:

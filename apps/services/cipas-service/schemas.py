@@ -68,6 +68,10 @@ class ComparisonResult(BaseModel):
         None, description="Type of clone detected (Type-1/2/3/4)"
     )
     pipeline_used: str = Field(..., description="Which pipeline was used")
+    normalization_level: Optional[str] = Field(
+        None,
+        description="Normalization level used (Literal, Blinded, or Token-based)",
+    )
 
     # Optional detailed results
     syntactic_features: Optional[SyntacticFeatures] = Field(
