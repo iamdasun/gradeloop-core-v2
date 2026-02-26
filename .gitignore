@@ -275,6 +275,11 @@ credentials.json
 *.sqlite
 *.sqlite3
 
+# Datasets (large files)
+datasets/
+*.csv
+*.jsonl
+
 # Go
 *.exe
 *.exe~
