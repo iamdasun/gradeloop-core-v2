@@ -1,8 +1,8 @@
 """
-CIPAS API Routes for Code Clone Detection.
+CIPAS Syntactics API Routes for Syntactic Code Clone Detection.
 
 This module implements REST API endpoints for comparing code snippets
-using the automatic cascade detection pipeline.
+using the automatic cascade detection pipeline for Type-1/2/3 clones.
 
 Automatic Cascade Detection Strategy:
 - Phase One: NiCad-Style Normalization
@@ -10,10 +10,8 @@ Automatic Cascade Detection Strategy:
   - Pass B: Blinded comparison (Type-2, threshold >= 0.95, token delta <= 5%)
 - Phase Two: TOMA Approach (Type-3)
   - Token Frequency Vector + Random Forest classification
-- Phase Three: Semantic Analysis (Type-4)
-  - AST-based features + XGBoost classification
 
-The pipeline automatically cascades through Type-1 → Type-2 → Type-3 → Type-4 → Non-clone,
+The pipeline automatically cascades through Type-1 → Type-2 → Type-3 → Non-clone,
 breaking early when a clone type is confirmed.
 """
 
@@ -22,14 +20,13 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 
-from clone_detection.features.semantic_features import SemanticFeatureExtractor
 from clone_detection.features.syntactic_features import SyntacticFeatureExtractor
-from clone_detection.models.classifiers import SemanticClassifier, SyntacticClassifier
+from clone_detection.models.classifiers import SyntacticClassifier
 from clone_detection.normalizers.structural_normalizer import (
     NormalizationLevel,
     StructuralNormalizer,
 )
-from clone_detection.pipelines.tiered_pipeline import (
+from clone_detection.pipelines import (
     TieredDetectionResult,
     TieredPipeline,
 )
@@ -42,10 +39,7 @@ from schemas import (
     ComparisonResult,
     FeatureImportanceResponse,
     HealthResponse,
-    LanguageEnum,
     ModelStatus,
-    SemanticFeatures,
-    SyntacticFeatures,
     TokenizeRequest,
     TokenizeResponse,
 )
@@ -57,10 +51,8 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 _syntactic_model: Optional[SyntacticClassifier] = None
-_semantic_model: Optional[SemanticClassifier] = None
 _tokenizer: Optional[TreeSitterTokenizer] = None
 _syntactic_extractor: Optional[SyntacticFeatureExtractor] = None
-_semantic_extractor: Optional[SemanticFeatureExtractor] = None
 _normalizer: Optional[StructuralNormalizer] = None
 _tiered_pipeline: Optional[TieredPipeline] = None
 
@@ -81,14 +73,6 @@ def _get_syntactic_extractor() -> SyntacticFeatureExtractor:
     return _syntactic_extractor
 
 
-def _get_semantic_extractor() -> SemanticFeatureExtractor:
-    """Get or create semantic feature extractor."""
-    global _semantic_extractor
-    if _semantic_extractor is None:
-        _semantic_extractor = SemanticFeatureExtractor()
-    return _semantic_extractor
-
-
 def _get_normalizer() -> StructuralNormalizer:
     """Get or create structural normalizer."""
     global _normalizer
@@ -98,20 +82,14 @@ def _get_normalizer() -> StructuralNormalizer:
 
 
 def _get_tiered_pipeline() -> TieredPipeline:
-    """Get or create tiered pipeline with loaded classifiers."""
-    global _tiered_pipeline, _syntactic_model, _semantic_model
+    """Get or create tiered pipeline with loaded classifier."""
+    global _tiered_pipeline, _syntactic_model
 
     if _tiered_pipeline is None:
         # Load syntactic model (Type-3)
         syntactic_classifier = _load_syntactic_model()
 
-        # Load semantic model (Type-4)
-        semantic_classifier = _load_semantic_model()
-
-        _tiered_pipeline = TieredPipeline(
-            classifier=syntactic_classifier,
-            semantic_classifier=semantic_classifier,
-        )
+        _tiered_pipeline = TieredPipeline(classifier=syntactic_classifier)
 
     return _tiered_pipeline
 
@@ -131,21 +109,6 @@ def _load_syntactic_model() -> Optional[SyntacticClassifier]:
     return _syntactic_model
 
 
-def _load_semantic_model() -> Optional[SemanticClassifier]:
-    """Load semantic model if available."""
-    global _semantic_model
-    if _semantic_model is None:
-        try:
-            model_path = get_model_path("type4_xgb.pkl")
-            if model_path.exists():
-                _semantic_model = SemanticClassifier.load("type4_xgb.pkl")
-                logger.info("Semantic model (Type-4) loaded successfully")
-        except Exception as e:
-            logger.warning(f"Could not load semantic model: {e}")
-            _semantic_model = None
-    return _semantic_model
-
-
 def _get_model_status() -> dict[str, ModelStatus]:
     """Get status of all models."""
     models = {}
@@ -162,67 +125,7 @@ def _get_model_status() -> dict[str, ModelStatus]:
         error=None if syntactic_available else "Model file not found",
     )
 
-    # Semantic model (Type-4)
-    semantic_path = get_model_path("type4_xgb.pkl")
-    semantic_available = semantic_path.exists()
-    semantic_loaded = _semantic_model is not None and _semantic_model.is_trained
-
-    models["semantic_type4"] = ModelStatus(
-        model_name="type4_xgb.pkl",
-        available=semantic_available,
-        loaded=semantic_loaded,
-        error=None if semantic_available else "Model file not found",
-    )
-
     return models
-
-
-def _determine_clone_type(
-    syntactic_features: "SyntacticFeatures",
-    syntactic_proba: Optional[list[float]] = None,
-    semantic_proba: Optional[list[float]] = None,
-) -> str:
-    """
-    Determine the type of clone based on feature analysis.
-
-    Note: This function is deprecated in favor of the tiered pipeline.
-    Kept for backward compatibility.
-
-    Args:
-        syntactic_features: Extracted syntactic features
-        syntactic_proba: Probability scores from syntactic model
-        semantic_proba: Probability scores from semantic model
-
-    Returns:
-        Clone type string (Type-1, Type-2, Type-3, or Type-4)
-    """
-    # If both models agree on clone
-    if syntactic_proba and semantic_proba:
-        syn_conf = syntactic_proba[1] if len(syntactic_proba) > 1 else 0
-        sem_conf = semantic_proba[1] if len(semantic_proba) > 1 else 0
-
-        if sem_conf > syn_conf and sem_conf > 0.7:
-            return "Type-4"
-
-    # Analyze syntactic features to determine Type-1/2/3
-    if syntactic_features:
-        # Type-1: Very high similarity across all metrics
-        if (
-            syntactic_features.jaccard_similarity > 0.9
-            and syntactic_features.levenshtein_ratio > 0.95
-        ):
-            return "Type-1"
-        # Type-2: High similarity with some differences (renamed variables)
-        elif (
-            syntactic_features.jaccard_similarity > 0.7
-            and syntactic_features.levenshtein_ratio > 0.8
-        ):
-            return "Type-2"
-        # Type-3: Modified code with lower similarity
-        elif syntactic_features.jaccard_similarity > 0.5:
-            return "Type-3"
-
-    return "Type-4"
 
 
 def compare_codes(
@@ -237,10 +140,8 @@ def compare_codes(
       - Pass B: Blinded comparison (Type-2, threshold >= 0.95, token delta <= 5%)
     - Phase Two: TOMA Approach (Type-3)
       - Token Frequency Vector + Random Forest classification
-    - Phase Three: Semantic Analysis (Type-4)
-      - AST-based features + XGBoost classification
 
-    The pipeline automatically cascades: Type-1 → Type-2 → Type-3 → Type-4 → Non-clone
+    The pipeline automatically cascades: Type-1 → Type-2 → Type-3 → Non-clone
     Early exit occurs when a clone type is confirmed.
 
     Args:
@@ -260,7 +161,7 @@ def compare_codes(
         tokens1 = tokenizer.tokenize(request.code1, language, abstract_identifiers=True)
         tokens2 = tokenizer.tokenize(request.code2, language, abstract_identifiers=True)
 
-        # Get tiered pipeline with all classifiers loaded
+        # Get tiered pipeline with classifier loaded
         tiered_pipeline = _get_tiered_pipeline()
 
         # Run automatic cascade detection
@@ -278,7 +179,7 @@ def compare_codes(
                 and detection_result.clone_type != "Not Clone"
                 else None
             ),
-            pipeline_used="Automatic Cascade (Type-1/2/3/4)",
+            pipeline_used="Syntactic Cascade (Type-1/2/3)",
             normalization_level=detection_result.normalization_level,
             tokens1_count=len(tokens1),
             tokens2_count=len(tokens2),
@@ -294,12 +195,6 @@ def compare_codes(
                 levenshtein_ratio=float(features[3]),
                 jaro_similarity=float(features[4]),
                 jaro_winkler_similarity=float(features[5]),
-            )
-
-        # Add semantic features metadata if available
-        if detection_result.semantic_features is not None:
-            result.semantic_features = SemanticFeatures(
-                feature_count=len(detection_result.semantic_features)
             )
 
         return result
@@ -338,7 +233,7 @@ def compare_codes_batch(
                 ComparisonResult(
                     is_clone=False,
                     confidence=0.0,
-                    pipeline_used=pair_request.pipeline.value,
+                    pipeline_used="Syntactic Cascade (Type-1/2/3)",
                     clone_type=None,
                 )
             )
@@ -356,18 +251,15 @@ def get_health() -> HealthResponse:
     """
     return HealthResponse(
         status="healthy",
-        service="cipas-service",
+        service="cipas-syntactics",
         version="0.1.0",
         models=_get_model_status(),
     )
 
 
-def get_feature_importance(pipeline: PipelineEnum) -> FeatureImportanceResponse:
+def get_feature_importance() -> FeatureImportanceResponse:
     """
-    Get feature importance from trained models.
-
-    Args:
-        pipeline: Which pipeline's model to query
+    Get feature importance from trained syntactic model.
 
     Returns:
         Feature importance scores
@@ -375,36 +267,15 @@ def get_feature_importance(pipeline: PipelineEnum) -> FeatureImportanceResponse:
     Raises:
         HTTPException: If model is not available
     """
-    if pipeline == PipelineEnum.SYNTACTIC:
-        model = _load_syntactic_model()
-        if model is None or not model.is_trained:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Syntactic model not available",
-            )
-
-        importance = model.get_feature_importance()
-        return FeatureImportanceResponse(model="type3_rf.pkl", features=importance)
-
-    elif pipeline == PipelineEnum.SEMANTIC:
-        model = _load_semantic_model()
-        if model is None or not model.is_trained:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Semantic model not available",
-            )
-
-        importance_list = model.get_feature_importance(top_n=20)
-        importance_dict = {name: float(score) for name, score in importance_list}
-        return FeatureImportanceResponse(
-            model="type4_xgb.pkl", features=importance_dict
-        )
-
-    else:
+    model = _load_syntactic_model()
+    if model is None or not model.is_trained:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Pipeline must be 'syntactic' or 'semantic'",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Syntactic model not available",
         )
+
+    importance = model.get_feature_importance()
+    return FeatureImportanceResponse(model="type3_rf.pkl", features=importance)
 
 
 def tokenize_code(request: TokenizeRequest) -> TokenizeResponse:

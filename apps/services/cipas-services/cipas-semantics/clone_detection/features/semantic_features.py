@@ -732,7 +732,7 @@ class SemanticFeatureExtractor:
             "file",
             "stream",
         }
-        io_count = sum(1 for p in io_patterns if p in io_patterns and p in code_lower)
+        io_count = sum(1 for p in io_patterns if p in code_lower)
         features.append(min(io_count / 3.0, 1.0))
 
         # Network operations
@@ -912,92 +912,3 @@ class SemanticFeatureExtractor:
         if fused:
             return self.n_fused_features
         return self.n_features_per_code
-
-
-class FeatureFusion:
-    """
-    Feature fusion strategies for combining multiple feature types.
-
-    Supports:
-    - Linear Combination (concatenation)
-    - Weighted Sum
-    - Feature Selection
-    """
-
-    @staticmethod
-    def linear_combination(*feature_arrays: np.ndarray) -> np.ndarray:
-        """
-        Concatenate feature arrays (linear combination).
-
-        This preserves original feature values and is optimal for
-        tree-ensemble models like XGBoost.
-
-        Args:
-            *feature_arrays: Variable number of feature arrays
-
-        Returns:
-            Concatenated feature vector
-        """
-        return np.concatenate([arr.flatten() for arr in feature_arrays])
-
-    @staticmethod
-    def weighted_sum(
-        *feature_arrays: np.ndarray, weights: Optional[list[float]] = None
-    ) -> np.ndarray:
-        """
-        Compute weighted sum of feature arrays.
-
-        Args:
-            *feature_arrays: Variable number of feature arrays
-            weights: Optional weights for each feature array
-
-        Returns:
-            Weighted sum of features
-        """
-        if weights is None:
-            weights = [1.0] * len(feature_arrays)
-
-        if len(weights) != len(feature_arrays):
-            raise ValueError("Number of weights must match number of feature arrays")
-
-        result = np.zeros_like(feature_arrays[0])
-        for arr, weight in zip(feature_arrays, weights):
-            result += weight * arr.flatten()
-
-        return result
-
-    @staticmethod
-    def normalize_features(features: np.ndarray, method: str = "zscore") -> np.ndarray:
-        """
-        Normalize features for ML model input.
-
-        Args:
-            features: Feature array of shape (n_samples, n_features)
-            method: Normalization method ('zscore', 'minmax', 'robust')
-
-        Returns:
-            Normalized features
-        """
-        if method == "zscore":
-            mean = np.mean(features, axis=0)
-            std = np.std(features, axis=0)
-            std[std == 0] = 1  # Avoid division by zero
-            return (features - mean) / std
-
-        elif method == "minmax":
-            min_val = np.min(features, axis=0)
-            max_val = np.max(features, axis=0)
-            range_val = max_val - min_val
-            range_val[range_val == 0] = 1
-            return (features - min_val) / range_val
-
-        elif method == "robust":
-            median = np.median(features, axis=0)
-            q1 = np.percentile(features, 25, axis=0)
-            q3 = np.percentile(features, 75, axis=0)
-            iqr = q3 - q1
-            iqr[iqr == 0] = 1
-            return (features - median) / iqr
-
-        else:
-            raise ValueError(f"Unknown normalization method: {method}")

@@ -1,5 +1,5 @@
 """
-Tiered Detection Pipeline Orchestrator for CIPAS.
+Tiered Detection Pipeline for Syntactic Clone Detection.
 
 This module implements the tiered detection strategy with automatic cascade:
 - Phase One: NiCad-Style Normalization (Type-1 & Type-2)
@@ -8,13 +8,10 @@ This module implements the tiered detection strategy with automatic cascade:
 - Phase Two: TOMA Approach (Type-3)
   - Token Frequency Vector + Token Sequence Stream
   - 6 core syntactic features fed to Random Forest
-- Phase Three: Semantic Analysis (Type-4)
-  - AST-based features + Code embeddings
-  - XGBoost classification
 
 Output Constraints:
 - normalization_level: Literal, Blinded, or Token-based
-- Confidence: 1.0 for Type-1, ~0.95 for Type-2, RF probability for Type-3, XGB for Type-4
+- Confidence: 1.0 for Type-1, ~0.95 for Type-2, RF probability for Type-3
 - Pipeline breaks early when a clone type is confirmed
 """
 
@@ -24,9 +21,8 @@ from typing import Optional
 
 import numpy as np
 
-from ..features.semantic_features import SemanticFeatureExtractor
 from ..features.syntactic_features import SyntacticFeatureExtractor
-from ..models.classifiers import SemanticClassifier, SyntacticClassifier
+from ..models.classifiers import SyntacticClassifier
 from ..normalizers.structural_normalizer import (
     NormalizationLevel,
     StructuralNormalizer,
@@ -45,7 +41,6 @@ class TieredDetectionResult:
     jaccard_similarity: float
     levenshtein_ratio: float
     syntactic_features: Optional[np.ndarray] = None
-    semantic_features: Optional[np.ndarray] = None
     blinded_code1: Optional[str] = None
     blinded_code2: Optional[str] = None
     normalized_code1: Optional[str] = None
@@ -56,12 +51,11 @@ class TieredPipeline:
     """
     Tiered detection pipeline for syntactic clone detection.
 
-    Implements a four-tier cascade strategy:
+    Implements a three-tier cascade strategy:
     1. Type-1: Literal comparison with high threshold (>=0.98)
     2. Type-2: Blinded comparison with medium threshold (>=0.95) + token count delta <=5%
     3. Type-3: TOMA features with Random Forest classification
-    4. Type-4: Semantic features with XGBoost classification
-    5. Non-clone: If all tiers fail to confirm a clone
+    4. Non-clone: If all tiers fail to confirm a clone
     """
 
     def __init__(
@@ -70,8 +64,6 @@ class TieredPipeline:
         tokenizer: Optional[TreeSitterTokenizer] = None,
         feature_extractor: Optional[SyntacticFeatureExtractor] = None,
         classifier: Optional[SyntacticClassifier] = None,
-        semantic_classifier: Optional[SemanticClassifier] = None,
-        semantic_extractor: Optional[SemanticFeatureExtractor] = None,
     ):
         """
         Initialize the tiered pipeline.
@@ -81,15 +73,11 @@ class TieredPipeline:
             tokenizer: Tree-sitter tokenizer
             feature_extractor: Syntactic feature extractor
             classifier: Pre-trained Random Forest classifier (Type-3)
-            semantic_classifier: Pre-trained XGBoost classifier (Type-4)
-            semantic_extractor: Semantic feature extractor
         """
         self.normalizer = normalizer or StructuralNormalizer()
         self.tokenizer = tokenizer or TreeSitterTokenizer()
         self.feature_extractor = feature_extractor or SyntacticFeatureExtractor()
         self.classifier = classifier
-        self.semantic_classifier = semantic_classifier
-        self.semantic_extractor = semantic_extractor or SemanticFeatureExtractor()
 
     def detect(
         self,
@@ -105,8 +93,7 @@ class TieredPipeline:
         1. Type-1: Literal comparison (threshold >= 0.98)
         2. Type-2: Blinded comparison (threshold >= 0.95, token delta <= 5%)
         3. Type-3: TOMA features + Random Forest
-        4. Type-4: Semantic features + XGBoost
-        5. Non-clone: If all tiers fail
+        4. Non-clone: If all tiers fail
 
         Args:
             code1: First code snippet
@@ -131,8 +118,8 @@ class TieredPipeline:
         if result.clone_type == "Type-3":
             return result
 
-        # Phase Three: Semantic Analysis for Type-4
-        return self._phase_three_semantic(code1, code2, language)
+        # Not a syntactic clone
+        return result
 
     def _phase_one_normalization(
         self, code1: str, code2: str, language: str
@@ -257,9 +244,6 @@ class TieredPipeline:
         # Extract 6 core syntactic features
         features = self.feature_extractor.extract_features(tokens1, tokens2)
 
-        # Extract additional TOMA features
-        toma_features = self.feature_extractor.extract_toma_features(tokens1, tokens2)
-
         # Use Random Forest classifier if available
         if self.classifier is not None and self.classifier.is_trained:
             try:
@@ -282,7 +266,8 @@ class TieredPipeline:
                 )
             except Exception as e:
                 # Fallback to threshold-based detection if classifier fails
-                pass
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Classifier failed: {e}, using fallback")
 
         # Fallback: Threshold-based Type-3 detection
         jaccard = float(features[0])
@@ -310,102 +295,17 @@ class TieredPipeline:
             syntactic_features=features,
         )
 
-    def _phase_three_semantic(
-        self, code1: str, code2: str, language: str
-    ) -> TieredDetectionResult:
-        """
-        Phase Three: Semantic Analysis for Type-4 detection.
-
-        Uses semantic feature extraction and XGBoost classification
-        to detect clones with similar functionality but different implementation.
-
-        Args:
-            code1: First code snippet
-            code2: Second code snippet
-            language: Programming language
-
-        Returns:
-            TieredDetectionResult with Type-4 or Not Clone classification
-        """
-        # Use XGBoost classifier if available
-        if self.semantic_classifier is not None and self.semantic_classifier.is_trained:
-            try:
-                # Extract fused semantic features
-                fused_features = self.semantic_extractor.extract_fused_features(
-                    code1, code2, language
-                )
-
-                # Predict using XGBoost
-                prediction = self.semantic_classifier.predict(
-                    fused_features.reshape(1, -1)
-                )[0]
-                probabilities = self.semantic_classifier.predict_proba(
-                    fused_features.reshape(1, -1)
-                )[0]
-
-                is_clone = bool(prediction == 1)
-                confidence = float(probabilities[1]) if len(probabilities) > 1 else 0.0
-
-                return TieredDetectionResult(
-                    is_clone=is_clone,
-                    confidence=confidence,
-                    clone_type="Type-4" if is_clone else "Not Clone",
-                    normalization_level=NormalizationLevel.TOKEN_BASED.value,
-                    jaccard_similarity=0.0,
-                    levenshtein_ratio=0.0,
-                    semantic_features=fused_features,
-                )
-            except Exception as e:
-                # Fallback to threshold-based detection if classifier fails
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Semantic classifier failed: {e}, using fallback")
-
-        # Fallback: Use syntactic features with lower threshold for Type-4 detection
-        # This is a conservative fallback - Type-4 typically requires semantic analysis
-        tokens1 = self.tokenizer.tokenize(code1, language, abstract_identifiers=True)
-        tokens2 = self.tokenizer.tokenize(code2, language, abstract_identifiers=True)
-
-        features = self.feature_extractor.extract_features(tokens1, tokens2)
-        jaccard = float(features[0])
-        lev_ratio = float(features[3])
-
-        # Type-4 threshold (semantic clones) - lower than Type-3
-        type4_threshold = 0.4
-
-        # More lenient fallback - only one metric needs to pass
-        is_clone = jaccard >= type4_threshold or lev_ratio >= 50.0
-
-        # Confidence based on how far above threshold
-        if is_clone:
-            confidence = max(jaccard, lev_ratio / 100.0)
-        else:
-            confidence = 1.0 - max(jaccard, lev_ratio / 100.0)
-
-        return TieredDetectionResult(
-            is_clone=is_clone,
-            confidence=confidence,
-            clone_type="Type-4" if is_clone else "Not Clone",
-            normalization_level=NormalizationLevel.TOKEN_BASED.value,
-            jaccard_similarity=jaccard,
-            levenshtein_ratio=lev_ratio,
-            syntactic_features=features,
-        )
-
 
 def get_tiered_pipeline(
     classifier: Optional[SyntacticClassifier] = None,
-    semantic_classifier: Optional[SemanticClassifier] = None,
 ) -> TieredPipeline:
     """
     Get a configured tiered pipeline instance.
 
     Args:
         classifier: Optional pre-trained Random Forest classifier (Type-3)
-        semantic_classifier: Optional pre-trained XGBoost classifier (Type-4)
 
     Returns:
         Configured TieredPipeline instance
     """
-    return TieredPipeline(
-        classifier=classifier, semantic_classifier=semantic_classifier
-    )
+    return TieredPipeline(classifier=classifier)

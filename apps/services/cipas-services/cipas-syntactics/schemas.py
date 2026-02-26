@@ -1,7 +1,7 @@
 """
-Pydantic schemas for the CIPAS API.
+Pydantic schemas for the CIPAS Syntactics API.
 
-This module defines request/response models for the code clone detection API endpoints.
+This module defines request/response models for the syntactic code clone detection API endpoints.
 """
 
 from enum import Enum
@@ -18,13 +18,6 @@ class LanguageEnum(str, Enum):
     PYTHON = "python"
 
 
-class PipelineEnum(str, Enum):
-    """Available pipelines for feature importance queries."""
-
-    SYNTACTIC = "syntactic"  # Pipeline A: Type-1/2/3 clones
-    SEMANTIC = "semantic"  # Pipeline B: Type-4 clones
-
-
 class ComparisonRequest(BaseModel):
     """Request model for code comparison."""
 
@@ -36,7 +29,7 @@ class ComparisonRequest(BaseModel):
 
 
 class SyntacticFeatures(BaseModel):
-    """Syntactic similarity features (Pipeline A)."""
+    """Syntactic similarity features."""
 
     jaccard_similarity: float = Field(..., description="Jaccard similarity coefficient")
     dice_coefficient: float = Field(..., description="Dice coefficient")
@@ -46,25 +39,17 @@ class SyntacticFeatures(BaseModel):
     jaro_winkler_similarity: float = Field(..., description="Jaro-Winkler similarity")
 
 
-class SemanticFeatures(BaseModel):
-    """Semantic features (Pipeline B)."""
-
-    feature_count: int = Field(..., description="Number of semantic features extracted")
-    # Note: Full feature vector is too large to include in response
-    # Only metadata is provided
-
-
 class ComparisonResult(BaseModel):
     """Response model for code comparison."""
 
     is_clone: bool = Field(..., description="Whether the codes are clones")
     confidence: float = Field(..., description="Confidence score (0-1)")
     clone_type: Optional[str] = Field(
-        None, description="Type of clone detected (Type-1/2/3/4)"
+        None, description="Type of clone detected (Type-1/2/3)"
     )
     pipeline_used: str = Field(
         ...,
-        description="Which pipeline was used (automatically determined cascade)",
+        description="Which pipeline was used (Syntactic Cascade Type-1/2/3)",
     )
     normalization_level: Optional[str] = Field(
         None,
@@ -73,10 +58,7 @@ class ComparisonResult(BaseModel):
 
     # Optional detailed results
     syntactic_features: Optional[SyntacticFeatures] = Field(
-        None, description="Syntactic features (if Pipeline A was used)"
-    )
-    semantic_features: Optional[SemanticFeatures] = Field(
-        None, description="Semantic features metadata (if Pipeline B was used)"
+        None, description="Syntactic features"
     )
 
     # Additional metadata
@@ -114,7 +96,7 @@ class HealthResponse(BaseModel):
     """Health check response."""
 
     status: str = "healthy"
-    service: str = "cipas-service"
+    service: str = "cipas-syntactics"
     version: str = "0.1.0"
     models: dict[str, ModelStatus] = Field(
         default_factory=dict, description="Status of ML models"

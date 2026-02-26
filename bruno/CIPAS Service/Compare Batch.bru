@@ -13,6 +13,9 @@ post {
 body:json {
   {
     "pairs": [
+  
+      // ---------- TYPE 1 (Exact Clones) ----------
+  
       {
         "code1": "int sum(int n){int total=0;for(int i=1;i<=n;i++){total+=i;}return total;}",
         "code2": "int sum(int n){int total=0;for(int i=1;i<=n;i++){total+=i;}return total;}",
@@ -25,12 +28,98 @@ body:json {
         "language": "java",
         "pipeline": "syntactic"
       },
-       {
+      {
         "code1": "def find_max(arr): max_val=arr[0]; [max_val:=x for x in arr if x>max_val]; return max_val",
         "code2": "def find_max(arr): max_val=arr[0]; [max_val:=x for x in arr if x>max_val]; return max_val",
+        "language": "python",
+        "pipeline": "syntactic"
+      },
+  
+  
+      // ---------- TYPE 2 (Renamed Clones) ----------
+  
+      {
+        "code1": "int sum(int n){int total=0;for(int i=0;i<n;i++){total+=i;}return total;}",
+        "code2": "int computeSum(int value){int result=0;for(int index=0;index<value;index++){result+=index;}return result;}",
+        "language": "c",
+        "pipeline": "syntactic"
+      },
+      {
+        "code1": "public int countEven(int[] arr){int count=0;for(int i=0;i<arr.length;i++){if(arr[i]%2==0){count++;}}return count;}",
+        "code2": "public int findEvenNumbers(int[] numbers){int total=0;for(int j=0;j<numbers.length;j++){if(numbers[j]%2==0){total++;}}return total;}",
         "language": "java",
         "pipeline": "syntactic"
+      },
+      {
+        "code1": "def average(nums): total=0; [total:=total+n for n in nums]; return total/len(nums)",
+        "code2": "def compute_mean(values): sum_val=0; [sum_val:=sum_val+x for x in values]; return sum_val/len(values)",
+        "language": "python",
+        "pipeline": "syntactic"
+      },
+  
+  
+      // ---------- TYPE 3 (Near Miss Clones) ----------
+  
+      {
+        "code1": "int sum_positive(int arr[],int n){int total=0;for(int i=0;i<n;i++){if(arr[i]>0){total+=arr[i];}}return total;}",
+        "code2": "int sum_positive(int arr[],int n){int total=0;for(int i=0;i<n;i++){if(arr[i]>0){total+=arr[i];}if(arr[i]==0){continue;}}return total;}",
+        "language": "c",
+        "pipeline": "syntactic"
+      },
+      {
+        "code1": "public int sumArray(int[] arr){int sum=0;for(int i=0;i<arr.length;i++){sum+=arr[i];}return sum;}",
+        "code2": "public int sumArray(int[] arr){int sum=0;for(int i=0;i<arr.length;i++){sum+=arr[i];if(arr[i]<0){System.out.println(\"Negative\");}}return sum;}",
+        "language": "java",
+        "pipeline": "syntactic"
+      },
+      {
+        "code1": "def count_positive(arr): count=0; [count:=count+1 for x in arr if x>0]; return count",
+        "code2": "def count_positive(arr): count=0; [count:=count+1 for x in arr if x>0]; [print(\"Zero\") for x in arr if x==0]; return count",
+        "language": "python",
+        "pipeline": "syntactic"
+      },
+  
+  
+      // ---------- TYPE 4 (Semantic Clones) ----------
+  
+      {
+        "code1": "int sum_formula(int n){return n*(n+1)/2;}",
+        "code2": "int sum_loop(int n){int total=0;for(int i=1;i<=n;i++){total+=i;}return total;}",
+        "language": "c",
+        "pipeline": "semantic"
+      },
+      {
+        "code1": "public int factorialRec(int n){if(n<=1)return 1;return n*factorialRec(n-1);}",
+        "code2": "public int factorialIter(int n){int result=1;for(int i=1;i<=n;i++){result*=i;}return result;}",
+        "language": "java",
+        "pipeline": "semantic"
+      },
+      {
+        "code1": "def is_even(n): return n%2==0",
+        "code2": "def is_even(n): return (n&1)==0",
+        "language": "python",
+        "pipeline": "semantic"
+      },
+  
+      {
+        "code1": "int max_array(int a[],int n){int m=a[0];for(int i=1;i<n;i++){if(a[i]>m)m=a[i];}return m;}",
+        "code2": "int max_array(int a[],int n){int m=a[0];int i=1;while(i<n){if(a[i]>m)m=a[i];i++;}return m;}",
+        "language": "c",
+        "pipeline": "semantic"
+      },
+      {
+        "code1": "public int sumArray(int[] arr){int s=0;for(int x:arr){s+=x;}return s;}",
+        "code2": "public int sumArray(int[] arr){return java.util.Arrays.stream(arr).sum();}",
+        "language": "java",
+        "pipeline": "semantic"
+      },
+      {
+        "code1": "def reverse_string(s): return ''.join(reversed(s))",
+        "code2": "def reverse_string(s): return s[::-1]",
+        "language": "python",
+        "pipeline": "semantic"
       }
+  
     ]
   }
 }
