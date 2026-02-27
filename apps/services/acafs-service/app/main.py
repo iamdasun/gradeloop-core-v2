@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from threading import Thread
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, status
+from fastapi import APIRouter, FastAPI, status
 from fastapi.responses import JSONResponse
 
 from app.config import get_settings
@@ -115,17 +115,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     logger.info("acafs_service_shutdown_complete")
 
 
-# Create FastAPI app
+# Load settings early for use in route handlers
 settings = get_settings()
-app = FastAPI(
-    title="ACAFS Service",
-    description="Automated Code Analysis & Feedback System Engine for Gradeloop",
-    version="0.1.0",
-    lifespan=lifespan,
-)
 
 
-@app.get("/health", tags=["health"])
+# Create API router with prefix
+api_router = APIRouter(prefix="/api/v1/acafs")
+
+
+@api_router.get("/health", tags=["health"])
 async def health_check() -> JSONResponse:
     """Health check endpoint.
     
@@ -142,7 +140,7 @@ async def health_check() -> JSONResponse:
     )
 
 
-@app.get("/ready", tags=["health"])
+@api_router.get("/ready", tags=["health"])
 async def readiness_check() -> JSONResponse:
     """Readiness check endpoint.
     
@@ -182,7 +180,7 @@ async def readiness_check() -> JSONResponse:
     )
 
 
-@app.get("/metrics", tags=["observability"])
+@api_router.get("/metrics", tags=["observability"])
 async def metrics() -> JSONResponse:
     """Metrics endpoint for monitoring.
     
@@ -199,7 +197,7 @@ async def metrics() -> JSONResponse:
     )
 
 
-@app.get("/languages", tags=["info"])
+@api_router.get("/languages", tags=["info"])
 async def supported_languages() -> JSONResponse:
     """Get list of supported programming languages.
     
@@ -225,6 +223,17 @@ def signal_handler(sig, frame) -> None:
     logger.info("shutdown_signal_received", signal=sig)
     sys.exit(0)
 
+
+# Create FastAPI app
+app = FastAPI(
+    title="ACAFS Service",
+    description="Automated Code Analysis & Feedback System Engine for Gradeloop",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+# Include API router
+app.include_router(api_router)
 
 # Register signal handlers
 signal.signal(signal.SIGINT, signal_handler)

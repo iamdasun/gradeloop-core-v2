@@ -535,6 +535,8 @@ services:
       context: ./apps/services/acafs-service
       dockerfile: Dockerfile
       target: development
+    volumes:
+      - ./apps/services/acafs-service:/app
     container_name: acafs-service
     restart: unless-stopped
     labels:
@@ -542,7 +544,6 @@ services:
       - "traefik.http.routers.acafs.rule=PathPrefix(`/api/v1/acafs`)"
       - "traefik.http.routers.acafs.entrypoints=web"
       - "traefik.http.services.acafs.loadbalancer.server.port=8086"
-      - "traefik.http.routers.acafs.service=acafs"
       # Request size limiting (10MB for batch operations)
       - "traefik.http.middlewares.acafs-limit.buffering.maxRequestBodyBytes=10485760"
       # Rate limiting
@@ -594,7 +595,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/api/v1/acafs/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
