@@ -101,10 +101,11 @@ Clones with further modifications, such as added, removed, or changed statements
 - **Detection Method:** **Phase Two** of the Syntactic Cascade using **ToMa + XGBoost** with hybrid features:
   - **6 Syntactic Features** (String-based): Jaccard, Dice, Levenshtein distance/ratio, Jaro, Jaro-Winkler.
   - **4+N Structural Features** (AST-based): AST Jaccard, Depth Difference, Node Count Difference/Ratio, and optional per-node-type distribution diffs.
-  - **Binary Classification Split:** Trained to distinguish *syntactic* similarity from *semantic* similarity.
+  - **Objective:** Maximum Type-3 Recall while maintaining **Precision > 90%**.
 - **Training Strategy:** 
   - **Positives (Label 1):** `type-3.csv` (near-miss) and `type-4.csv` (moderate Type-3).
   - **Negatives (Label 0):** `nonclone.csv` (negative samples).
+  - **Optimization:** Uses `scale_pos_weight=3.0` and a custom threshold (typically **0.25 - 0.35**) to prioritize near-miss detection.
 - **Confidence Score:** XGBoost probability.
 - **Normalization Level:** `Token-based`.
 - **Performance:** Evaluated on `bigclonebench_balanced.json` with per-clone-type recall breakdown.

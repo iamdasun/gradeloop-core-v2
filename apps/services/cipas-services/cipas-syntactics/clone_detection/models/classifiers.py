@@ -41,6 +41,7 @@ class SyntacticClassifier:
         random_state: int = 42,
         feature_names: Optional[list[str]] = None,
         use_gpu: bool = False,
+        **kwargs,
     ):
         """
         Initialize the XGBoost classifier.
@@ -63,6 +64,7 @@ class SyntacticClassifier:
             min_child_weight=min_child_weight,
             subsample=subsample,
             colsample_bytree=colsample_bytree,
+            scale_pos_weight=kwargs.get("scale_pos_weight", 1.0),
             random_state=random_state,
             n_jobs=-1,  # Use all CPU cores
             tree_method="hist" if not use_gpu else "gpu_hist",
