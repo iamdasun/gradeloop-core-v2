@@ -7,9 +7,13 @@ Pipeline context:
   Fallback: Non-syntactic clone (semantic / Type-4+)
 
 Training data (from TOMA dataset):
-  Positives  → type-3.csv  (syntactic Type-3 clones)
-               type-4.csv  (near-miss / gapped clones, treated as positives for Type-3 detection)
-  Negatives  → nonclone.csv
+  Positives (label = 1):
+    type-3.csv — syntactic near-miss clones (Type-3)
+    type-4.csv — moderate Type-3 clones (still syntactically similar)
+  Negatives (label = 0):
+    nonclone.csv — confirmed non-clone pairs
+    type-5.csv   — semantic / Type-4 clones (NOT syntactically similar;
+                    model learns to reject these as non-syntactic)
 
 Features used (hybrid):
   String-based (6)  : Jaccard, Dice, Levenshtein distance/ratio, Jaro, Jaro-Winkler
@@ -42,8 +46,14 @@ TOMA_DATASET_DIR = Path(
     "/home/iamdasun/Projects/4yrg/gradeloop-core-v2/datasets/toma-dataset"
 )
 
-# CSV filenames whose pairs count as Type-3 clones (positives)
+# CSV files whose pairs are syntactic clones → positive class (label = 1)
+#   type-3.csv — syntactic near-miss clones
+#   type-4.csv — moderate Type-3 clones (still syntactic)
 CLONE_CSV_FILES = ["type-3.csv", "type-4.csv"]
+
+# CSV files whose pairs are negatives for this model → label = 0
+#   nonclone.csv — genuine non-clone pairs
+NEGATIVE_CSV_FILES = ["nonclone.csv"]
 
 # Default output model name
 DEFAULT_MODEL_NAME = "type3_xgb.pkl"
@@ -68,22 +78,28 @@ def _load_code(func_id: str, id2code_dir: Path) -> str | None:
 def load_toma_dataset(
     dataset_dir: Path,
     clone_csv_files: list[str],
+    negative_csv_files: list[str],
     sample_size: int | None = None,
 ) -> tuple[list[str], list[str], list[int]]:
     """
-    Load TOMA dataset pairs.
+    Load TOMA dataset pairs for Type-3 syntactic clone detection.
 
-    Positive pairs  → loaded from each file in *clone_csv_files*
-                      (type-3.csv and type-4.csv).  No header, columns:
-                      FUNCTION_ID_ONE, FUNCTION_ID_TWO, CLONE_TYPE, SIM1, SIM2
-    Negative pairs  → loaded from nonclone.csv.  Has a header row:
-                      FUNCTION_ID_ONE, FUNCTION_ID_TWO
+    Positive pairs (label = 1):
+        Loaded from each file in *clone_csv_files*.
+        Files have no header — columns: FUNCTION_ID_ONE, FUNCTION_ID_TWO,
+        CLONE_TYPE, SIM1, SIM2
+          type-3.csv — syntactic near-miss clones
+          type-4.csv — moderate Type-3 clones (still syntactic)
+
+    Negative pairs (label = 0):
+        Loaded from each file in *negative_csv_files*:
+          nonclone.csv — genuine non-clone pairs (has header row)
 
     Args:
         dataset_dir: Path to TOMA dataset directory.
-        clone_csv_files: List of CSV file names for positive (clone) pairs.
-        sample_size: If set, sample at most *sample_size* rows per split (clones /
-                     non-clones independently).
+        clone_csv_files: CSV file names for positive (syntactic clone) pairs.
+        negative_csv_files: CSV file names that contribute negative pairs.
+        sample_size: If set, sample at most this many rows per file.
 
     Returns:
         (code1_list, code2_list, labels)  where label 1 = clone, 0 = non-clone.
@@ -96,26 +112,25 @@ def load_toma_dataset(
     code2_list: list[str] = []
     labels: list[int] = []
 
-    # ---- Positive pairs ------------------------------------------------
+    # ── Positive pairs: syntactic clones (Type-3 + moderate Type-3) ────────
     for csv_name in clone_csv_files:
         csv_path = dataset_dir / csv_name
         if not csv_path.exists():
-            logger.warning(f"Clone CSV not found: {csv_path} — skipping")
+            logger.warning(f"[+] Clone CSV not found: {csv_path} — skipping")
             continue
 
-        logger.info(f"Loading clone pairs from {csv_path} …")
+        logger.info(f"[+] Loading POSITIVE pairs from {csv_path} …")
         df = pd.read_csv(
             csv_path,
             header=None,
             names=["FUNCTION_ID_ONE", "FUNCTION_ID_TWO", "CLONE_TYPE", "SIM1", "SIM2"],
         )
-
         if sample_size and len(df) > sample_size:
-            logger.info(f"  Sampling {sample_size} / {len(df)} rows from {csv_name}")
+            logger.info(f"    Sampling {sample_size} / {len(df)} rows")
             df = df.sample(n=sample_size, random_state=42)
 
         loaded = 0
-        for _, row in tqdm(df.iterrows(), total=len(df), desc=f"  Loading {csv_name}"):
+        for _, row in tqdm(df.iterrows(), total=len(df), desc=f"    {csv_name}"):
             id1 = str(int(row["FUNCTION_ID_ONE"]))
             id2 = str(int(row["FUNCTION_ID_TWO"]))
             c1 = _load_code(id1, id2code_dir)
@@ -125,21 +140,33 @@ def load_toma_dataset(
                 code2_list.append(c2)
                 labels.append(1)
                 loaded += 1
+        logger.info(f"    Loaded {loaded} valid positive pairs from {csv_name}")
 
-        logger.info(f"  Loaded {loaded} valid clone pairs from {csv_name}")
+    # ── Negative pairs: non-clones ────────────────────────────────────────
+    for csv_name in negative_csv_files:
+        neg_path = dataset_dir / csv_name
+        if not neg_path.exists():
+            logger.warning(f"[-] Negative CSV not found: {neg_path} — skipping")
+            continue
 
-    # ---- Negative pairs ------------------------------------------------
-    nonclone_path = dataset_dir / "nonclone.csv"
-    if nonclone_path.exists():
-        logger.info(f"Loading non-clone pairs from {nonclone_path} …")
-        df_nc = pd.read_csv(nonclone_path)  # has header
+        logger.info(f"[-] Loading NEGATIVE pairs from {neg_path} …")
 
-        if sample_size and len(df_nc) > sample_size:
-            logger.info(f"  Sampling {sample_size} / {len(df_nc)} non-clone rows")
-            df_nc = df_nc.sample(n=sample_size, random_state=42)
+        # nonclone.csv has a header; the clone-type CSVs do not
+        if csv_name == "nonclone.csv":
+            df_neg = pd.read_csv(neg_path)  # header: FUNCTION_ID_ONE, FUNCTION_ID_TWO
+        else:
+            df_neg = pd.read_csv(
+                neg_path,
+                header=None,
+                names=["FUNCTION_ID_ONE", "FUNCTION_ID_TWO", "CLONE_TYPE", "SIM1", "SIM2"],
+            )
+
+        if sample_size and len(df_neg) > sample_size:
+            logger.info(f"    Sampling {sample_size} / {len(df_neg)} rows from {csv_name}")
+            df_neg = df_neg.sample(n=sample_size, random_state=42)
 
         loaded = 0
-        for _, row in tqdm(df_nc.iterrows(), total=len(df_nc), desc="  Loading nonclone.csv"):
+        for _, row in tqdm(df_neg.iterrows(), total=len(df_neg), desc=f"    {csv_name}"):
             id1 = str(int(row["FUNCTION_ID_ONE"]))
             id2 = str(int(row["FUNCTION_ID_TWO"]))
             c1 = _load_code(id1, id2code_dir)
@@ -149,10 +176,7 @@ def load_toma_dataset(
                 code2_list.append(c2)
                 labels.append(0)
                 loaded += 1
-
-        logger.info(f"  Loaded {loaded} valid non-clone pairs")
-    else:
-        logger.warning(f"nonclone.csv not found at {nonclone_path}")
+        logger.info(f"    Loaded {loaded} valid negative pairs from {csv_name}")
 
     return code1_list, code2_list, labels
 
@@ -226,16 +250,20 @@ def train(
     logger.info("=" * 80)
     logger.info("Type-3 Clone Detection — Model Training (ToMa + XGBoost)")
     logger.info("=" * 80)
-    logger.info(f"Dataset : {TOMA_DATASET_DIR}")
-    logger.info(f"Positives from : {CLONE_CSV_FILES}")
-    logger.info(f"Model output   : models/{model_name}")
-    logger.info(f"GPU            : {'Enabled' if use_gpu else 'Disabled'}")
+    logger.info(f"Dataset    : {TOMA_DATASET_DIR}")
+    logger.info(f"Positives  : {CLONE_CSV_FILES}")
+    logger.info(f"             (type-3=near-miss clones, type-4=moderate Type-3 clones)")
+    logger.info(f"Negatives  : {NEGATIVE_CSV_FILES}")
+    logger.info(f"             (nonclone.csv=non-clones)")
+    logger.info(f"Model out  : models/{model_name}")
+    logger.info(f"GPU        : {'Enabled' if use_gpu else 'Disabled'}")
     logger.info("=" * 80)
 
     # ---- Load data -------------------------------------------------------
     code1_list, code2_list, labels = load_toma_dataset(
         dataset_dir=TOMA_DATASET_DIR,
         clone_csv_files=CLONE_CSV_FILES,
+        negative_csv_files=NEGATIVE_CSV_FILES,
         sample_size=sample_size,
     )
 

@@ -50,55 +50,58 @@ class BigCloneBenchEvaluator:
         self.type3_model = None
         self.type4_model = None
 
+        # Path to the balanced dataset
+        self.bcb_balanced_path = Path(
+            "/home/iamdasun/Projects/4yrg/gradeloop-core-v2/datasets/bigclonebench/"
+            "bigclonebench_balanced.json"
+        )
+
         # Benchmark results for comparison
         self.benchmarks = {
             "SourcererCC": {"precision": 0.87, "recall": 0.73, "f1": 0.79},
             "ASTNN": {"precision": 0.91, "recall": 0.85, "f1": 0.88},
         }
 
-    def load_bcb_samples(self, n_samples: int = 500) -> list:
-        """Load clone samples from BigCloneBench efficiently."""
-        bcb_dir = get_bigclonebench_dir()
-        jsonl_file = bcb_dir / "bigclonebench.jsonl"
+    def load_bcb_data(self) -> list:
+        """Load code pairs from BigCloneBench Balanced JSON."""
+        if not self.bcb_balanced_path.exists():
+            raise FileNotFoundError(f"Balanced BCB file not found: {self.bcb_balanced_path}")
 
-        if not jsonl_file.exists():
-            raise FileNotFoundError(f"BigCloneBench file not found: {jsonl_file}")
-
-        logger.info(f"Loading {n_samples} clones from BigCloneBench (28GB file)...")
-
-        # Read limited lines for efficiency
-        data = []
-        with open(jsonl_file, "r", encoding="utf-8") as f:
-            for i, line in enumerate(f):
-                if i >= 5000:  # Read first 5000 lines
-                    break
-                try:
-                    record = json.loads(line.strip())
-                    if record.get("clone_type") == 3:  # Only Type-3
-                        data.append(record)
-                        if len(data) >= n_samples:
-                            break
-                except json.JSONDecodeError:
-                    continue
-
-        logger.info(f"Loaded {len(data)} Type-3 clones from BCB")
-        return data
+        logger.info(f"Loading BigCloneBench Balanced from {self.bcb_balanced_path} …")
+        with open(self.bcb_balanced_path, "r", encoding="utf-8") as f:
+            return json.load(f)
 
     def load_models(self):
-        """Load trained models."""
+        """Load trained models (XGBoost)."""
         logger.info("Loading trained models...")
 
-        try:
-            self.type3_model = SyntacticClassifier.load("type3_rf.pkl")
-            logger.info("✓ Loaded Type-3 (Random Forest) model")
-        except FileNotFoundError:
-            logger.warning("Type-3 model not found. Run train_type3.py first")
+        # Try to find models in the new microservice structure first, then fallback
+        model_paths = [
+            Path(__file__).parent.parent.parent / "cipas-services/cipas-syntactics/clone_detection/models",
+            Path(__file__).parent.parent / "models"
+        ]
 
-        try:
-            self.type4_model = SemanticClassifier.load("type4_xgb.pkl")
-            logger.info("✓ Loaded Type-4 (XGBoost) model")
-        except FileNotFoundError:
-            logger.warning("Type-4 model not found. Run train_type4.py first")
+        # Type-3
+        for path in model_paths:
+            m_path = path / "type3_xgb.pkl"
+            if m_path.exists():
+                self.type3_model = SyntacticClassifier.load(str(m_path))
+                logger.info(f"✓ Loaded Type-3 (XGBoost) model from {m_path}")
+                break
+        
+        if not self.type3_model:
+            logger.warning("Type-3 model (type3_xgb.pkl) not found.")
+
+        # Type-4
+        for path in model_paths:
+            m_path = path / "type4_xgb.pkl"
+            if m_path.exists():
+                self.type4_model = SemanticClassifier.load(str(m_path))
+                logger.info(f"✓ Loaded Type-4 (XGBoost) model from {m_path}")
+                break
+
+        if not self.type4_model:
+            logger.warning("Type-4 model (type4_xgb.pkl) not found.")
 
     def extract_syntactic_features(
         self, code1: str, code2: str, language: str
@@ -129,51 +132,44 @@ class BigCloneBenchEvaluator:
         except Exception:
             return np.zeros(self.semantic_extractor.n_fused_features)
 
-    def evaluate_type3(self, n_clones: int = 200) -> dict:
+    def evaluate_type3(self, n_samples: int = 200) -> dict:
         """
-        Evaluate Type-3 detection using BCB clones + TOMA non-clones.
+        Evaluate Type-3 detection using BigCloneBench Balanced.
         """
         if self.type3_model is None:
             return {}
 
         logger.info("=" * 60)
-        logger.info("Type-3 Clone Detection Evaluation (BigCloneBench)")
+        logger.info("Type-3 Clone Detection Evaluation (BCB Balanced)")
         logger.info("=" * 60)
 
-        # Load BCB clones
-        bcb_clones = self.load_bcb_samples(n_clones)
+        # Load balanced data
+        records = self.load_bcb_data()
+        
+        # Filter for Type-3 clones or Non-clones
+        clones = [r for r in records if int(r["label"]) == 1 and int(r.get("clone_type", 0)) == 3]
+        non_clones = [r for r in records if int(r["label"]) == 0]
 
-        # Load TOMA non-clones
-        logger.info("Loading non-clones from TOMA dataset...")
-        df_nonclones = load_toma_csv("nonclone.csv")
-        df_nonclones = df_nonclones.sample(
-            n=min(n_clones, len(df_nonclones)), random_state=42
-        )
+        import random
+        random.seed(42)
+        if len(clones) > n_samples:
+            clones = random.sample(clones, n_samples)
+        if len(non_clones) > n_samples:
+            non_clones = random.sample(non_clones, n_samples)
+
+        logger.info(f"Evaluating on {len(clones)} Type-3 clones and {len(non_clones)} non-clones")
 
         # Build evaluation dataset
         features = []
         labels = []
 
-        # Process BCB clones (label=1)
-        logger.info(f"Processing {len(bcb_clones)} BCB clones...")
-        for record in bcb_clones[:n_clones]:
-            code1 = record.get("code1", "")
-            code2 = record.get("code2", "")
-            if code1 and code2:
-                lang = "java"  # BCB is Java-only
-                feat = self.extract_syntactic_features(code1, code2, lang)
-                features.append(feat)
-                labels.append(1)
-
-        # Process TOMA non-clones (label=0)
-        logger.info(f"Processing {len(df_nonclones)} TOMA non-clones...")
-        for _, row in df_nonclones.iterrows():
-            code1 = load_toma_code(row["id1"])
-            code2 = load_toma_code(row["id2"])
+        for record in clones + non_clones:
+            code1 = record.get("code1", "").strip()
+            code2 = record.get("code2", "").strip()
             if code1 and code2:
                 feat = self.extract_syntactic_features(code1, code2, "java")
                 features.append(feat)
-                labels.append(0)
+                labels.append(int(record["label"]))
 
         if len(features) < 10:
             logger.warning("Not enough valid samples")
@@ -181,10 +177,6 @@ class BigCloneBenchEvaluator:
 
         X = np.array(features)
         y = np.array(labels)
-
-        logger.info(
-            f"Evaluation dataset: {len(X)} samples ({sum(y)} clones, {len(y) - sum(y)} non-clones)"
-        )
 
         # Predict
         y_pred = self.type3_model.predict(X)
@@ -205,9 +197,7 @@ class BigCloneBenchEvaluator:
             "precision": precision_score(y, y_pred, zero_division=0),
             "recall": recall_score(y, y_pred, zero_division=0),
             "f1": f1_score(y, y_pred, zero_division=0),
-            "auc_roc": roc_auc_score(y, y_proba[:, 1])
-            if len(np.unique(y)) > 1
-            else 0.0,
+            "auc_roc": roc_auc_score(y, y_proba[:, 1]) if len(np.unique(y)) > 1 else 0.0,
         }
         metrics["confusion_matrix"] = confusion_matrix(y, y_pred).tolist()
 
@@ -222,46 +212,49 @@ class BigCloneBenchEvaluator:
 
         return metrics
 
-    def evaluate_type4(self, n_clones: int = 200) -> dict:
+    def evaluate_type4(self, n_samples: int = 200) -> dict:
         """
-        Evaluate Type-4 detection using BCB clones + TOMA non-clones.
+        Evaluate Type-4 detection using TOMA semantic clones + BCB non-clones.
         """
         if self.type4_model is None:
             return {}
 
         logger.info("\n" + "=" * 60)
-        logger.info("Type-4 Clone Detection Evaluation (BigCloneBench)")
+        logger.info("Type-4 Clone Detection Evaluation (TOMA + BCB)")
         logger.info("=" * 60)
 
-        # Load BCB clones (use same as Type-3)
-        bcb_clones = self.load_bcb_samples(n_clones)
+        # Load semantic clones from TOMA (balanced BCB doesn't have Type-4)
+        logger.info("Loading semantic clones from TOMA dataset...")
+        df_semantic = load_toma_csv("type-5.csv")
+        df_semantic = df_semantic.sample(n=min(n_samples, len(df_semantic)), random_state=43)
 
-        # Load TOMA non-clones
-        logger.info("Loading non-clones from TOMA dataset...")
-        df_nonclones = load_toma_csv("nonclone.csv")
-        df_nonclones = df_nonclones.sample(
-            n=min(n_clones, len(df_nonclones)), random_state=43
-        )
+        # Load non-clones from BCB Balanced
+        records = self.load_bcb_data()
+        non_clones = [r for r in records if int(r["label"]) == 0]
+        import random
+        random.seed(43)
+        if len(non_clones) > n_samples:
+            non_clones = random.sample(non_clones, n_samples)
 
         # Build evaluation dataset
         features = []
         labels = []
 
-        # Process BCB clones (label=1)
-        logger.info(f"Processing {len(bcb_clones)} BCB clones...")
-        for record in bcb_clones[:n_clones]:
-            code1 = record.get("code1", "")
-            code2 = record.get("code2", "")
+        # Process TOMA semantic clones (label=1)
+        logger.info(f"Processing {len(df_semantic)} TOMA semantic clones...")
+        for _, row in df_semantic.iterrows():
+            code1 = load_toma_code(row["id1"])
+            code2 = load_toma_code(row["id2"])
             if code1 and code2:
                 feat = self.extract_semantic_features(code1, code2, "java")
                 features.append(feat)
                 labels.append(1)
 
-        # Process TOMA non-clones (label=0)
-        logger.info(f"Processing {len(df_nonclones)} TOMA non-clones...")
-        for _, row in df_nonclones.iterrows():
-            code1 = load_toma_code(row["id1"])
-            code2 = load_toma_code(row["id2"])
+        # Process BCB non-clones (label=0)
+        logger.info(f"Processing {len(non_clones)} BCB non-clones...")
+        for record in non_clones:
+            code1 = record.get("code1", "").strip()
+            code2 = record.get("code2", "").strip()
             if code1 and code2:
                 feat = self.extract_semantic_features(code1, code2, "java")
                 features.append(feat)
@@ -273,10 +266,6 @@ class BigCloneBenchEvaluator:
 
         X = np.array(features)
         y = np.array(labels)
-
-        logger.info(
-            f"Evaluation dataset: {len(X)} samples ({sum(y)} clones, {len(y) - sum(y)} non-clones)"
-        )
 
         # Predict
         y_pred = self.type4_model.predict(X)
@@ -297,9 +286,7 @@ class BigCloneBenchEvaluator:
             "precision": precision_score(y, y_pred, zero_division=0),
             "recall": recall_score(y, y_pred, zero_division=0),
             "f1": f1_score(y, y_pred, zero_division=0),
-            "auc_roc": roc_auc_score(y, y_proba[:, 1])
-            if len(np.unique(y)) > 1
-            else 0.0,
+            "auc_roc": roc_auc_score(y, y_proba[:, 1]) if len(np.unique(y)) > 1 else 0.0,
         }
         metrics["confusion_matrix"] = confusion_matrix(y, y_pred).tolist()
 
@@ -375,8 +362,8 @@ def main():
     start_time = time.time()
 
     # Evaluate
-    type3_metrics = evaluator.evaluate_type3(n_clones=args.sample_size)
-    type4_metrics = evaluator.evaluate_type4(n_clones=args.sample_size)
+    type3_metrics = evaluator.evaluate_type3(n_samples=args.sample_size)
+    type4_metrics = evaluator.evaluate_type4(n_samples=args.sample_size)
 
     # Compare with benchmarks
     evaluator.compare_with_benchmarks(type3_metrics, type4_metrics)
