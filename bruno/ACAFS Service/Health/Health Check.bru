@@ -1,0 +1,11 @@
+meta {
+  name: Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{ACAFS_BASE_URL}}/api/v1/acafs/health
+  body: none
+  auth: inherit
+}
