@@ -1,0 +1,19 @@
+meta {
+  name: System Info
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{JUDGE0_URL}}/system_info
+  body: none
+  auth: none
+}
+
+docs {
+  # System Info
+  
+  Returns system information for the Judge0 instance.
+  
+  This includes information string like architecture, cpu count, memory, etc.
+}
