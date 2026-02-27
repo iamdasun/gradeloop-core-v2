@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 tui.py — Terminal User Interface for Clone Detection Management.
-Powered by Textual.
+
+Powered by Textual. Runs train.py (Stage 1: Clone Detector) and
+evaluate.py (Stages 1+2: Clone Detector + Type-3 Filter).
 """
 
 from textual.app import App, ComposeResult
@@ -96,19 +98,27 @@ class CloneDetectionTUI(App):
                 
                 with Vertical(classes="form-item"):
                     yield Label("Model Name:")
-                    yield Input(placeholder="type3_xgb.pkl", id="model-name", value="type3_xgb.pkl")
+                    yield Input(placeholder="clone_detector_xgb.pkl", id="model-name", value="clone_detector_xgb.pkl")
 
                 with Vertical(classes="form-item"):
                     yield Label("N Estimators:")
-                    yield Input(placeholder="200", id="n-estimators", value="200")
+                    yield Input(placeholder="500", id="n-estimators", value="500")
 
                 with Vertical(classes="form-item"):
                     yield Label("Scale Pos Weight:")
-                    yield Input(placeholder="5.0", id="scale-pos-weight", value="5.0")
+                    yield Input(placeholder="2.0", id="scale-pos-weight", value="2.0")
 
                 with Vertical(classes="form-item"):
                     yield Label("Colsample Bytree:")
-                    yield Input(placeholder="0.6", id="colsample-bytree", value="0.6")
+                    yield Input(placeholder="0.8", id="colsample-bytree", value="0.8")
+
+                with Vertical(classes="form-item"):
+                    yield Label("Min Child Weight:")
+                    yield Input(placeholder="2", id="min-child-weight", value="2")
+
+                with Vertical(classes="form-item"):
+                    yield Label("Gamma:")
+                    yield Input(placeholder="0.1", id="gamma", value="0.1")
 
                 with Vertical(classes="form-item"):
                     yield Label("Eval Threshold:")
@@ -116,6 +126,9 @@ class CloneDetectionTUI(App):
                 
                 with Horizontal(classes="form-item"):
                     yield Checkbox("Disable Node Types", value=False, id="no-node-types")
+
+                with Horizontal(classes="form-item"):
+                    yield Checkbox("Log Type-3 Similarity", value=False, id="log-type3")
                 
                 yield Button("RUN SCRIPT", variant="success", id="run-btn")
                 yield Button("CLEAR LOG", variant="default", id="clear-btn")
@@ -141,25 +154,31 @@ class CloneDetectionTUI(App):
         n_estimators     = self.query_one("#n-estimators", Input).value
         scale_pos_weight = self.query_one("#scale-pos-weight", Input).value
         colsample_bytree = self.query_one("#colsample-bytree", Input).value
+        min_child_weight = self.query_one("#min-child-weight", Input).value
+        gamma            = self.query_one("#gamma", Input).value
         threshold        = self.query_one("#threshold", Input).value
         no_node_types    = self.query_one("#no-node-types", Checkbox).value
+        log_type3        = self.query_one("#log-type3", Checkbox).value
 
         # Build command
         cmd = []
         if task == "train":
             cmd = ["poetry", "run", "python", "train.py"]
-            if sample_size:       cmd.extend(["--sample-size",      sample_size])
-            if model_name:        cmd.extend(["--model-name",        model_name])
-            if n_estimators:      cmd.extend(["--n-estimators",      n_estimators])
-            if scale_pos_weight:  cmd.extend(["--scale-pos-weight",  scale_pos_weight])
-            if colsample_bytree:  cmd.extend(["--colsample-bytree",  colsample_bytree])
-            if no_node_types:     cmd.append("--no-node-types")
+            if sample_size:       cmd.extend(["--sample-size",       sample_size])
+            if model_name:         cmd.extend(["--model-name",         model_name])
+            if n_estimators:       cmd.extend(["--n-estimators",       n_estimators])
+            if scale_pos_weight:   cmd.extend(["--scale-pos-weight",   scale_pos_weight])
+            if colsample_bytree:   cmd.extend(["--colsample-bytree",   colsample_bytree])
+            if min_child_weight:   cmd.extend(["--min-child-weight",   min_child_weight])
+            if gamma:              cmd.extend(["--gamma",              gamma])
+            if no_node_types:      cmd.append("--no-node-types")
         elif task == "evaluate":
             cmd = ["poetry", "run", "python", "evaluate.py"]
             if sample_size:       cmd.extend(["--sample-size",  sample_size])
             if model_name:        cmd.extend(["--model",         model_name])
             if threshold:         cmd.extend(["--threshold",     threshold])
             if no_node_types:     cmd.append("--no-node-types")
+            if log_type3:         cmd.append("--log-type3-similarity")
         elif task == "evaluate_bcb":
             # Jump to the legacy service script
             script_path = Path(__file__).parent.parent.parent / "cipas-service" / "scripts" / "evaluate_bcb.py"

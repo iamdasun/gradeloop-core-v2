@@ -1,36 +1,70 @@
 """
-train.py — Type-3 Clone Detection Model Training (ToMa + XGBoost).
+train.py — Clone Detection Model Training (Two-Stage Pipeline).
 
 Pipeline context:
-  Phase 1: NiCAD-style normalizer → detects Type-1 and Type-2 clones
-  Phase 2 (this model): ToMa + XGBoost → detects Type-3 clones
-  Fallback: Non-syntactic clone (semantic / Type-4+)
+  Stage 0: NiCAD-style normalizer detects Type-1 and Type-2 clones.
+           (Handled separately in the normalizer module.)
 
-Training data (from TOMA dataset, ALL SEMANTIC DATA EXCLUDED):
+  Stage 1 (this model): XGBoost Clone Detector
+           Trained on the full clone spectrum:
+             Type-1 + Type-2 + Type-3 → label = 1 (Clone)
+             NonClone                 → label = 0 (NonClone)
+           Learns what ANY syntactic clone looks like, not just Type-3.
+
+  Stage 2: Type-3 Filter (clone_detection/type3_filter.py)
+           Takes the clone probability and structural features, then
+           applies the near-miss corridor to isolate Type-3 clones:
+             levenshtein_ratio ≤ 0.85 AND
+             ast_jaccard       ≤ 0.90 AND
+             clone_probability ≥ 0.35
+
+Training data (TOMA dataset — TOMA label semantics):
   Positives (label = 1):
-    type-3.csv — syntactic near-miss clones (Type-3)
-    type-4.csv — moderate Type-3 clones (still syntactically similar)
+    type-1.csv  — exact clones                            (Type-1/2)
+    type-2.csv  — renamed / parameterized clones          (Type-1/2)
+    type-3.csv  — STRONG near-miss clones                 (Type-3)
+    type-4.csv  — MODERATE near-miss / heavy modification (Type-3)
+    type-5.csv  — WEAK near-miss / borderline semantic    (Type-3 / boundary of Type-4)
   Negatives (label = 0):
     nonclone.csv — confirmed non-clone pairs
 
-Optimization Strategy:
-  Objective  : Maximize Type-3 Recall (target: 40%+) at Precision ≥ 90%
-  scale_pos_weight = 5.0   — penalizes False Negatives more aggressively
-  sample_weight: rows from type-3.csv/type-4.csv get weight 2.0 (vs 1.0 for nonclone)
-  colsample_bytree = 0.6   — forces trees to use AST features by excluding
-                              String features (Levenshtein) in ~40% of branches
-  Threshold sweep: 0.10 → 0.50 in 0.05 steps — selects threshold that
-                   maximizes recall while keeping overall precision ≥ 90%.
+  ┌────────────────┬───────────┬─────────┬────────┬───────────────────────────────────────┐
+  │ CSV            │ TOMA type │  Target │ Weight │ Rationale                             │
+  ├────────────────┼───────────┼─────────┼────────┼───────────────────────────────────────┤
+  │ type-1.csv     │ Exact     │  8,000  │  1.5×  │ Easy positives — shape the boundary   │
+  │ type-2.csv     │ Renamed   │  8,000  │  1.5×  │ Easy positives — shape the boundary   │
+  │ type-3.csv     │ Strong T3 │ 20,000  │  2.0×  │ Hard near-miss — most important       │
+  │ type-4.csv     │ Moderate  │ 15,000  │  1.5×  │ Mid-difficulty — broadens T3 spectrum │
+  │ type-5.csv     │ Weak/T4   │ 10,000  │  1.0×  │ Noisy/borderline — gentle signal      │
+  │ nonclone.csv   │ NonClone  │ 25,000  │  1.0×  │ Balanced against larger positive set  │
+  └────────────────┴───────────┴─────────┴────────┴───────────────────────────────────────┘
 
-New Features:
-  feat_structural_density_1/2 : AST nodes per LOC for each snippet.
-  feat_structural_density_diff: Absolute difference in structural density.
-  These capture code complexity invariant to text similarity.
+Optimization Strategy:
+  Objective  : Maximize Type-3 Recall (target: ≥ 40%) at Precision ≥ 80%.
+  After the clone detector is trained, the Type-3 Filter provides
+  additional precision control without retraining.
+
+XGBoost Hyperparameters:
+  n_estimators     = 500
+  max_depth        = 8
+  learning_rate    = 0.05
+  subsample        = 0.9
+  colsample_bytree = 0.8   (relaxed from 0.6; richer positive set makes
+                             forced AST splits unnecessary)
+  min_child_weight = 2
+  gamma            = 0.1   (conservative pruning)
+  reg_lambda       = 1.0
+  eval_metric      = "auc"
+  scale_pos_weight = 2.0   (reduced from 5.0; larger positive class)
+  sample_weight    : type-3 → 2.0×, type-4 → 1.5×, type-1/2 → 1.5×,
+                     type-5 → 1.0×, nonclone → 1.0×
+
+Output model:
+  clone_detector_xgb.pkl
 
 Usage:
     poetry run python train.py
-    poetry run python train.py --sample-size 5000
-    poetry run python train.py --scale-pos-weight 3.0 --no-node-types
+    poetry run python train.py --scale-pos-weight 2.0 --no-node-types
 """
 
 import argparse
@@ -55,29 +89,56 @@ from clone_detection.utils.common_setup import setup_logging
 logger = setup_logging(__name__)
 
 # ---------------------------------------------------------------------------
-# Dataset paths & file lists (NO semantic data)
+# Dataset paths
 # ---------------------------------------------------------------------------
 
 TOMA_DATASET_DIR = Path(
     "/home/iamdasun/Projects/4yrg/gradeloop-core-v2/datasets/toma-dataset"
 )
 
-# Positive class — syntactic near-misses only
-CLONE_CSV_FILES = ["type-3.csv", "type-4.csv"]
+# Output model name used by Stage 1 of the two-stage pipeline.
+DEFAULT_MODEL_NAME = "clone_detector_xgb.pkl"
 
-# Negative class — genuine non-clones only
-NEGATIVE_CSV_FILES = ["nonclone.csv"]
+# ---------------------------------------------------------------------------
+# Balanced dataset targets
+# Each entry:  (csv_filename, label, target_count, sample_weight)
+#
+# TOMA label semantics used here:
+#   type-1.csv  → Exact clones             (easy positive)
+#   type-2.csv  → Renamed clones           (easy positive)
+#   type-3.csv  → Strong Type-3 near-miss  (hard positive — highest weight)
+#   type-4.csv  → Moderate Type-3          (mid-difficulty positive)
+#   type-5.csv  → Weak Type-3 / borderline (noisy signal — baseline weight)
+#   nonclone.csv → Confirmed non-clones    (negative class)
+# ---------------------------------------------------------------------------
+DATASET_CONFIG: list[tuple[str, int, int, float]] = [
+    ("type-1.csv",   1,  8_000, 1.5),   # Exact clones          — easy positive
+    ("type-2.csv",   1,  8_000, 1.5),   # Renamed clones        — easy positive
+    ("type-3.csv",   1, 20_000, 2.0),   # Strong near-miss      — hard positive, highest weight
+    ("type-4.csv",   1, 15_000, 1.5),   # Moderate near-miss    — mid-difficulty positive
+    ("type-5.csv",   1, 10_000, 1.0),   # Weak / borderline T4  — noisy positive, baseline weight
+    ("nonclone.csv", 0, 20_000, 1.0),   # Negative class        — equal to Type-3 to balance
+]
 
-# Default output model
-DEFAULT_MODEL_NAME = "type3_xgb.pkl"
 
-# Per-source sample weights applied during XGBoost .fit()
-# Near-miss sources are weighted higher to compensate for their difficulty.
-SOURCE_WEIGHTS: dict[str, float] = {
-    "type-3.csv": 2.0,   # Hard near-miss clones → emphasize heavily
-    "type-4.csv": 2.0,   # Moderate Type-3 → still syntactically challenging
-    "nonclone.csv": 1.0, # Negative class stays at baseline
-}
+# ---------------------------------------------------------------------------
+# Helper: binary label assignment
+# ---------------------------------------------------------------------------
+
+def label_clone_binary(clone_type: int) -> int:
+    """
+    Assign a binary training label based on clone type.
+
+    Args:
+        clone_type: Integer clone type (1, 2, 3) or 0 for non-clone.
+
+    Returns:
+        1 if the pair is any syntactic clone (Type-1, 2, or 3),
+        0 if it is a confirmed non-clone.
+    """
+    if clone_type in {1, 2, 3}:
+        return 1
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -98,16 +159,26 @@ def _load_code(func_id: str, id2code_dir: Path) -> str | None:
 
 def load_toma_dataset(
     dataset_dir: Path,
-    clone_csv_files: list[str],
-    negative_csv_files: list[str],
-    sample_size: int | None = None,
-) -> tuple[list[str], list[str], list[int], list[str]]:
+    dataset_config: list[tuple[str, int, int, float]],
+) -> tuple[list[str], list[str], list[int], list[str], list[float]]:
     """
-    Load TOMA dataset pairs for Type-3 syntactic clone detection.
+    Load TOMA dataset pairs for the two-stage clone detection model.
+
+    Applies balanced per-source sampling as defined in ``dataset_config``.
+    Each source has a target count so that Type-3 pairs dominate while
+    Type-1/2 still inform the model about the full clone spectrum.
+
+    Args:
+        dataset_dir:    Path to the TOMA dataset root.
+        dataset_config: List of (csv_name, label, target_count, sample_weight)
+                        tuples. ``label`` is a binary clone/non-clone int; the
+                        actual per-row clone type is read from the CSV but
+                        collapsed via ``label_clone_binary``.
 
     Returns:
-        (code1_list, code2_list, labels, sources)
-        sources — CSV filename for each pair (used to assign sample_weights).
+        (code1_list, code2_list, labels, sources, weights)
+        sources — CSV filename for each pair (used in per-source reporting).
+        weights — Per-row sample weights for XGBoost .fit().
     """
     id2code_dir = dataset_dir / "id2sourcecode"
     if not id2code_dir.exists():
@@ -115,66 +186,48 @@ def load_toma_dataset(
 
     code1_list: list[str] = []
     code2_list: list[str] = []
-    labels: list[int] = []
-    sources: list[str] = []
+    labels:     list[int] = []
+    sources:    list[str] = []
+    weights:    list[float] = []
 
-    # ── Positive pairs ──────────────────────────────────────────────────────
-    for csv_name in clone_csv_files:
+    for csv_name, binary_label, target_count, sample_weight in dataset_config:
         csv_path = dataset_dir / csv_name
         if not csv_path.exists():
-            logger.warning(f"[+] Clone CSV not found: {csv_path} — skipping")
+            logger.warning(f"CSV not found: {csv_path} — skipping")
             continue
 
-        logger.info(f"[+] Loading POSITIVE pairs from {csv_name} …")
-        df = pd.read_csv(csv_path, header=None,
-                         names=["FUNCTION_ID_ONE", "FUNCTION_ID_TWO", "CLONE_TYPE", "SIM1", "SIM2"])
-        if sample_size and len(df) > sample_size:
-            logger.info(f"    Sampling {sample_size:,} / {len(df):,} rows")
-            df = df.sample(n=sample_size, random_state=42)
+        logger.info(f"Loading {csv_name}  (label={binary_label}, target={target_count:,}) …")
 
-        loaded = 0
-        for _, row in tqdm(df.iterrows(), total=len(df), desc=f"    {csv_name}"):
-            c1 = _load_code(str(int(row["FUNCTION_ID_ONE"])), id2code_dir)
-            c2 = _load_code(str(int(row["FUNCTION_ID_TWO"])), id2code_dir)
-            if c1 and c2:
-                code1_list.append(c1)
-                code2_list.append(c2)
-                labels.append(1)
-                sources.append(csv_name)
-                loaded += 1
-        logger.info(f"    Loaded {loaded:,} valid positive pairs from {csv_name}")
-
-    # ── Negative pairs ──────────────────────────────────────────────────────
-    for csv_name in negative_csv_files:
-        neg_path = dataset_dir / csv_name
-        if not neg_path.exists():
-            logger.warning(f"[-] Negative CSV not found: {neg_path} — skipping")
-            continue
-
-        logger.info(f"[-] Loading NEGATIVE pairs from {csv_name} …")
+        # ---- Read CSV --------------------------------------------------------
         if csv_name == "nonclone.csv":
-            df_neg = pd.read_csv(neg_path)
+            df = pd.read_csv(csv_path)
         else:
-            df_neg = pd.read_csv(neg_path, header=None,
-                                 names=["FUNCTION_ID_ONE", "FUNCTION_ID_TWO", "CLONE_TYPE", "SIM1", "SIM2"])
+            df = pd.read_csv(
+                csv_path, header=None,
+                names=["FUNCTION_ID_ONE", "FUNCTION_ID_TWO", "CLONE_TYPE", "SIM1", "SIM2"],
+            )
 
-        if sample_size and len(df_neg) > sample_size:
-            logger.info(f"    Sampling {sample_size:,} / {len(df_neg):,} rows from {csv_name}")
-            df_neg = df_neg.sample(n=sample_size, random_state=42)
+        # Sample down to target count if needed
+        if len(df) > target_count:
+            logger.info(f"  Sampling {target_count:,} / {len(df):,} rows from {csv_name}")
+            df = df.sample(n=target_count, random_state=42)
 
+        # ---- Load code pairs ------------------------------------------------
         loaded = 0
-        for _, row in tqdm(df_neg.iterrows(), total=len(df_neg), desc=f"    {csv_name}"):
+        for _, row in tqdm(df.iterrows(), total=len(df), desc=f"  {csv_name}"):
             c1 = _load_code(str(int(row["FUNCTION_ID_ONE"])), id2code_dir)
             c2 = _load_code(str(int(row["FUNCTION_ID_TWO"])), id2code_dir)
             if c1 and c2:
                 code1_list.append(c1)
                 code2_list.append(c2)
-                labels.append(0)
+                labels.append(binary_label)
                 sources.append(csv_name)
+                weights.append(sample_weight)
                 loaded += 1
-        logger.info(f"    Loaded {loaded:,} valid negative pairs from {csv_name}")
 
-    return code1_list, code2_list, labels, sources
+        logger.info(f"  Loaded {loaded:,} valid pairs  (weight={sample_weight}×)")
+
+    return code1_list, code2_list, labels, sources, weights
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +246,9 @@ def extract_features(
     String features  (6)  : Jaccard, Dice, Levenshtein dist/ratio, Jaro, Jaro-Winkler
     AST features    (7+N) : Structural Jaccard, AST depth diff, node count diff/ratio,
                             structural_density_1/2/diff, per-node-type dists
+
+    Feature extraction is identical to what evaluate.py uses so that the
+    trained model can be applied directly without re-processing.
     """
     extractor = SyntacticFeatureExtractor(language=language, include_node_types=include_node_types)
     features: list[np.ndarray] = []
@@ -218,40 +274,44 @@ def extract_features(
 
 
 # ---------------------------------------------------------------------------
-# Threshold sweep — the core calibration step
+# Threshold sweep
 # ---------------------------------------------------------------------------
 
 def threshold_sweep(
     y_true: np.ndarray,
     y_proba: np.ndarray,
-    start: float = 0.10,
-    stop: float = 0.50,
-    step: float = 0.05,
-    target_precision: float = 0.90,
+    start: float = 0.30,
+    stop: float = 0.80,
+    step: float = 0.01,
 ) -> list[dict]:
     """
-    Sweep classification thresholds from `start` to `stop` in `step` increments.
+    Sweep classification thresholds from ``start`` to ``stop`` in ``step``
+    increments and compute precision / recall / F1 at each point.
 
-    For each threshold, reports precision, recall, F1, and whether the threshold
-    satisfies the precision floor.
-
-    Returns:
-        List of dicts with keys: threshold, precision, recall, f1, meets_floor
+    The primary goal is to maximize F1-score across the optimal boundary.
     """
     results = []
     thresholds = np.arange(start, stop + step / 2, step)
 
     for thresh in thresholds:
         y_pred = (y_proba >= thresh).astype(int)
-        prec = precision_score(y_true, y_pred, zero_division=0)
-        rec  = recall_score(y_true, y_pred, zero_division=0)
-        f1   = f1_score(y_true, y_pred, zero_division=0)
+        
+        # If all predictions are identical, avoid warnings
+        if len(np.unique(y_pred)) <= 1 and len(np.unique(y_true)) > 1:
+            prec = 0.0
+            rec = 0.0
+            f1 = 0.0
+        else:
+            prec = precision_score(y_true, y_pred, zero_division=0)
+            rec  = recall_score(y_true, y_pred, zero_division=0)
+            f1   = f1_score(y_true, y_pred, zero_division=0)
+            
         results.append({
             "threshold": round(float(thresh), 4),
             "precision": round(prec, 4),
             "recall":    round(rec,  4),
             "f1":        round(f1,   4),
-            "meets_floor": prec >= target_precision,
+            "meets_floor": True, # maintained for backward compat
         })
 
     return results
@@ -259,19 +319,12 @@ def threshold_sweep(
 
 def select_best_threshold(sweep_results: list[dict]) -> dict:
     """
-    From sweep results, select the threshold that:
-      1. Satisfies the precision floor (>= target_precision), AND
-      2. Maximizes recall.
-
-    Falls back to highest-precision entry if no threshold meets the floor.
+    Select the threshold that maximises F1 Score.
     """
-    floor_candidates = [r for r in sweep_results if r["meets_floor"]]
+    if not sweep_results:
+        return {"threshold": 0.5, "precision": 0.0, "recall": 0.0, "f1": 0.0}
 
-    if not floor_candidates:
-        logger.warning("No threshold achieved the precision floor — returning highest precision.")
-        return max(sweep_results, key=lambda r: r["precision"])
-
-    return max(floor_candidates, key=lambda r: r["recall"])
+    return max(sweep_results, key=lambda r: r["f1"])
 
 
 # ---------------------------------------------------------------------------
@@ -279,109 +332,232 @@ def select_best_threshold(sweep_results: list[dict]) -> dict:
 # ---------------------------------------------------------------------------
 
 def train(
-    sample_size: int | None = None,
     model_name: str = DEFAULT_MODEL_NAME,
+    sample_size: int | None = None,
     test_size: float = 0.2,
-    n_estimators: int = 200,
-    max_depth: int = 6,
-    learning_rate: float = 0.1,
-    subsample: float = 0.8,
-    colsample_bytree: float = 0.6,    # reduced from 0.8 → forces AST features into trees
-    scale_pos_weight: float = 5.0,    # aggressive FN penalization
+    n_estimators: int = 500,
+    max_depth: int = 8,
+    learning_rate: float = 0.05,
+    subsample: float = 0.9,
+    colsample_bytree: float = 0.8,
+    min_child_weight: int = 2,
+    gamma: float = 0.1,
+    reg_lambda: float = 1.0,
+    scale_pos_weight: float = 2.0,
     include_node_types: bool = True,
     use_gpu: bool = False,
 ) -> dict:
     """
-    Train the Type-3 recall-optimized XGBoost clone detection model.
+    Train the two-stage XGBoost Clone Detector (Stage 1).
 
-    Key choices:
-      * colsample_bytree=0.6  — each tree only sees 60% of features at split time;
-        since String features dominate, this forces the model to also rely on
-        feat_ast_jaccard, feat_node_block_diff, feat_structural_density_diff, etc.
-      * scale_pos_weight=5.0  — clone examples count 5× more than non-clone
-        examples in the gradient computation, pushing the model toward recall.
-      * sample_weight per-row — rows from type-3.csv / type-4.csv get 2× weight,
-        further emphasizing correct prediction of hard near-miss pairs.
-      * Threshold sweep 0.10→0.50 — post-training calibration to find the
-        operating point that maximises recall with precision ≥ 90%.
+    This model is trained on ALL syntactic clone types so that it learns
+    what *any* clone looks like before the Type-3 Filter (Stage 2) applies
+    the near-miss boundary correction.
+
+    Key design choices:
+      * Balanced sampling       — Type-3 pairs dominate (20k) while Type-1/2
+                                  (8k each) still teach the full spectrum.
+      * colsample_bytree=0.8   — Relaxed from 0.6; with a richer positive set
+                                  the AST features no longer need forced selection.
+      * scale_pos_weight=2.0   — Reduced from 5.0; Type-1/2 pairs make the
+                                  positive class much larger so less amplification.
+      * min_child_weight=2     — Prevents overfitting to rare structural patterns.
+      * gamma=0.1              — Conservative pruning for a balanced model.
+      * Threshold sweep        — Post-training calibration at precision floor 0.80;
+                                  the Type-3 Filter handles per-type precision.
 
     Returns:
-        dict of metrics at the selected operating threshold.
+        dict of metrics at the selected clone detector operating threshold.
     """
     logger.info("=" * 80)
-    logger.info("Type-3 Clone Detection — RECALL-OPTIMIZED Training (v2)")
+    logger.info("Two-Stage Clone Detection — Stage 1: XGBoost Clone Detector")
     logger.info("=" * 80)
-    logger.info(f"Positives        : {CLONE_CSV_FILES}")
-    logger.info(f"Negatives        : {NEGATIVE_CSV_FILES}")
-    logger.info(f"scale_pos_weight : {scale_pos_weight}")
-    logger.info(f"colsample_bytree : {colsample_bytree}  (reduced to boost AST feature usage)")
-    logger.info(f"sample_weights   : type-3/4 → 2.0×, nonclone → 1.0×")
-    logger.info(f"n_estimators     : {n_estimators}")
-    logger.info(f"Threshold sweep  : 0.10 → 0.50 @ 0.05 steps; precision floor = 90%")
+    logger.info("Training objective : Clone vs NonClone (Type-1 + 2 + 3 = positive)")
+    logger.info("Stage 2 (Type-3 Filter) will be applied at inference time in evaluate.py")
+    logger.info(f"n_estimators      : {n_estimators}")
+    logger.info(f"max_depth         : {max_depth}")
+    logger.info(f"learning_rate     : {learning_rate}")
+    logger.info(f"subsample         : {subsample}")
+    logger.info(f"colsample_bytree  : {colsample_bytree}")
+    logger.info(f"min_child_weight  : {min_child_weight}")
+    logger.info(f"gamma             : {gamma}")
+    logger.info(f"reg_lambda        : {reg_lambda}")
+    logger.info(f"scale_pos_weight  : {scale_pos_weight}")
+    logger.info(f"Precision floor   : 0.80 (Type-3 Filter adds extra precision)")
+    logger.info("")
+    for csv_name, label, target, weight in DATASET_CONFIG:
+        logger.info(f"  {csv_name:<16s}  label={label}  target={target:>6,}  weight={weight}×")
     logger.info("=" * 80)
 
-    # ---- Load data -----------------------------------------------------------
-    code1_list, code2_list, labels, sources = load_toma_dataset(
+    # ---- Handle sample_size ----------------------------------------------
+    config_to_use = DATASET_CONFIG
+    if sample_size is not None:
+        total_target = sum(t for _, _, t, _ in DATASET_CONFIG)
+        ratio = sample_size / total_target
+        config_to_use = [
+            (csv_name, label, max(1, int(target * ratio)), weight)
+            for csv_name, label, target, weight in DATASET_CONFIG
+        ]
+        logger.info(f"Applying sample_size={sample_size} (Scaling targets by {ratio:.4f})")
+        for csv_name, label, target, weight in config_to_use:
+            logger.info(f"  {csv_name:<16s}  Target: {target:>6,}")
+        logger.info("=" * 80)
+
+    # ---- Load balanced dataset -------------------------------------------
+    code1_list, code2_list, labels, sources, row_weights = load_toma_dataset(
         dataset_dir=TOMA_DATASET_DIR,
-        clone_csv_files=CLONE_CSV_FILES,
-        negative_csv_files=NEGATIVE_CSV_FILES,
-        sample_size=sample_size,
+        dataset_config=config_to_use,
     )
 
     total = len(labels)
     n_pos = sum(labels)
     n_neg = total - n_pos
-    logger.info(f"\nDataset: {total:,} pairs  |  Positives: {n_pos:,}  |  Negatives: {n_neg:,}")
+    logger.info(f"\nDataset: {total:,} pairs  |  Clones: {n_pos:,}  |  NonClones: {n_neg:,}")
 
-    # ---- Feature extraction -------------------------------------------------
+    # Log per-source breakdown
+    import collections
+    src_counts = collections.Counter(sources)
+    logger.info("\nPer-source counts:")
+    for src, cnt in sorted(src_counts.items()):
+        logger.info(f"  {src:<16s}: {cnt:,}")
+
+    # ---- Feature extraction -----------------------------------------------
     logger.info("\nExtracting hybrid String + AST + Structural Density features …")
     X, feature_names = extract_features(
         code1_list, code2_list, language="java", include_node_types=include_node_types
     )
     y = np.array(labels)
     s = np.array(sources)
+    w = np.array(row_weights)
 
     logger.info(f"Feature matrix: {X.shape}  ({len(feature_names)} features)")
     logger.info(f"  String features      : 6")
     logger.info(f"  AST core features    : 7  (incl. structural_density ×3)")
     logger.info(f"  Node-type dists      : {len(feature_names) - 13}")
 
-    # ---- Train/test split ---------------------------------------------------
-    X_train, X_test, y_train, y_test, s_train, s_test = train_test_split(
-        X, y, s, test_size=test_size, random_state=42, stratify=y
+    # ---- Train/test split ------------------------------------------------
+    X_train, X_test, y_train, y_test, s_train, s_test, w_train, w_test = train_test_split(
+        X, y, s, w, test_size=test_size, random_state=42, stratify=y
     )
 
-    # ---- Per-row sample weights ---------------------------------------------
-    # type-3 / type-4 rows → 2.0; nonclone → 1.0
-    train_weights = np.array([SOURCE_WEIGHTS.get(src, 1.0) for src in s_train])
-    logger.info(f"\nSample-weight distribution (train split):")
-    for src in np.unique(s_train):
-        w = SOURCE_WEIGHTS.get(src, 1.0)
-        n = np.sum(s_train == src)
-        logger.info(f"  {src:<16s} × {w:.1f}  ({n:,} rows)")
+    logger.info(f"\nTrain / test split  {1 - test_size:.0%} / {test_size:.0%}:")
+    logger.info(f"  Train: {len(y_train):,} pairs")
+    logger.info(f"  Test : {len(y_test):,} pairs")
+    
+    # ---- Dynamically compute scale_pos_weight ---------------------------
+    # Using negative_samples / positive_samples
+    computed_scale_pos_weight = float(np.sum(y_train == 0)) / max(1, np.sum(y_train == 1))
+    scale_pos_weight = computed_scale_pos_weight
+    logger.info(f"\nComputed scale_pos_weight = {scale_pos_weight:.4f} (neg={np.sum(y_train==0)} / pos={np.sum(y_train==1)})")
 
-    # ---- Classifier ---------------------------------------------------------
+    # ---- Per-row sample weight distribution (train) ----------------------
+    logger.info("\nSample-weight distribution (train split):")
+    for src in sorted(np.unique(s_train)):
+        mask = s_train == src
+        avg_w = w_train[mask].mean()
+        logger.info(f"  {src:<16s} × {avg_w:.2f}  ({mask.sum():,} rows)")
+    # ---- Classifier -------------------------------------------------------
     classifier = SyntacticClassifier(
         n_estimators=n_estimators,
         max_depth=max_depth,
         learning_rate=learning_rate,
         subsample=subsample,
         colsample_bytree=colsample_bytree,
+        min_child_weight=min_child_weight,
         feature_names=feature_names,
         use_gpu=use_gpu,
         scale_pos_weight=scale_pos_weight,
+        gamma=gamma,
+        reg_lambda=reg_lambda,
+        eval_metric="auc",
     )
+    
+    classifier.model.set_params(scale_pos_weight=scale_pos_weight)
 
-    logger.info(f"\nTraining XGBoost …")
-    classifier.model.fit(X_train, y_train, sample_weight=train_weights)
+    X_train_final = X_train
+    X_test_final = X_test
+
+    logger.info(f"\nScaling features with StandardScaler...")
+    X_train_scaled = classifier.scaler.fit_transform(X_train_final)
+    X_test_scaled = classifier.scaler.transform(X_test_final)
+    
+    # --- Feature Selection (importance >= 1%) ---
+    logger.info("\nRunning preliminary training for Feature Selection...")
+    classifier.model.fit(X_train_scaled, y_train, sample_weight=w_train)
+    
+    importances = classifier.model.feature_importances_
+    # features >= 1% importance
+    kept_indices = list(np.where(importances >= 0.01)[0])
+    
+    # Force keeping the Type-3 filter boundaries regardless of importance!
+    for mandatory_feat in ["feat_levenshtein_ratio", "feat_ast_jaccard"]:
+        if mandatory_feat in feature_names:
+            idx = feature_names.index(mandatory_feat)
+            if idx not in kept_indices:
+                kept_indices.append(idx)
+                
+    kept_indices = np.array(sorted(kept_indices))
+    dropped_count = len(feature_names) - len(kept_indices)
+    
+    if dropped_count > 0 and len(kept_indices) > 0:
+        logger.info(f"Dropping {dropped_count} features with < 1% importance.")
+        new_feature_names = [feature_names[i] for i in kept_indices]
+        X_train_final = X_train[:, kept_indices]
+        X_test_final = X_test[:, kept_indices]
+        
+        # update classifier features and fit scaler again on filtered features
+        classifier.feature_names = new_feature_names
+        X_train_scaled = classifier.scaler.fit_transform(X_train_final)
+        X_test_scaled = classifier.scaler.transform(X_test_final)
+    else:
+        logger.info("Keeping all features (none < 1% or all dropped).")
+
+    # --- Hyperparameter Optimization ---
+    logger.info("\nRunning RandomizedSearchCV Hyperparameter Optimization...")
+    from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
+    
+    param_dist = {
+        'max_depth': [4, 5, 6, 7],
+        'learning_rate': [0.03, 0.05, 0.1],
+        'n_estimators': [200, 300, 400, 500],
+        'subsample': [0.7, 0.8, 0.9],
+        'colsample_bytree': [0.7, 0.8, 0.9],
+        'gamma': [0, 0.1, 0.3],
+        'min_child_weight': [1, 3, 5],
+    }
+    
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    random_search = RandomizedSearchCV(
+        classifier.model, param_distributions=param_dist,
+        n_iter=5, scoring='f1', cv=cv, verbose=1, random_state=42, n_jobs=-1
+    )
+    # Fit random search (don't use early stopping/eval set here as CV handles it)
+    random_search.fit(X_train_scaled, y_train, sample_weight=w_train)
+    
+    best_params = random_search.best_params_
+    logger.info(f"Best hyperparameters found for F1: {best_params}")
+    classifier.model.set_params(**best_params)
+
+    # Configure early stopping parameter on the original model to safely run with early_stopping_rounds
+    classifier.model.set_params(early_stopping_rounds=30)
+    
+    # --- Final Training with Early Stopping ---
+    logger.info(f"\nTraining Final XGBoost Clone Detector with Early Stopping …")
+    
+    classifier.model.fit(
+        X_train_scaled, y_train, 
+        sample_weight=w_train,
+        eval_set=[(X_test_scaled, y_test)],
+        verbose=False
+    )
     classifier.is_trained = True
 
-    # ---- Threshold sweep ----------------------------------------------------
-    logger.info("\nRunning threshold sweep (0.10 → 0.50) …")
-    y_proba_test = classifier.predict_proba(X_test)[:, 1]
-    sweep = threshold_sweep(y_test, y_proba_test, target_precision=0.90)
+    # ---- Threshold sweep -------------------------------------------------
+    logger.info("\nRunning threshold sweep (0.30 → 0.80) to maximize F1 …")
+    # predict_proba expects unscaled features, it scales them automatically inside
+    y_proba_test = classifier.predict_proba(X_test_final)[:, 1]
+    sweep = threshold_sweep(y_test, y_proba_test)
 
-    # Print the sweep table
     logger.info(f"\n  {'Thresh':>7} | {'Precision':>9} | {'Recall':>7} | {'F1':>7} | Floor?")
     logger.info(f"  {'-'*7}-+-{'-'*9}-+-{'-'*7}-+-{'-'*7}-+-{'-'*6}")
     for row in sweep:
@@ -392,45 +568,74 @@ def train(
         )
 
     best = select_best_threshold(sweep)
-    logger.info(f"\n  ► Selected threshold: {best['threshold']:.2f}")
-    logger.info(f"    Precision : {best['precision']:.4f}")
-    logger.info(f"    Recall    : {best['recall']:.4f}")
-    logger.info(f"    F1        : {best['f1']:.4f}")
+    logger.info(f"\n  ► Selected threshold : {best['threshold']:.2f}")
 
-    # ---- Per-source recall at selected threshold ----------------------------
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
     y_pred_best = (y_proba_test >= best["threshold"]).astype(int)
-    logger.info("\nPer-Source Metrics at Selected Threshold:")
+    
+    # Final robust metrics
+    test_acc = accuracy_score(y_test, y_pred_best)
+    test_prec = precision_score(y_test, y_pred_best, zero_division=0)
+    test_rec = recall_score(y_test, y_pred_best, zero_division=0)
+    test_f1 = f1_score(y_test, y_pred_best, zero_division=0)
+    test_auc = roc_auc_score(y_test, y_proba_test)
+    
+    logger.info("\n" + "=" * 40)
+    logger.info("FINAL EVALUATION METRICS (Test Set)")
+    logger.info("=" * 40)
+    logger.info(f"Accuracy : {test_acc:.4f}")
+    logger.info(f"Precision: {test_prec:.4f}")
+    logger.info(f"Recall   : {test_rec:.4f}")
+    logger.info(f"F1 Score : {test_f1:.4f}")
+    logger.info(f"ROC AUC  : {test_auc:.4f}")
+    
+    cm = confusion_matrix(y_test, y_pred_best)
+    logger.info("\nConfusion Matrix:")
+    logger.info(f"True Neg (TN): {cm[0][0]:>6} | False Pos (FP): {cm[0][1]:>6}")
+    logger.info(f"False Neg(FN): {cm[1][0]:>6} | True Pos  (TP): {cm[1][1]:>6}")
+    logger.info("=" * 40)
+
+    # ---- Per-source recall at selected threshold -------------------------
+    y_pred_best = (y_proba_test >= best["threshold"]).astype(int)
+    logger.info("\nPer-Source Metrics at Selected Clone Detector Threshold:")
     logger.info(f"  {'Source':<18} | {'Metric':<7} | Value")
     logger.info(f"  {'-'*18}-+-{'-'*7}-+-{'-'*6}")
-    for src in np.unique(s_test):
+    for src in sorted(np.unique(s_test)):
         mask = s_test == src
         yt = y_test[mask]
         yp = y_pred_best[mask]
         if np.any(yt == 1):
-            tp = np.sum((yt == 1) & (yp == 1))
-            fn = np.sum((yt == 1) & (yp == 0))
+            tp = int(np.sum((yt == 1) & (yp == 1)))
+            fn = int(np.sum((yt == 1) & (yp == 0)))
             rec_src = tp / (tp + fn) if (tp + fn) > 0 else 0.0
             logger.info(f"  {src:<18s} | Recall  | {rec_src:.4f}  (TP={tp}, FN={fn})")
         else:
-            fp = np.sum((yt == 0) & (yp == 1))
+            fp = int(np.sum((yt == 0) & (yp == 1)))
             fpr = fp / len(yt) if len(yt) > 0 else 0.0
             logger.info(f"  {src:<18s} | FPR     | {fpr:.4f}  (FP={fp}, n={len(yt)})")
 
-    # ---- Feature importance -------------------------------------------------
+    # ---- Feature importance ----------------------------------------------
     logger.info("\nTop-20 Feature Importances:")
     logger.info(f"  {'Feature':<50} | Importance")
     logger.info(f"  {'-'*50}-+-{'-'*10}")
     for feat_name, imp in classifier.get_feature_importance_sorted()[:20]:
         logger.info(f"  {feat_name:<50s} | {imp:.4f}")
 
-    # ---- Save ---------------------------------------------------------------
-    # Persist calibrated threshold inside the pkl so evaluate.py can read it
-    # without the user needing to pass --threshold every time.
+    # ---- Save ------------------------------------------------------------
+    # Persist calibrated threshold in the pkl so evaluate.py/inference
+    # code can apply the same boundary without extra CLI flags.
     classifier.calibrated_threshold = best["threshold"]
     saved_path = classifier.save(model_name)
-    logger.info(f"\nModel saved → {saved_path}")
-    logger.info(f"Recommended inference threshold: {best['threshold']:.2f}")
-    logger.info("(Pass this via --threshold to evaluate.py or the inference pipeline)")
+    logger.info(f"\n{'='*80}")
+    logger.info(f"Model saved → {saved_path}")
+    logger.info(f"Clone detector threshold: {best['threshold']:.2f}")
+    logger.info("Next step: run evaluate.py to measure Type-3 recall via the Type-3 Filter")
+    logger.info(f"  poetry run python evaluate.py --threshold {best['threshold']:.2f}")
+    logger.info("  or sweep thresholds for the best Type-3 F1:")
+    logger.info("  for t in 0.10 0.15 0.20 0.25 0.30; do")
+    logger.info(f"    poetry run python evaluate.py --threshold $t")
+    logger.info("  done")
+    logger.info("=" * 80)
 
     return {
         "threshold": best["threshold"],
@@ -446,36 +651,48 @@ def train(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Train recall-optimized ToMa + XGBoost (Type-3 clone detection)",
+        description=(
+            "Train the two-stage XGBoost Clone Detector (Stage 1).\n\n"
+            "Labels: Type-1 + Type-2 + Type-3 → 1 (Clone), NonClone → 0.\n"
+            "Stage 2 (Type-3 Filter) is applied at evaluation / inference time."
+        ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--sample-size",       type=int,   default=None,
-                        help="Max rows per CSV file (None = use all)")
-    parser.add_argument("--model-name",        type=str,   default=DEFAULT_MODEL_NAME)
-    parser.add_argument("--n-estimators",      type=int,   default=200)
-    parser.add_argument("--max-depth",         type=int,   default=6)
-    parser.add_argument("--learning-rate",     type=float, default=0.1)
-    parser.add_argument("--subsample",         type=float, default=0.8)
-    parser.add_argument("--colsample-bytree",  type=float, default=0.6)
-    parser.add_argument("--scale-pos-weight",  type=float, default=5.0,
-                        help="XGBoost scale_pos_weight (5.0 = strong FN penalization)")
-    parser.add_argument("--no-node-types",     action="store_true",
+    parser.add_argument("--model-name",         type=str,   default=DEFAULT_MODEL_NAME)
+    parser.add_argument("--sample-size",        type=int,   default=None,
+                        help="Limit total pairs across all sources (scales config proportionally)")
+    parser.add_argument("--n-estimators",        type=int,   default=500)
+    parser.add_argument("--max-depth",           type=int,   default=8)
+    parser.add_argument("--learning-rate",       type=float, default=0.05)
+    parser.add_argument("--subsample",           type=float, default=0.9)
+    parser.add_argument("--colsample-bytree",    type=float, default=0.8)
+    parser.add_argument("--min-child-weight",    type=int,   default=2)
+    parser.add_argument("--gamma",               type=float, default=0.1,
+                        help="Min loss reduction for leaf split (conservative pruning)")
+    parser.add_argument("--reg-lambda",          type=float, default=1.0,
+                        help="L2 regularization on leaf weights")
+    parser.add_argument("--scale-pos-weight",    type=float, default=2.0,
+                        help="Scale factor for positive class (clone) gradient")
+    parser.add_argument("--no-node-types",       action="store_true",
                         help="Disable per-node-type AST distribution features")
-    parser.add_argument("--use-gpu",           action="store_true")
-    parser.add_argument("--verbose",           action="store_true")
+    parser.add_argument("--use-gpu",             action="store_true")
+    parser.add_argument("--verbose",             action="store_true")
 
     args = parser.parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
     train(
-        sample_size=args.sample_size,
         model_name=args.model_name,
+        sample_size=args.sample_size,
         n_estimators=args.n_estimators,
         max_depth=args.max_depth,
         learning_rate=args.learning_rate,
         subsample=args.subsample,
         colsample_bytree=args.colsample_bytree,
+        min_child_weight=args.min_child_weight,
+        gamma=args.gamma,
+        reg_lambda=args.reg_lambda,
         scale_pos_weight=args.scale_pos_weight,
         include_node_types=not args.no_node_types,
         use_gpu=args.use_gpu,

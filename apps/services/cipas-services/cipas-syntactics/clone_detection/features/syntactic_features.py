@@ -80,6 +80,28 @@ SYNTACTIC_FEATURE_NAMES = [
     "feat_jaro_winkler_similarity",
 ]
 
+TOKEN_FEATURE_NAMES = [
+    "token_jaccard",
+    "token_cosine",
+    "token_edit_similarity",
+    "token_lcs_similarity",
+]
+
+AST_STRUCTURAL_NAMES = [
+    "ast_node_similarity",
+    "ast_depth_similarity",
+    "statement_distribution_similarity",
+    "subtree_similarity",
+]
+
+CODE_METRICS_NAMES = [
+    "lines_ratio",
+    "token_count_ratio",
+    "loop_count_difference",
+    "condition_count_difference",
+    "function_call_similarity",
+]
+
 STRUCTURAL_FEATURE_NAMES = [
     "feat_ast_jaccard",
     "feat_ast_depth_diff",
@@ -120,6 +142,9 @@ class SyntacticFeatureExtractor:
 
         # Build feature names list
         self.feature_names = SYNTACTIC_FEATURE_NAMES.copy()
+        self.feature_names.extend(TOKEN_FEATURE_NAMES)
+        self.feature_names.extend(AST_STRUCTURAL_NAMES)
+        self.feature_names.extend(CODE_METRICS_NAMES)
         self.feature_names.extend(STRUCTURAL_FEATURE_NAMES)
 
         # Add node type distribution features if enabled
@@ -157,12 +182,36 @@ class SyntacticFeatureExtractor:
 
         syntactic_features = [jaccard, dice, lev_dist, lev_rat, jaro, jaro_wink]
 
+        # Additional Syntactic/Token Features
+        token_jaccard = jaccard
+        
+        # Token Cosine
+        counter1 = Counter(tokens1)
+        counter2 = Counter(tokens2)
+        token_cosine = self._cosine_similarity(counter1, counter2)
+        
+        # Token Edit distance on the arrays of tokens
+        token_edit = fuzz.ratio(tokens1, tokens2) / 100.0  # rapidfuzz works on lists of strings too
+        
+        # LCS Similarity
+        lcs = self._lcs_length(tokens1, tokens2)
+        max_len = max(len(tokens1), len(tokens2))
+        token_lcs_similarity = lcs / max_len if max_len > 0 else 1.0
+
+        token_features = [token_jaccard, token_cosine, token_edit, token_lcs_similarity]
+
         # Structural features will be computed from raw code
         # For backward compatibility, we compute them from tokens joined as strings
-        structural_features = self._extract_structural_features(str1, str2)
+        additional_struct, metrics, structural_features = self._extract_all_structural_metrics(str1, str2)
+
+        # Code Metrics
+        len1 = len(tokens1)
+        len2 = len(tokens2)
+        t_ratio = min(len1, len2) / max(len1, len2) if max(len1, len2) > 0 else 1.0
+        metrics[1] = t_ratio # overwrite block placeholder with actual token ratio
 
         # Combine all features
-        all_features = syntactic_features + structural_features
+        all_features = syntactic_features + token_features + additional_struct + metrics + structural_features
 
         return np.array(all_features)
 
@@ -206,11 +255,35 @@ class SyntacticFeatureExtractor:
 
         syntactic_features = [jaccard, dice, lev_dist, lev_rat, jaro, jaro_wink]
 
-        # Extract structural features from AST
-        structural_features = self._extract_structural_features(code1, code2)
+        # Additional Syntactic/Token Features
+        token_jaccard = jaccard
+        
+        # Token Cosine
+        counter1 = Counter(tokens1)
+        counter2 = Counter(tokens2)
+        token_cosine = self._cosine_similarity(counter1, counter2)
+        
+        # Token Edit distance
+        token_edit = fuzz.ratio(tokens1, tokens2) / 100.0
+        
+        # LCS Similarity
+        lcs = self._lcs_length(tokens1, tokens2)
+        max_len = max(len(tokens1), len(tokens2))
+        token_lcs_similarity = lcs / max_len if max_len > 0 else 1.0
+
+        token_features = [token_jaccard, token_cosine, token_edit, token_lcs_similarity]
+
+        # Extract all structural metrics
+        additional_struct, metrics, structural_features = self._extract_all_structural_metrics(code1, code2)
+
+        # Token count ratio
+        len1 = len(tokens1)
+        len2 = len(tokens2)
+        t_ratio = min(len1, len2) / max(len1, len2) if max(len1, len2) > 0 else 1.0
+        metrics[1] = t_ratio
 
         # Combine all features
-        all_features = syntactic_features + structural_features
+        all_features = syntactic_features + token_features + additional_struct + metrics + structural_features
 
         return np.array(all_features)
 
@@ -266,6 +339,108 @@ class SyntacticFeatureExtractor:
             return 0.0
 
         return (2 * intersection) / (len(set1) + len(set2))
+
+    def _lcs_length(self, seq1: list[str], seq2: list[str]) -> int:
+        """Calculate length of longest common subsequence."""
+        if not seq1 or not seq2:
+            return 0
+        
+        # O(N) space implementation
+        m, n = len(seq1), len(seq2)
+        # Use two rows to save space
+        prev = [0] * (n + 1)
+        curr = [0] * (n + 1)
+        
+        for i in range(1, m + 1):
+            for j in range(1, n + 1):
+                if seq1[i-1] == seq2[j-1]:
+                    curr[j] = prev[j-1] + 1
+                else:
+                    curr[j] = max(prev[j], curr[j-1])
+            prev, curr = curr, [0] * (n + 1)
+            
+        return prev[n]
+
+    def _extract_all_structural_metrics(self, code1: str, code2: str) -> tuple[list[float], list[float], list[float]]:
+        """
+        Extract additional AST limits, Code Metrics, and Classic Structural features.
+        Returns multiple feature lists to concatenate.
+        """
+        try:
+            ast_info1 = self._parse_code_safely(code1)
+            ast_info2 = self._parse_code_safely(code2)
+        except Exception:
+            ast_info1 = {"node_types": set(), "node_type_counts": {}, "max_depth": 0, "node_count": 0, "loc": 0}
+            ast_info2 = {"node_types": set(), "node_type_counts": {}, "max_depth": 0, "node_count": 0, "loc": 0}
+
+        # AST_STRUCTURAL_NAMES (4)
+        c1_node = ast_info1["node_count"]
+        c2_node = ast_info2["node_count"]
+        ast_node_similarity = min(c1_node, c2_node) / max(c1_node, c2_node) if max(c1_node, c2_node) > 0 else 1.0
+        
+        c1_depth = ast_info1["max_depth"]
+        c2_depth = ast_info2["max_depth"]
+        ast_depth_similarity = min(c1_depth, c2_depth) / max(c1_depth, c2_depth) if max(c1_depth, c2_depth) > 0 else 1.0
+
+        # Subtree / Statement distribution simplifications
+        cnt1 = ast_info1["node_type_counts"]
+        cnt2 = ast_info2["node_type_counts"]
+        
+        # Cosine sim on statement distributions
+        statement_distribution_similarity = self._cosine_similarity(Counter(cnt1), Counter(cnt2))
+        
+        # Jaccard on structural nodes acts as generic subtree similarity
+        subtree_similarity = self._structural_jaccard(ast_info1["node_types"], ast_info2["node_types"])
+
+        additional_struct = [ast_node_similarity, ast_depth_similarity, statement_distribution_similarity, subtree_similarity]
+
+        # CODE_METRICS_NAMES (5)
+        # lines_ratio, token_count_ratio, loop_count_difference, condition_count_difference, function_call_similarity
+        loc1 = ast_info1["loc"]
+        loc2 = ast_info2["loc"]
+        lines_ratio = min(loc1, loc2) / max(loc1, loc2) if max(loc1, loc2) > 0 else 1.0
+
+        # loop count
+        loop_nodes = ["for_statement", "while_statement", "do_statement", "enhanced_for_statement"]
+        loop1 = sum(cnt1.get(n, 0) for n in loop_nodes)
+        loop2 = sum(cnt2.get(n, 0) for n in loop_nodes)
+        loop_diff = abs(loop1 - loop2)
+
+        # conditions
+        cond_nodes = ["if_statement", "switch_statement", "ternary_expression"]
+        cond1 = sum(cnt1.get(n, 0) for n in cond_nodes)
+        cond2 = sum(cnt2.get(n, 0) for n in cond_nodes)
+        cond_diff = abs(cond1 - cond2)
+
+        # function calls
+        call1 = cnt1.get("method_invocation", 0)
+        call2 = cnt2.get("method_invocation", 0)
+        func_call_sim = min(call1, call2) / max(call1, call2) if max(call1, call2) > 0 else 1.0
+
+        metrics = [lines_ratio, 0.0, float(loop_diff), float(cond_diff), func_call_sim]
+
+        # STRUCTURAL_FEATURE_NAMES
+        n_structural_features = len(STRUCTURAL_FEATURE_NAMES)
+        if self.include_node_types:
+            n_structural_features += len(self._node_types)
+            
+        struct_jaccard = self._structural_jaccard(ast_info1["node_types"], ast_info2["node_types"])
+        depth_diff = self._normalize_depth_diff(ast_info1["max_depth"], ast_info2["max_depth"])
+        node_count_diff = self._normalize_node_count_diff(ast_info1["node_count"], ast_info2["node_count"])
+        node_count_ratio = self._node_count_ratio(ast_info1["node_count"], ast_info2["node_count"])
+        density1 = self._structural_density(code1, ast_info1["node_count"])
+        density2 = self._structural_density(code2, ast_info2["node_count"])
+        density_diff = abs(density1 - density2)
+        
+        struct_feats = [struct_jaccard, depth_diff, node_count_diff, node_count_ratio, density1, density2, density_diff]
+
+        if self.include_node_types:
+            node_type_diffs = self._node_type_distribution_diff(
+                ast_info1["node_type_counts"], ast_info2["node_type_counts"]
+            )
+            struct_feats.extend(node_type_diffs)
+            
+        return additional_struct, metrics, struct_feats
 
     def _extract_structural_features(self, code1: str, code2: str) -> list[float]:
         """
