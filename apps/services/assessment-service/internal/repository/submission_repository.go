@@ -37,6 +37,10 @@ type SubmissionRepository interface {
 	// It is called by the queue worker after a successful MinIO upload
 	// to move the submission from "queued" to "pending".
 	UpdateStatus(id uuid.UUID, status string) error
+
+	// UpdateExecutionResults updates the submission with Judge0 execution results.
+	// It is called by the queue worker after code execution.
+	UpdateExecutionResults(submission *domain.Submission) error
 }
 
 // submissionRepository is the concrete GORM-backed implementation.
@@ -200,4 +204,31 @@ func (r *submissionRepository) GetLatestSubmission(
 	}
 
 	return &submission, nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UpdateExecutionResults
+// ─────────────────────────────────────────────────────────────────────────────
+
+// UpdateExecutionResults updates the submission with Judge0 execution results.
+// It updates all execution-related fields including stdout, stderr, compile output,
+// execution status, time, memory, and test case results.
+func (r *submissionRepository) UpdateExecutionResults(submission *domain.Submission) error {
+	return r.db.
+		Model(&domain.Submission{}).
+		Where("id = ?", submission.ID).
+		Updates(map[string]interface{}{
+			"status":                submission.Status,
+			"execution_stdout":      submission.ExecutionStdout,
+			"execution_stderr":      submission.ExecutionStderr,
+			"compile_output":        submission.CompileOutput,
+			"execution_status":      submission.ExecutionStatus,
+			"execution_status_id":   submission.ExecutionStatusID,
+			"execution_time":        submission.ExecutionTime,
+			"memory_used":           submission.MemoryUsed,
+			"test_cases_passed":     submission.TestCasesPassed,
+			"total_test_cases":      submission.TotalTestCases,
+			"test_case_results":     submission.TestCaseResults,
+		}).
+		Error
 }

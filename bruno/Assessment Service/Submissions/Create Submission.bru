@@ -18,6 +18,7 @@ body:json {
   {
     "assignment_id": "{{ASSIGNMENT_ID}}",
     "language": "python",
+    "language_id": 71,
     "code": "def solve():\n    print('Hello, GradeLoop!')\n\nsolve()"
   }
 }
@@ -41,6 +42,7 @@ script:post-response {
     console.log("   Is Latest  :", res.body.is_latest);
     console.log("   Status     :", res.body.status);
     console.log("   Language   :", res.body.language);
+    console.log("   Language ID:", res.body.language_id);
     console.log("   Storage    :", res.body.storage_path);
     console.log("   Submitted  :", res.body.submitted_at);
 
@@ -94,6 +96,7 @@ docs {
   | assignment_id | uuid   | ✅       | The assignment this submission belongs to                |
   | group_id      | uuid   | ❌       | Omit for individual; provide for group submission        |
   | language      | string | ❌       | Programming language identifier, e.g. "python", "go"    |
+  | language_id   | int    | ❌       | Judge0 language ID (e.g., 71 for Python, 60 for Go)     |
   | code          | string | ✅       | The full source code to submit (stored in MinIO)         |
 
   ## Individual Submission (default)
@@ -135,6 +138,7 @@ docs {
     "user_id":       "uuid",
     "storage_path":  "submissions/assign-uuid/sub-uuid/code.txt",
     "language":      "python",
+    "language_id":   71,
     "status":        "pending",
     "version":       1,
     "is_latest":     true,

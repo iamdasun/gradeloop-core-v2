@@ -55,6 +55,14 @@ type SubmissionService interface {
 		assignmentID uuid.UUID,
 		userID, groupID *uuid.UUID,
 	) (*domain.Submission, error)
+
+	// RunCode executes code via Judge0 without creating a persistent submission.
+	// Validates that the user is enrolled in the assignment's course.
+	RunCode(
+		ctx context.Context,
+		req *dto.RunCodeRequest,
+		userID uuid.UUID,
+	) (*dto.RunCodeResponse, error)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,6 +77,8 @@ type submissionService struct {
 	publisher      *queue.SubmissionPublisher
 	auditClient    *client.AuditClient
 	academicClient *client.AcademicClient
+	judge0Client   *client.Judge0Client
+	maxPayloadSize int64
 	db             *gorm.DB
 	logger         *zap.Logger
 }
@@ -82,6 +92,8 @@ func NewSubmissionService(
 	publisher *queue.SubmissionPublisher,
 	auditClient *client.AuditClient,
 	academicClient *client.AcademicClient,
+	judge0Client *client.Judge0Client,
+	maxPayloadSize int64,
 	db *gorm.DB,
 	logger *zap.Logger,
 ) SubmissionService {
@@ -93,6 +105,8 @@ func NewSubmissionService(
 		publisher:      publisher,
 		auditClient:    auditClient,
 		academicClient: academicClient,
+		judge0Client:   judge0Client,
+		maxPayloadSize: maxPayloadSize,
 		db:             db,
 		logger:         logger,
 	}
@@ -252,6 +266,7 @@ func (s *submissionService) CreateSubmission(
 			GroupID:      ownerGroupID,
 			StoragePath:  storagePath,
 			Language:     req.Language,
+			LanguageID:   req.LanguageID,
 			Status:       string(domain.SubmissionStatusQueued),
 			Version:      nextVersion,
 			IsLatest:     true,
@@ -279,6 +294,7 @@ func (s *submissionService) CreateSubmission(
 		AssignmentID: req.AssignmentID,
 		Code:         req.Code,
 		Language:     req.Language,
+		LanguageID:   req.LanguageID,
 		StoragePath:  newSubmission.StoragePath,
 		UserID:       userID.String(),
 		Username:     username,
@@ -444,4 +460,89 @@ func (s *submissionService) assertGroupMembership(
 	}
 
 	return utils.ErrBadRequest("invalid group: you are not a member of this group")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RunCode
+// ─────────────────────────────────────────────────────────────────────────────
+
+// RunCode executes code via Judge0 without creating a persistent submission.
+// It validates that the user is enrolled in the assignment's course instance.
+func (s *submissionService) RunCode(
+	ctx context.Context,
+	req *dto.RunCodeRequest,
+	userID uuid.UUID,
+) (*dto.RunCodeResponse, error) {
+	// Validate request
+	if req.AssignmentID == uuid.Nil {
+		return nil, utils.ErrBadRequest("assignment_id is required")
+	}
+	if req.SourceCode == "" {
+		return nil, utils.ErrBadRequest("source_code is required")
+	}
+	if req.LanguageID == 0 {
+		return nil, utils.ErrBadRequest("language_id is required")
+	}
+
+	// Check payload size
+	if int64(len(req.SourceCode)) > s.maxPayloadSize {
+		return nil, utils.ErrBadRequest("source_code exceeds maximum allowed size")
+	}
+
+	// Load and validate the assignment
+	assignment, err := s.assignmentRepo.GetAssignmentByID(req.AssignmentID)
+	if err != nil {
+		s.logger.Error("failed to load assignment for run-code",
+			zap.String("assignment_id", req.AssignmentID.String()),
+			zap.Error(err),
+		)
+		return nil, utils.ErrInternal("failed to load assignment", err)
+	}
+	if assignment == nil {
+		return nil, utils.ErrNotFound("assignment not found")
+	}
+	if !assignment.IsActive {
+		return nil, utils.ErrBadRequest("assignment is not active")
+	}
+
+	// Check enrollment
+	enrolled, err := s.academicClient.IsEnrolled(
+		userID.String(),
+		assignment.CourseInstanceID.String(),
+	)
+	if err != nil {
+		s.logger.Warn("enrollment check failed for run-code; proceeding without enrollment gate",
+			zap.String("user_id", userID.String()),
+			zap.String("course_instance_id", assignment.CourseInstanceID.String()),
+			zap.Error(err),
+		)
+	} else if !enrolled {
+		return nil, utils.ErrForbidden("not enrolled in the course instance for this assignment")
+	}
+
+	// Execute code via Judge0
+	execResult, err := s.judge0Client.CreateSubmission(ctx, client.Judge0SubmissionRequest{
+		SourceCode: req.SourceCode,
+		LanguageID: req.LanguageID,
+		Stdin:      req.Stdin,
+	})
+	if err != nil {
+		s.logger.Error("judge0 execution failed",
+			zap.String("user_id", userID.String()),
+			zap.Int("language_id", req.LanguageID),
+			zap.Error(err),
+		)
+		return nil, utils.ErrInternal("code execution failed", err)
+	}
+
+	return &dto.RunCodeResponse{
+		Stdout:        execResult.Stdout,
+		Stderr:        execResult.Stderr,
+		CompileOutput: execResult.CompileOutput,
+		ExecutionTime: execResult.Time,
+		MemoryUsed:    execResult.Memory,
+		Status:        execResult.Status.Description,
+		StatusID:      execResult.Status.ID,
+		Message:       execResult.Message,
+	}, nil
 }

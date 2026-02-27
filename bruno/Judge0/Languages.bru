@@ -1,0 +1,19 @@
+meta {
+  name: Languages
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{JUDGE0_URL}}/languages
+  body: none
+  auth: none
+}
+
+docs {
+  # Supported Languages
+  
+  Returns a list of supported programming languages and their internal Judge0 IDs.
+  
+  For example, 71 is typically Python, 60 is Go, etc.
+}

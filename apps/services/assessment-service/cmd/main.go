@@ -94,6 +94,7 @@ func run() error {
 	// ── External clients ─────────────────────────────────────────────────────
 	auditClient := client.NewAuditClient(cfg.IAMServiceURL, logger)
 	academicClient := client.NewAcademicClient(cfg.AcademicSvcURL, logger)
+	judge0Client := client.NewJudge0Client(cfg.Judge0.URL, cfg.Judge0.APIKey, cfg.Judge0.Timeout, logger)
 
 	// ── Repositories ─────────────────────────────────────────────────────────
 	assignmentRepo := repository.NewAssignmentRepository(db.DB)
@@ -103,10 +104,16 @@ func run() error {
 	// ── Message queue: publisher + worker + consumer ──────────────────────────
 	submissionPublisher := queue.NewSubmissionPublisher(rmq, logger)
 
+	// Create evaluation service for test case evaluation
+	evaluationService := service.NewEvaluationService(judge0Client, logger)
+
 	submissionWorker := service.NewSubmissionWorker(
 		submissionRepo,
+		assignmentRepo,
 		minioStorage,
 		auditClient,
+		judge0Client,
+		evaluationService,
 		db.DB,
 		logger,
 	)
@@ -129,6 +136,8 @@ func run() error {
 		submissionPublisher,
 		auditClient,
 		academicClient,
+		judge0Client,
+		cfg.Judge0.MaxPayloadSize,
 		db.DB,
 		logger,
 	)

@@ -1,0 +1,108 @@
+meta {
+  name: Run Code
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{SUBMISSIONS_URL_V1}}/run-code
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "assignment_id": "{{ASSIGNMENT_ID}}",
+    "language_id": 71,
+    "source_code": "def solve():\n    print('Hello, Judge0!')\n\nsolve()",
+    "stdin": ""
+  }
+}
+
+docs {
+  # Run Code
+  
+  Executes code via Judge0 without creating a persistent submission.
+  This endpoint is used for testing code before final submission.
+  
+  ## Endpoint
+  POST /api/v1/submissions/run-code
+  
+  ## Authentication
+  - Requires a valid Bearer access token.
+  - User must be enrolled in the assignment's course instance.
+  
+  ## Request Body Fields
+  | Field         | Type   | Required | Description                                              |
+  |---------------|--------|----------|----------------------------------------------------------|
+  | assignment_id | uuid   | ✅       | The assignment to validate enrollment against            |
+  | language_id   | int    | ✅       | Judge0 language ID (e.g., 71 for Python, 60 for Go)     |
+  | source_code   | string | ✅       | The source code to execute                               |
+  | stdin         | string | ❌       | Optional input to provide to the program                 |
+  
+  ## Common Language IDs
+  | Language | ID |
+  |----------|-----|
+  | Python   | 71  |
+  | Go       | 60  |
+  | Java     | 62  |
+  | C++      | 54  |
+  | C        | 50  |
+  | JavaScript | 63 |
+  
+  ## Response (200 OK)
+  ```json
+  {
+    "stdout": "Hello, Judge0!\n",
+    "stderr": "",
+    "compile_output": "",
+    "execution_time": "0.023",
+    "memory_used": 1234,
+    "status": "Accepted",
+    "status_id": 3,
+    "message": ""
+  }
+  ```
+  
+  ## Response Fields
+  | Field          | Type   | Description                                              |
+  |----------------|--------|----------------------------------------------------------|
+  | stdout         | string | Program standard output                                  |
+  | stderr         | string | Program standard error                                   |
+  | compile_output | string | Compiler output (if any)                                 |
+  | execution_time | string | Execution time in seconds                                |
+  | memory_used    | int    | Memory used in KB                                        |
+  | status         | string | Execution status description (e.g., "Accepted")          |
+  | status_id      | int    | Judge0 status ID (3 = Accepted, 6 = Compilation Error, etc.) |
+  | message        | string | Additional message from Judge0                           |
+  
+  ## Judge0 Status IDs
+  | ID | Description              |
+  |----|--------------------------|
+  | 3  | Accepted                 |
+  | 4  | Wrong Answer             |
+  | 5  | Time Limit Exceeded      |
+  | 6  | Compilation Error        |
+  | 7  | Runtime Error (SIGSEGV)  |
+  | 8  | Runtime Error (SIGXFSZ)  |
+  | 9  | Runtime Error (SIGFPE)   |
+  | 10 | Runtime Error (SIGABRT)  |
+  | 11 | Runtime Error (NZEC)     |
+  | 12 | Runtime Error (Other)    |
+  | 13 | Internal Error           |
+  | 14 | Exec Format Error        |
+  
+  ## Error Responses
+  | Status | Reason                                                              |
+  |--------|---------------------------------------------------------------------|
+  | 400    | Missing required fields, invalid assignment_id, inactive assignment |
+  | 401    | Missing or invalid Bearer token                                     |
+  | 403    | Not enrolled in the course instance                                 |
+  | 404    | Assignment not found                                                |
+  | 413    | Source code exceeds maximum size (64KB default)                     |
+  | 503    | Judge0 service unavailable                                          |
+}

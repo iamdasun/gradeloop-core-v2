@@ -11,7 +11,7 @@ import (
 // Claims mirrors the JWT structure emitted by the IAM Service.
 type Claims struct {
 	UserID      string   `json:"user_id"`
-	Username    string   `json:"username"`
+	Email       string   `json:"email"`
 	RoleName    string   `json:"role_name"`
 	Permissions []string `json:"permissions"`
 	jwt.RegisteredClaims
@@ -61,7 +61,7 @@ func AuthMiddleware(secretKey []byte) fiber.Handler {
 		}
 
 		c.Locals("user_id", claims.UserID)
-		c.Locals("username", claims.Username)
+		c.Locals("username", claims.Email)
 		c.Locals("role_name", claims.RoleName)
 		c.Locals("permissions", claims.Permissions)
 

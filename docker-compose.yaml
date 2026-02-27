@@ -313,6 +313,11 @@ services:
       # RabbitMQ message queue
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - RABBITMQ_SUBMISSION_WORKERS=${ASSESSMENT_SVC_SUBMISSION_WORKERS:-8}
+      # Judge0 code execution service
+      - JUDGE0_URL=${JUDGE0_URL}
+      - JUDGE0_API_KEY=${JUDGE0_API_KEY}
+      - JUDGE0_TIMEOUT_SECONDS=${JUDGE0_TIMEOUT_SECONDS:-30}
+      - JUDGE0_MAX_PAYLOAD_SIZE=${JUDGE0_MAX_PAYLOAD_SIZE:-65536}
 
     expose:
       - "8084"

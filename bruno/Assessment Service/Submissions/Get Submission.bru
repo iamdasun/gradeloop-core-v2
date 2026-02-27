@@ -91,10 +91,18 @@ docs {
     "user_id":       "uuid",
     "storage_path":  "submissions/assign-uuid/sub-uuid/code.txt",
     "language":      "python",
-    "status":        "pending",
+    "language_id":   71,
+    "status":        "accepted",
     "version":       1,
     "is_latest":     true,
-    "submitted_at":  "2025-08-01T10:00:00Z"
+    "submitted_at":  "2025-08-01T10:00:00Z",
+    "execution_status": "Accepted",
+    "execution_status_id": 3,
+    "execution_time": "0.045",
+    "memory_used": 5678,
+    "execution_stdout": "Hello, GradeLoop!\n",
+    "execution_stderr": "",
+    "compile_output": ""
   }
   ```
 
@@ -115,19 +123,30 @@ docs {
   ```
 
   ## Fields
-  | Field         | Type      | Description                                               |
-  |---------------|-----------|-----------------------------------------------------------|
-  | id            | uuid      | Submission primary key                                    |
-  | assignment_id | uuid      | The assignment this submission belongs to                 |
-  | user_id       | uuid/null | Owner for individual submissions; null for group ones     |
-  | group_id      | uuid/null | Owner for group submissions; null for individual ones     |
-  | storage_path  | string    | MinIO object key — use the /code endpoint to fetch bytes  |
-  | language      | string    | Programming language, e.g. "python", "go"                |
-  | status        | string    | pending / running / accepted / rejected / error           |
-  | version       | integer   | Monotonically increasing counter per (assignment, owner)  |
-  | is_latest     | boolean   | true on exactly one record per (assignment, owner) scope  |
-  | judge0_job_id | string    | Populated by the judge runner when execution starts       |
-  | submitted_at  | timestamp | UTC timestamp of when this version was created            |
+  | Field                | Type      | Description                                               |
+  |----------------------|-----------|-----------------------------------------------------------|
+  | id                   | uuid      | Submission primary key                                    |
+  | assignment_id        | uuid      | The assignment this submission belongs to                 |
+  | user_id              | uuid/null | Owner for individual submissions; null for group ones     |
+  | group_id             | uuid/null | Owner for group submissions; null for individual ones     |
+  | storage_path         | string    | MinIO object key — use the /code endpoint to fetch bytes  |
+  | language             | string    | Programming language, e.g. "python", "go"                |
+  | language_id          | int       | Judge0 language ID for code execution                     |
+  | status               | string    | pending / running / accepted / rejected / error           |
+  | version              | integer   | Monotonically increasing counter per (assignment, owner)  |
+  | is_latest            | boolean   | true on exactly one record per (assignment, owner) scope  |
+  | judge0_job_id        | string    | Populated by the judge runner when execution starts       |
+  | submitted_at         | timestamp | UTC timestamp of when this version was created            |
+  | execution_status     | string    | Judge0 execution status (e.g., "Accepted")                |
+  | execution_status_id  | int       | Judge0 status ID (3=Accepted, 6=Compilation Error, etc.)  |
+  | execution_time       | string    | Execution time in seconds                                 |
+  | memory_used          | int       | Memory used in KB                                         |
+  | execution_stdout     | string    | Program standard output                                   |
+  | execution_stderr     | string    | Program standard error                                    |
+  | compile_output       | string    | Compiler output                                           |
+  | test_cases_passed    | int       | Number of test cases passed                               |
+  | total_test_cases     | int       | Total number of test cases                                |
+  | test_case_results    | array     | Detailed test case results                                |
 
   ## Variable Automation
   On success this script saves:

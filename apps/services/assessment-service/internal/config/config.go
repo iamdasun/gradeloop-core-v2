@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -15,6 +16,7 @@ type Config struct {
 	JWT            JWTConfig
 	MinIO          MinIOConfig
 	RabbitMQ       RabbitMQConfig
+	Judge0         Judge0Config
 	FrontendURL    string
 	IAMServiceURL  string
 	AcademicSvcURL string
@@ -61,6 +63,24 @@ type RabbitMQConfig struct {
 	SubmissionWorkers int
 }
 
+// Judge0Config holds Judge0 code execution service settings.
+type Judge0Config struct {
+	// URL is the base URL of the Judge0 instance, e.g.
+	// http://judge0:2358 or http://localhost:2358
+	URL string
+
+	// APIKey is the optional authentication token for Judge0.
+	APIKey string
+
+	// Timeout is the maximum time to wait for code execution.
+	// Defaults to 30 seconds.
+	Timeout time.Duration
+
+	// MaxPayloadSize is the maximum allowed source code size in bytes.
+	// Defaults to 64KB (65536 bytes).
+	MaxPayloadSize int64
+}
+
 // Load reads configuration from environment variables, falling back to
 // sensible defaults. A missing .env file is silently ignored.
 func Load() (*Config, error) {
@@ -96,6 +116,12 @@ func Load() (*Config, error) {
 		RabbitMQ: RabbitMQConfig{
 			URL:               getEnv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/"),
 			SubmissionWorkers: getEnvAsInt("RABBITMQ_SUBMISSION_WORKERS", 8),
+		},
+		Judge0: Judge0Config{
+			URL:            getEnv("JUDGE0_URL", "http://localhost:2358"),
+			APIKey:         getEnv("JUDGE0_API_KEY", ""),
+			Timeout:        time.Duration(getEnvAsInt("JUDGE0_TIMEOUT_SECONDS", 30)) * time.Second,
+			MaxPayloadSize: getEnvAsInt64("JUDGE0_MAX_PAYLOAD_SIZE", 65536),
 		},
 		FrontendURL:    getEnv("FRONTEND_URL", "http://localhost:3000"),
 		IAMServiceURL:  getEnv("IAM_SERVICE_URL", "http://localhost:8081"),
@@ -141,6 +167,18 @@ func getEnvAsInt(key string, defaultValue int) int {
 		return defaultValue
 	}
 	result, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue
+	}
+	return result
+}
+
+func getEnvAsInt64(key string, defaultValue int64) int64 {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	result, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
 		return defaultValue
 	}
