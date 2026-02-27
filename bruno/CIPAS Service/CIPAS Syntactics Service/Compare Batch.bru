@@ -1,0 +1,33 @@
+meta {
+  name: Compare Batch
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{CIPAS_SYNTACTICS_URL_V1}}/compare/batch
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "pairs": [
+      {
+        "code1": "public int foo(int x) { return x + 1; }",
+        "code2": "public int bar(int y) { return y + 1; }",
+        "language": "java"
+      },
+      {
+        "code1": "int add(int a, int b) { return a + b; }",
+        "code2": "int sum(int x, int y) { return x + y; }",
+        "language": "java"
+      }
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

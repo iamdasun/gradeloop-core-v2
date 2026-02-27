@@ -27,7 +27,7 @@ var (
 )
 
 type AuthService interface {
-	Login(ctx context.Context, username, password string) (*dto.LoginResponse, error)
+	Login(ctx context.Context, email, password string) (*dto.LoginResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*dto.RefreshTokenResponse, error)
 	Logout(ctx context.Context, refreshToken string) error
 	RevokeUserSessions(ctx context.Context, userID uuid.UUID, actorPermissions []string) (*dto.RevokeUserSessionsResponse, error)
@@ -57,9 +57,9 @@ func NewAuthService(
 	}
 }
 
-func (s *authService) Login(ctx context.Context, username, password string) (*dto.LoginResponse, error) {
-	// Get user with role and permissions (username parameter is actually email)
-	user, err := s.authRepo.GetUserByEmail(ctx, username)
+func (s *authService) Login(ctx context.Context, email, password string) (*dto.LoginResponse, error) {
+	// Get user with role and permissions
+	user, err := s.authRepo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, fmt.Errorf("fetching user: %w", err)
 	}

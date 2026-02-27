@@ -1,0 +1,24 @@
+meta {
+  name: Tokenize Code
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{CIPAS_SYNTACTICS_URL_V1}}/tokenize
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "code": "int x = calculate(a, b);",
+    "language": "java",
+    "abstract_identifiers": true
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

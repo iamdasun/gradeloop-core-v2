@@ -1,0 +1,33 @@
+meta {
+  name: Compare Batch
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{CIPAS_SEMANTICS_URL_V1}}/compare/batch
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "pairs": [
+      {
+        "code1": "int sum(int a, int b) { return a + b; }",
+        "code2": "int add(int x, int y) { int result = x + y; return result; }",
+        "language": "java"
+      },
+      {
+        "code1": "void printHello() { System.out.println(\"Hello\"); }",
+        "code2": "void sayHi() { String msg = \"Hello\"; System.out.print(msg); }",
+        "language": "java"
+      }
+    ]
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

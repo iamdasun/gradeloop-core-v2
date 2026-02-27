@@ -40,7 +40,7 @@ func main() {
 	}()
 	fmt.Println("Database connected")
 
-	// Pre-migration fix: Cleanup orphaned refresh tokens before adding FK constraint
+	// Cleanup orphaned refresh tokens before adding FK constraint
 	fmt.Println("Running pre-migration fixes...")
 	if err := db.DB.Exec(`DELETE FROM refresh_tokens WHERE user_id NOT IN (SELECT id FROM users)`).Error; err != nil {
 		fmt.Printf("Warning: Failed to cleanup orphaned refresh tokens: %v\n", err)

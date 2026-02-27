@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+.eggs/
+*.egg-info/
+*.egg
+MANIFEST
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+build/
+dist/
+*.tar.gz
+
+# Documentation
+*.md
+!README.md
+
+# Datasets (too large for Docker)
+datasets/
+!datasets/.gitkeep
+
+# Models (will be built inside container)
+clone_detection/models/saved/*.pkl
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yaml
+
+# Testing scripts
+scripts/test_*.py
+tests/
+
+# Evaluation results
+EVALUATION_RESULTS.md
