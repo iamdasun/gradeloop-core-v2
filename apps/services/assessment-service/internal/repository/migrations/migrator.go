@@ -112,6 +112,96 @@ func (m *Migrator) Run() error {
 		m.logger.Warn("failed to create index on groups(assignment_id)", zap.Error(err))
 	}
 
+	// ── Judge0 execution columns migration ────────────────────────────────────
+	// These columns are added for Judge0 code execution integration
+
+	// Add language_id column to submissions
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS language_id INTEGER
+	`).Error; err != nil {
+		m.logger.Warn("failed to add language_id column to submissions", zap.Error(err))
+	}
+
+	// Add execution result columns to submissions
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS execution_stdout TEXT
+	`).Error; err != nil {
+		m.logger.Warn("failed to add execution_stdout column", zap.Error(err))
+	}
+
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS execution_stderr TEXT
+	`).Error; err != nil {
+		m.logger.Warn("failed to add execution_stderr column", zap.Error(err))
+	}
+
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS compile_output TEXT
+	`).Error; err != nil {
+		m.logger.Warn("failed to add compile_output column", zap.Error(err))
+	}
+
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS execution_status VARCHAR(50)
+	`).Error; err != nil {
+		m.logger.Warn("failed to add execution_status column", zap.Error(err))
+	}
+
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS execution_status_id INTEGER
+	`).Error; err != nil {
+		m.logger.Warn("failed to add execution_status_id column", zap.Error(err))
+	}
+
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS execution_time VARCHAR(20)
+	`).Error; err != nil {
+		m.logger.Warn("failed to add execution_time column", zap.Error(err))
+	}
+
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS memory_used INTEGER
+	`).Error; err != nil {
+		m.logger.Warn("failed to add memory_used column", zap.Error(err))
+	}
+
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS test_cases_passed INTEGER DEFAULT 0
+	`).Error; err != nil {
+		m.logger.Warn("failed to add test_cases_passed column", zap.Error(err))
+	}
+
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS total_test_cases INTEGER DEFAULT 0
+	`).Error; err != nil {
+		m.logger.Warn("failed to add total_test_cases column", zap.Error(err))
+	}
+
+	if err := m.db.Exec(`
+		ALTER TABLE submissions
+		ADD COLUMN IF NOT EXISTS test_case_results JSONB
+	`).Error; err != nil {
+		m.logger.Warn("failed to add test_case_results column", zap.Error(err))
+	}
+
+	// Index on execution_status for filtering by execution result
+	if err := m.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_submissions_execution_status
+		ON submissions(execution_status)
+	`).Error; err != nil {
+		m.logger.Warn("failed to create index on submissions(execution_status)", zap.Error(err))
+	}
+
 	m.logger.Info("migrations completed successfully")
 	return nil
 }
