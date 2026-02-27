@@ -104,7 +104,7 @@ Clones with further modifications, such as added, removed, or changed statements
   - **Binary Classification Split:** Trained to distinguish *syntactic* similarity from *semantic* similarity.
 - **Training Strategy:** 
   - **Positives (Label 1):** `type-3.csv` (near-miss) and `type-4.csv` (moderate Type-3).
-  - **Negatives (Label 0):** `nonclone.csv` (negative samples) and `type-5.csv` (semantic clones). Inclusion of semantic clones as negatives teaches the model to reject pairs that only share logic but differ in implementation.
+  - **Negatives (Label 0):** `nonclone.csv` (negative samples).
 - **Confidence Score:** XGBoost probability.
 - **Normalization Level:** `Token-based`.
 - **Performance:** Evaluated on `bigclonebench_balanced.json` with per-clone-type recall breakdown.
@@ -132,10 +132,10 @@ Location: `datasets/toma-dataset/`
 |------|------|---------|-----------------|-------------|
 | `type-3.csv` | 21,395 | 5 | **Positive (1)** | Type-3 syntactic near-miss clones |
 | `type-4.csv` | 86,341 | 5 | **Positive (1)** | Moderate Type-3 clones (still syntactic) |
-| `type-5.csv` | 109,914 | 5 | **Negative (0)** | Type-4 semantic clones (Not Syntactic) |
+| `type-5.csv` | 109,914 | 5 | **N/A** | Type-4 semantic clones (Reserved for Semantics) |
 | `nonclone.csv` | 279,033 | 2 | **Negative (0)** | Confirmed non-clone pairs |
 
-**Synthetic Feature Split:** The Phase 2 model treats `type-5.csv` (semantic clones) as negatives to force the XGBoost classifier to learn the difference between structural similarity and functional similarity. This ensures the syntactic pipeline only flags clones that are "near-miss" in their code structure.
+**Syntactic Feature Training:** The Phase 2 model focuses on distinguishing syntactic near-misses from confirmed non-clones. Semantic clones are excluded from this stage to avoid penalizing logic similarity that doesn't share structural patterns.
 
 ### BigCloneBench Dataset
 
@@ -149,7 +149,7 @@ Location: `datasets/bigclonebench/`
 **Evaluation Split:**
 - Clones (1, 2, 3) → Positive Label
 - Non-clones → Negative Label
-- Type-4 (Semantic) → Excluded from Syntactic evaluation or treated as negative.
+- Type-4 (Semantic) → Excluded from Syntactic evaluation.
 
 **Evaluation Script:** `evaluate.py`. Loads the model and reports metrics along with a per-clone-type recall breakdown.
 

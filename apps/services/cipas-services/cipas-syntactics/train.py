@@ -12,8 +12,6 @@ Training data (from TOMA dataset):
     type-4.csv — moderate Type-3 clones (still syntactically similar)
   Negatives (label = 0):
     nonclone.csv — confirmed non-clone pairs
-    type-5.csv   — semantic / Type-4 clones (NOT syntactically similar;
-                    model learns to reject these as non-syntactic)
 
 Features used (hybrid):
   String-based (6)  : Jaccard, Dice, Levenshtein distance/ratio, Jaro, Jaro-Winkler

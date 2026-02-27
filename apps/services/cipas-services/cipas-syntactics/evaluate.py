@@ -36,7 +36,6 @@ Usage:
     poetry run python evaluate.py
     poetry run python evaluate.py --model models/type3_xgb.pkl --sample-size 2000
     poetry run python evaluate.py --clone-types 3         # evaluate only on Type-3 pairs
-    poetry run python evaluate.py --include-type4         # include semantic clones as negatives
 """
 
 import argparse
@@ -86,7 +85,6 @@ SYNTACTIC_CLONE_TYPES = {1, 2, 3}
 def load_bcb_dataset(
     bcb_path: Path,
     clone_types: set[int] | None = None,
-    include_type4_as_negative: bool = False,
     sample_size: int | None = None,
 ) -> tuple[list[str], list[str], list[int], list[dict]]:
     """
@@ -96,9 +94,6 @@ def load_bcb_dataset(
         bcb_path: Path to bigclonebench_balanced.json.
         clone_types: If set, only evaluate on pairs whose clone_type is in this
                      set (for clones) or all non-clones.  Default: {1, 2, 3}.
-        include_type4_as_negative: If True, include clone_type=4 pairs as label=0
-                                   (they are non-syntactic clones).  Default: False
-                                   (exclude them entirely to keep evaluation clean).
         sample_size: If set, sample at most this many pairs from each class.
 
     Returns:
@@ -125,14 +120,7 @@ def load_bcb_dataset(
             if ct in clone_types:
                 clones.append(rec)
             elif ct == 4:
-                if include_type4_as_negative:
-                    # Treat semantic clones as label=0 for syntactic evaluation
-                    rec = dict(rec)
-                    rec["label"] = 0
-                    rec["_original_clone_type"] = ct
-                    non_clones.append(rec)
-                else:
-                    skipped_type4 += 1
+                skipped_type4 += 1
         else:
             non_clones.append(rec)
 
@@ -212,7 +200,6 @@ def extract_features(
 def evaluate(
     model_name: str = DEFAULT_MODEL_NAME,
     clone_types: set[int] | None = None,
-    include_type4_as_negative: bool = False,
     sample_size: int | None = None,
     include_node_types: bool = True,
 ) -> dict:
@@ -231,7 +218,6 @@ def evaluate(
     logger.info(f"Model       : {model_name}")
     logger.info(f"Dataset     : {BCB_BALANCED_PATH}")
     logger.info(f"Clone types : {sorted(clone_types)}")
-    logger.info(f"Type-4 as negative: {include_type4_as_negative}")
     logger.info("=" * 80)
 
     # ---- Load model -------------------------------------------------------
@@ -250,7 +236,6 @@ def evaluate(
     code1_list, code2_list, labels, meta_list = load_bcb_dataset(
         bcb_path=BCB_BALANCED_PATH,
         clone_types=clone_types,
-        include_type4_as_negative=include_type4_as_negative,
         sample_size=sample_size,
     )
 
@@ -380,12 +365,6 @@ if __name__ == "__main__":
              "Use '--clone-types 3' to evaluate only on Type-3 pairs.",
     )
     parser.add_argument(
-        "--include-type4",
-        action="store_true",
-        help="Include semantic / Type-4 clone pairs as label=0 negatives "
-             "(default: exclude them from evaluation).",
-    )
-    parser.add_argument(
         "--sample-size",
         type=int,
         default=None,
@@ -411,7 +390,6 @@ if __name__ == "__main__":
     evaluate(
         model_name=args.model,
         clone_types=set(args.clone_types),
-        include_type4_as_negative=args.include_type4,
         sample_size=args.sample_size,
         include_node_types=not args.no_node_types,
     )
