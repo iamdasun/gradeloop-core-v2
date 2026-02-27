@@ -210,6 +210,9 @@ func (s *Seeder) seedSuperAdmin() error {
 			"email":                      email,
 		}
 
+		// Update email to match the email
+		updates["email"] = email
+
 		if err := s.db.Model(&existingUser).Updates(updates).Error; err != nil {
 			return fmt.Errorf("updating super admin user: %w", err)
 		}
