@@ -2,17 +2,12 @@
 CIPAS Syntactics API Routes for Syntactic Code Clone Detection.
 
 This module implements REST API endpoints for comparing code snippets
-using the automatic cascade detection pipeline for Type-1/2/3 clones.
+using the automatic cascade detection pipeline:
 
-Automatic Cascade Detection Strategy:
-- Phase One: NiCad-Style Normalization
-  - Pass A: Literal comparison (Type-1, threshold >= 0.98)
-  - Pass B: Blinded comparison (Type-2, threshold >= 0.95, token delta <= 5%)
-- Phase Two: TOMA Approach (Type-3)
-  - Token Frequency Vector + Random Forest classification
-
-The pipeline automatically cascades through Type-1 → Type-2 → Type-3 → Non-clone,
-breaking early when a clone type is confirmed.
+  Type-1 → Phase One (NiCAD-style) : Literal CST comparison  (threshold ≥ 0.98)
+  Type-2 → Phase One (NiCAD-style) : Blinded CST comparison  (threshold ≥ 0.95, token delta ≤ 5 %)
+  Type-3 → Phase Two (ToMa + XGB)  : Hybrid String + AST features → XGBoost classifier
+  Non-Syntactic → returned when no syntactic clone is confirmed
 """
 
 import logging
@@ -95,16 +90,21 @@ def _get_tiered_pipeline() -> TieredPipeline:
 
 
 def _load_syntactic_model() -> Optional[SyntacticClassifier]:
-    """Load syntactic model if available."""
+    """Load the Type-3 XGBoost model if available."""
     global _syntactic_model
     if _syntactic_model is None:
         try:
-            model_path = get_model_path("type3_rf.pkl")
+            model_path = get_model_path("type3_xgb.pkl")
             if model_path.exists():
-                _syntactic_model = SyntacticClassifier.load("type3_rf.pkl")
-                logger.info("Syntactic model (Type-3) loaded successfully")
-        except Exception as e:
-            logger.warning(f"Could not load syntactic model: {e}")
+                _syntactic_model = SyntacticClassifier.load("type3_xgb.pkl")
+                logger.info("Type-3 XGBoost model loaded successfully")
+            else:
+                logger.warning(
+                    "Type-3 model not found (type3_xgb.pkl). "
+                    "Run 'poetry run python train.py' to train it."
+                )
+        except Exception as exc:
+            logger.warning(f"Could not load Type-3 model: {exc}")
             _syntactic_model = None
     return _syntactic_model
 
@@ -113,16 +113,16 @@ def _get_model_status() -> dict[str, ModelStatus]:
     """Get status of all models."""
     models = {}
 
-    # Syntactic model (Type-3)
-    syntactic_path = get_model_path("type3_rf.pkl")
-    syntactic_available = syntactic_path.exists()
-    syntactic_loaded = _syntactic_model is not None and _syntactic_model.is_trained
+    # Type-3 XGBoost model
+    model_path = get_model_path("type3_xgb.pkl")
+    available = model_path.exists()
+    loaded = _syntactic_model is not None and _syntactic_model.is_trained
 
     models["syntactic_type3"] = ModelStatus(
-        model_name="type3_rf.pkl",
-        available=syntactic_available,
-        loaded=syntactic_loaded,
-        error=None if syntactic_available else "Model file not found",
+        model_name="type3_xgb.pkl",
+        available=available,
+        loaded=loaded,
+        error=None if available else "Model file not found — run train.py",
     )
 
     return models
@@ -132,17 +132,15 @@ def compare_codes(
     request: ComparisonRequest,
 ) -> ComparisonResult:
     """
-    Compare two code snippets for clone detection using automatic cascade.
+    Compare two code snippets for clone detection using the tiered pipeline.
 
-    Automatic Cascade Detection Strategy:
-    - Phase One: NiCad-Style Normalization
-      - Pass A: Literal comparison (Type-1, threshold >= 0.98)
-      - Pass B: Blinded comparison (Type-2, threshold >= 0.95, token delta <= 5%)
-    - Phase Two: TOMA Approach (Type-3)
-      - Token Frequency Vector + Random Forest classification
+    Detection cascade:
+      Type-1        → NiCAD-style literal CST comparison  (threshold ≥ 0.98)
+      Type-2        → NiCAD-style blinded CST comparison  (threshold ≥ 0.95)
+      Type-3        → ToMa + XGBoost (String + AST features)
+      Non-Syntactic → returned when no syntactic clone is confirmed
 
-    The pipeline automatically cascades: Type-1 → Type-2 → Type-3 → Non-clone
-    Early exit occurs when a clone type is confirmed.
+    Early exit occurs as soon as a clone type is confirmed.
 
     Args:
         request: Comparison request with code pairs
@@ -176,10 +174,9 @@ def compare_codes(
             clone_type=(
                 detection_result.clone_type
                 if detection_result.is_clone
-                and detection_result.clone_type != "Not Clone"
                 else None
             ),
-            pipeline_used="Syntactic Cascade (Type-1/2/3)",
+            pipeline_used="Syntactic Cascade (Type-1 → Type-2 → Type-3)",
             normalization_level=detection_result.normalization_level,
             tokens1_count=len(tokens1),
             tokens2_count=len(tokens2),
@@ -259,7 +256,7 @@ def get_health() -> HealthResponse:
 
 def get_feature_importance() -> FeatureImportanceResponse:
     """
-    Get feature importance from trained syntactic model.
+    Get feature importance from the trained Type-3 XGBoost model.
 
     Returns:
         Feature importance scores
@@ -271,11 +268,11 @@ def get_feature_importance() -> FeatureImportanceResponse:
     if model is None or not model.is_trained:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Syntactic model not available",
+            detail="Type-3 model not available — run 'python train.py' to train it.",
         )
 
     importance = model.get_feature_importance()
-    return FeatureImportanceResponse(model="type3_rf.pkl", features=importance)
+    return FeatureImportanceResponse(model="type3_xgb.pkl", features=importance)
 
 
 def tokenize_code(request: TokenizeRequest) -> TokenizeResponse:
