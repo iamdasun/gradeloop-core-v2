@@ -541,7 +541,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.acafs.rule=PathPrefix(`/api/v1/acafs`)"
       - "traefik.http.routers.acafs.entrypoints=web"
-      - "traefik.http.services.acafs-service.loadbalancer.server.port=8086"
+      - "traefik.http.services.acafs.loadbalancer.server.port=8086"
+      - "traefik.http.routers.acafs.service=acafs"
       # Request size limiting (10MB for batch operations)
       - "traefik.http.middlewares.acafs-limit.buffering.maxRequestBodyBytes=10485760"
       # Rate limiting
