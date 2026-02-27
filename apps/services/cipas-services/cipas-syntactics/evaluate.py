@@ -202,9 +202,15 @@ def evaluate(
     clone_types: set[int] | None = None,
     sample_size: int | None = None,
     include_node_types: bool = True,
+    threshold: float | None = None,
 ) -> dict:
     """
     Evaluate the Type-3 clone detection model on BigCloneBench Balanced.
+
+    Args:
+        threshold: If provided, classify with `proba >= threshold` instead of
+                   the default 0.5.  Use the value output by train.py under
+                   "Recommended inference threshold".
 
     Returns:
         Dictionary with accuracy, precision, recall, F1, ROC-AUC.
@@ -218,6 +224,7 @@ def evaluate(
     logger.info(f"Model       : {model_name}")
     logger.info(f"Dataset     : {BCB_BALANCED_PATH}")
     logger.info(f"Clone types : {sorted(clone_types)}")
+    logger.info(f"Threshold   : {threshold if threshold is not None else '0.5 (default)'}")
     logger.info("=" * 80)
 
     # ---- Load model -------------------------------------------------------
@@ -255,8 +262,23 @@ def evaluate(
 
     # ---- Predict ----------------------------------------------------------
     logger.info("\nRunning predictions …")
-    y_pred = model.predict(X)
     y_proba = model.predict_proba(X)[:, 1]
+
+    # Resolve threshold: CLI arg → model's calibrated_threshold → default 0.5
+    effective_threshold = threshold
+    if effective_threshold is None:
+        effective_threshold = getattr(model, "calibrated_threshold", None)
+        if effective_threshold is not None:
+            logger.info(
+                f"Using calibrated threshold from model: {effective_threshold:.2f} "
+                "(override with --threshold)"
+            )
+    if effective_threshold is not None:
+        logger.info(f"Applying threshold {effective_threshold:.2f}")
+        y_pred = (y_proba >= effective_threshold).astype(int)
+    else:
+        logger.info("Using default threshold 0.5")
+        y_pred = model.predict(X)
 
     # ---- Overall metrics --------------------------------------------------
     metrics = {
@@ -265,6 +287,7 @@ def evaluate(
         "recall"   : recall_score(y, y_pred, zero_division=0),
         "f1"       : f1_score(y, y_pred, zero_division=0),
         "roc_auc"  : roc_auc_score(y, y_proba),
+        "threshold": effective_threshold if effective_threshold is not None else 0.5,
     }
 
     # ---- Per-clone-type breakdown -----------------------------------------
@@ -313,15 +336,18 @@ def evaluate(
     logger.info(f"  TN={cm[0,0]:>7}  FP={cm[0,1]:>7}")
     logger.info(f"  FN={cm[1,0]:>7}  TP={cm[1,1]:>7}")
 
-    # Per-clone-type recall
+    # Per-clone-type recall — PRIMARY KPI
     if clone_type_metrics:
-        logger.info("\nPer-Clone-Type Recall (when Phase 1 passed these to Phase 2):")
-        logger.info("-" * 80)
+        logger.info("\n" + "=" * 80)
+        logger.info("Per-Clone-Type Recall  (PRIMARY KPI — target: Type-3 ≥ 40%)")
+        logger.info("=" * 80)
         for ct, m in clone_type_metrics.items():
+            bar_filled = int(m["recall"] * 20)  # 20-char bar
+            bar = "█" * bar_filled + "░" * (20 - bar_filled)
+            kpi = " ← TARGET" if ct == 3 else ""
             logger.info(
-                f"  Type-{ct}  : count={m['count']:>6}  "
-                f"TP={m['tp']:>6}  FN={m['fn']:>6}  "
-                f"Recall={m['recall']:.4f}"
+                f"  Type-{ct}  [{bar}] {m['recall']:.4f}"
+                f"  (TP={m['tp']:>5}, FN={m['fn']:>5}, n={m['count']:>6}){kpi}"
             )
 
     # Feature importance
@@ -372,6 +398,14 @@ if __name__ == "__main__":
         help="Sample at most N pairs per class for fast evaluation.",
     )
     parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        metavar="T",
+        help="Classification threshold (None = default 0.5). Use the value "
+             "reported by train.py to apply the calibrated decision boundary.",
+    )
+    parser.add_argument(
         "--no-node-types",
         action="store_true",
         help="Disable per-node-type AST features (must match training config).",
@@ -392,4 +426,5 @@ if __name__ == "__main__":
         clone_types=set(args.clone_types),
         sample_size=args.sample_size,
         include_node_types=not args.no_node_types,
+        threshold=args.threshold,
     )

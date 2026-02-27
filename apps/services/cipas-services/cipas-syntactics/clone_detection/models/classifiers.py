@@ -66,11 +66,15 @@ class SyntacticClassifier:
             colsample_bytree=colsample_bytree,
             scale_pos_weight=kwargs.get("scale_pos_weight", 1.0),
             random_state=random_state,
-            n_jobs=-1,  # Use all CPU cores
+            n_jobs=-1,
             tree_method="hist" if not use_gpu else "gpu_hist",
             eval_metric="logloss",
         )
         self.is_trained = False
+        # Calibrated decision threshold (float) set by train.py after the
+        # threshold sweep.  Persisted inside the pkl so inference code can
+        # apply the same boundary without extra CLI flags.
+        self.calibrated_threshold: float | None = None
         self.feature_names = feature_names or [
             "jaccard_similarity",
             "dice_coefficient",

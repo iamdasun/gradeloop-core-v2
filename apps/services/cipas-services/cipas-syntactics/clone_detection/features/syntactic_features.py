@@ -85,6 +85,13 @@ STRUCTURAL_FEATURE_NAMES = [
     "feat_ast_depth_diff",
     "feat_ast_node_count_diff",
     "feat_ast_node_count_ratio",
+    # Structural density: AST nodes per line of code.
+    # Captures code complexity independent of textual similarity.
+    # Critical for Type-3 recall: near-misses share control-flow density
+    # even when identifiers/literals diverge significantly.
+    "feat_structural_density_1",
+    "feat_structural_density_2",
+    "feat_structural_density_diff",
 ]
 
 # Node type distribution features (normalized counts for each node type)
@@ -283,8 +290,9 @@ class SyntacticFeatureExtractor:
             ast_info1 = self._parse_code_safely(code1)
             ast_info2 = self._parse_code_safely(code2)
         except Exception as e:
-            # Fallback: return zeros if parsing fails
-            n_structural_features = 4
+            # Return zeros matching the full structural feature count:
+            # 4 core AST + 3 structural density + (N node-type dists if enabled)
+            n_structural_features = len(STRUCTURAL_FEATURE_NAMES)
             if self.include_node_types:
                 n_structural_features += len(self._node_types)
             return [0.0] * n_structural_features
@@ -316,7 +324,16 @@ class SyntacticFeatureExtractor:
         )
         features.append(node_count_ratio)
 
-        # 5. Node Type Distribution differences (if enabled)
+        # 5. Structural Density: AST node_count / LOC for each snippet
+        #    Captures complexity (nesting + control-flow) independent of text.
+        density1 = self._structural_density(code1, ast_info1["node_count"])
+        density2 = self._structural_density(code2, ast_info2["node_count"])
+        density_diff = abs(density1 - density2)
+        features.append(density1)
+        features.append(density2)
+        features.append(density_diff)
+
+        # 6. Node Type Distribution differences (if enabled)
         if self.include_node_types:
             node_type_diffs = self._node_type_distribution_diff(
                 ast_info1["node_type_counts"], ast_info2["node_type_counts"]
@@ -367,11 +384,13 @@ class SyntacticFeatureExtractor:
             # Filter to only our standardized node types
             filtered_counts = {nt: cst_freqs.get(nt, 0) for nt in self._node_types}
 
+            loc = len([l for l in code.splitlines() if l.strip()])
             return {
                 "node_types": node_types,
                 "node_type_counts": filtered_counts,
                 "max_depth": max_depth,
                 "node_count": node_count,
+                "loc": loc,
             }
 
         except Exception as e:
@@ -381,6 +400,7 @@ class SyntacticFeatureExtractor:
                 "node_type_counts": {},
                 "max_depth": 0,
                 "node_count": 0,
+                "loc": 0,
             }
 
     def _estimate_ast_depth(self, code: str, language: str) -> int:
@@ -550,6 +570,28 @@ class SyntacticFeatureExtractor:
             return 0.0
 
         return min(count1, count2) / max(count1, count2)
+
+    def _structural_density(self, code: str, node_count: int) -> float:
+        """
+        Compute structural density: AST node count / lines of code.
+
+        A high density indicates deeply-nested, complex control flow.
+        This metric is invariant to identifier/literal renaming, making
+        it effective for detecting Type-3 near-miss clones whose text
+        has diverged but whose structure remains similar.
+
+        Args:
+            code: Source code string
+            node_count: Total AST node count
+
+        Returns:
+            Density value (nodes per line), clamped to [0, 50]
+        """
+        loc = len([l for l in code.splitlines() if l.strip()])
+        if loc == 0:
+            return 0.0
+        # Clamp to a reasonable maximum to prevent outlier dominance
+        return min(node_count / loc, 50.0)
 
     def _node_type_distribution_diff(
         self, counts1: dict[str, int], counts2: dict[str, int]

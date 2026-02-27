@@ -97,9 +97,24 @@ class CloneDetectionTUI(App):
                 with Vertical(classes="form-item"):
                     yield Label("Model Name:")
                     yield Input(placeholder="type3_xgb.pkl", id="model-name", value="type3_xgb.pkl")
+
+                with Vertical(classes="form-item"):
+                    yield Label("N Estimators:")
+                    yield Input(placeholder="200", id="n-estimators", value="200")
+
+                with Vertical(classes="form-item"):
+                    yield Label("Scale Pos Weight:")
+                    yield Input(placeholder="5.0", id="scale-pos-weight", value="5.0")
+
+                with Vertical(classes="form-item"):
+                    yield Label("Colsample Bytree:")
+                    yield Input(placeholder="0.6", id="colsample-bytree", value="0.6")
+
+                with Vertical(classes="form-item"):
+                    yield Label("Eval Threshold:")
+                    yield Input(placeholder="0.30 (leave blank for default)", id="threshold", value="")
                 
                 with Horizontal(classes="form-item"):
-                    yield Checkbox("Enable CV", value=True, id="enable-cv")
                     yield Checkbox("Disable Node Types", value=False, id="no-node-types")
                 
                 yield Button("RUN SCRIPT", variant="success", id="run-btn")
@@ -120,25 +135,31 @@ class CloneDetectionTUI(App):
 
     @on(Button.Pressed, "#run-btn")
     def handle_run(self) -> None:
-        task = self.query_one("#task-select", Select).value
-        sample_size = self.query_one("#sample-size", Input).value
-        model_name = self.query_one("#model-name", Input).value
-        enable_cv = self.query_one("#enable-cv", Checkbox).value
-        no_node_types = self.query_one("#no-node-types", Checkbox).value
+        task             = self.query_one("#task-select", Select).value
+        sample_size      = self.query_one("#sample-size", Input).value
+        model_name       = self.query_one("#model-name", Input).value
+        n_estimators     = self.query_one("#n-estimators", Input).value
+        scale_pos_weight = self.query_one("#scale-pos-weight", Input).value
+        colsample_bytree = self.query_one("#colsample-bytree", Input).value
+        threshold        = self.query_one("#threshold", Input).value
+        no_node_types    = self.query_one("#no-node-types", Checkbox).value
 
         # Build command
         cmd = []
         if task == "train":
             cmd = ["poetry", "run", "python", "train.py"]
-            if sample_size: cmd.extend(["--sample-size", sample_size])
-            if model_name: cmd.extend(["--model-name", model_name])
-            if not enable_cv: cmd.append("--no-cv")
-            if no_node_types: cmd.append("--no-node-types")
+            if sample_size:       cmd.extend(["--sample-size",      sample_size])
+            if model_name:        cmd.extend(["--model-name",        model_name])
+            if n_estimators:      cmd.extend(["--n-estimators",      n_estimators])
+            if scale_pos_weight:  cmd.extend(["--scale-pos-weight",  scale_pos_weight])
+            if colsample_bytree:  cmd.extend(["--colsample-bytree",  colsample_bytree])
+            if no_node_types:     cmd.append("--no-node-types")
         elif task == "evaluate":
             cmd = ["poetry", "run", "python", "evaluate.py"]
-            if sample_size: cmd.extend(["--sample-size", sample_size])
-            if model_name: cmd.extend(["--model", model_name])
-            if no_node_types: cmd.append("--no-node-types")
+            if sample_size:       cmd.extend(["--sample-size",  sample_size])
+            if model_name:        cmd.extend(["--model",         model_name])
+            if threshold:         cmd.extend(["--threshold",     threshold])
+            if no_node_types:     cmd.append("--no-node-types")
         elif task == "evaluate_bcb":
             # Jump to the legacy service script
             script_path = Path(__file__).parent.parent.parent / "cipas-service" / "scripts" / "evaluate_bcb.py"
