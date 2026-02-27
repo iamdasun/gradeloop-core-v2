@@ -3,6 +3,7 @@ package dto
 import (
 	"time"
 
+	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/domain"
 	"github.com/google/uuid"
 )
 
@@ -17,7 +18,30 @@ type CreateSubmissionRequest struct {
 	AssignmentID uuid.UUID  `json:"assignment_id"`
 	GroupID      *uuid.UUID `json:"group_id,omitempty"`
 	Language     string     `json:"language"`
+	LanguageID   int        `json:"language_id"`
 	Code         string     `json:"code"`
+}
+
+// RunCodeRequest is the payload for POST /run-code.
+// Executes code without creating a persistent submission.
+type RunCodeRequest struct {
+	AssignmentID uuid.UUID `json:"assignment_id"`
+	LanguageID   int       `json:"language_id"`
+	SourceCode   string    `json:"source_code"`
+	Stdin        string    `json:"stdin,omitempty"`
+}
+
+// RunCodeResponse is the response for POST /run-code.
+// Contains the execution result from Judge0.
+type RunCodeResponse struct {
+	Stdout         string `json:"stdout"`
+	Stderr         string `json:"stderr"`
+	CompileOutput  string `json:"compile_output"`
+	ExecutionTime  string `json:"execution_time"`
+	MemoryUsed     int    `json:"memory_used"`
+	Status         string `json:"status"`
+	StatusID       int    `json:"status_id"`
+	Message        string `json:"message,omitempty"`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,6 +59,7 @@ type SubmissionResponse struct {
 
 	StoragePath string `json:"storage_path"`
 	Language    string `json:"language"`
+	LanguageID  int    `json:"language_id,omitempty"`
 	Status      string `json:"status"`
 
 	Version  int  `json:"version"`
@@ -45,6 +70,18 @@ type SubmissionResponse struct {
 
 	// Code is only populated by the GET /submissions/:id/code endpoint.
 	Code string `json:"code,omitempty"`
+
+	// Judge0 execution results
+	ExecutionStdout   string                 `json:"execution_stdout,omitempty"`
+	ExecutionStderr   string                 `json:"execution_stderr,omitempty"`
+	CompileOutput     string                 `json:"compile_output,omitempty"`
+	ExecutionStatus   string                 `json:"execution_status,omitempty"`
+	ExecutionStatusID int                    `json:"execution_status_id,omitempty"`
+	ExecutionTime     string                 `json:"execution_time,omitempty"`
+	MemoryUsed        int                    `json:"memory_used,omitempty"`
+	TestCasesPassed   int                    `json:"test_cases_passed,omitempty"`
+	TotalTestCases    int                    `json:"total_test_cases,omitempty"`
+	TestCaseResults   []domain.TestCaseResult `json:"test_case_results,omitempty"`
 }
 
 // SubmissionCodeResponse wraps the raw source code returned by

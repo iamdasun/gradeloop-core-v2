@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"context"
+	"encoding/json"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/domain"
@@ -190,6 +193,33 @@ func (h *SubmissionHandler) GetLatestSubmission(c fiber.Ctx) error {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POST /run-code
+// ─────────────────────────────────────────────────────────────────────────────
+
+// RunCode handles POST /run-code.
+// Executes code via Judge0 without creating a persistent submission.
+// Requires authentication and enrollment in the assignment's course.
+func (h *SubmissionHandler) RunCode(c fiber.Ctx) error {
+	var req dto.RunCodeRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return utils.ErrBadRequest("invalid request body")
+	}
+
+	userID := requireUserID(c)
+	if userID == uuid.Nil {
+		return utils.ErrUnauthorized("user not authenticated")
+	}
+
+	ctx := context.Background()
+	result, err := h.submissionService.RunCode(ctx, &req, userID)
+	if err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(result)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -224,17 +254,41 @@ func parseOwnerQueryParams(c fiber.Ctx) (*uuid.UUID, *uuid.UUID, error) {
 
 // toSubmissionResponse converts a domain.Submission to its DTO representation.
 func toSubmissionResponse(s *domain.Submission) dto.SubmissionResponse {
-	return dto.SubmissionResponse{
+	response := dto.SubmissionResponse{
 		ID:           s.ID,
 		AssignmentID: s.AssignmentID,
 		UserID:       s.UserID,
 		GroupID:      s.GroupID,
 		StoragePath:  s.StoragePath,
 		Language:     s.Language,
+		LanguageID:   s.LanguageID,
 		Status:       s.Status,
 		Version:      s.Version,
 		IsLatest:     s.IsLatest,
 		Judge0JobID:  s.Judge0JobID,
 		SubmittedAt:  s.SubmittedAt,
 	}
+
+	// Add execution results if available
+	if s.ExecutionStatus != "" {
+		response.ExecutionStdout = s.ExecutionStdout
+		response.ExecutionStderr = s.ExecutionStderr
+		response.CompileOutput = s.CompileOutput
+		response.ExecutionStatus = s.ExecutionStatus
+		response.ExecutionStatusID = s.ExecutionStatusID
+		response.ExecutionTime = s.ExecutionTime
+		response.MemoryUsed = s.MemoryUsed
+		response.TestCasesPassed = s.TestCasesPassed
+		response.TotalTestCases = s.TotalTestCases
+
+		// Deserialize test case results if present
+		if len(s.TestCaseResults) > 0 {
+			var results []domain.TestCaseResult
+			if err := json.Unmarshal(s.TestCaseResults, &results); err == nil {
+				response.TestCaseResults = results
+			}
+		}
+	}
+
+	return response
 }

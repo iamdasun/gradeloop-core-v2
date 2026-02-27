@@ -100,6 +100,9 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	// validated at the service layer for individual submissions).
 	submissions := protected.Group("/submissions")
 
+	// POST   /api/v1/submissions/run-code      — execute code without persistence
+	submissions.Post("/run-code", cfg.SubmissionHandler.RunCode)
+
 	// POST   /api/v1/submissions                — create (versioned, immutable)
 	submissions.Post("/", cfg.SubmissionHandler.CreateSubmission)
 
