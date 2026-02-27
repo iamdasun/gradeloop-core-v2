@@ -1,0 +1,11 @@
+meta {
+  name: Metrics
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{ACAFS_BASE_URL}}/api/v1/acafs/metrics
+  body: none
+  auth: inherit
+}
