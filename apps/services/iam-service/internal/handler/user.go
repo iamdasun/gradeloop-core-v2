@@ -58,8 +58,9 @@ func (h *UserHandler) GetUsers(c fiber.Ctx) error {
 
 	userType := c.Query("user_type", "all")
 	roleID := c.Query("role_id", "")
+	search := c.Query("search", "")
 
-	response, err := h.userService.GetUsers(c.RequestCtx(), page, limit, userType, roleID)
+	response, err := h.userService.GetUsers(c.RequestCtx(), page, limit, userType, roleID, search)
 	if err != nil {
 		return handleUserError(err)
 	}
@@ -114,6 +115,18 @@ func (h *UserHandler) GetProfile(c fiber.Ctx) error {
 	}
 
 	response, err := h.userService.GetProfile(c.RequestCtx(), userID)
+	if err != nil {
+		return handleUserError(err)
+	}
+
+	return c.JSON(response)
+}
+
+// GetUserByID returns the profile of a specific user by ID
+func (h *UserHandler) GetUserByID(c fiber.Ctx) error {
+	id := c.Params("id")
+
+	response, err := h.userService.GetUserByID(c.RequestCtx(), id)
 	if err != nil {
 		return handleUserError(err)
 	}

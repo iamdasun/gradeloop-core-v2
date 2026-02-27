@@ -281,6 +281,8 @@ datasets/
 *.jsonl
 
 # Go
+main
+bin/
 *.exe
 *.exe~
 *.dll

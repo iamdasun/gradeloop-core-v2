@@ -22,6 +22,7 @@ type Config struct {
 	EnrollmentHandler       *handler.EnrollmentHandler
 	CourseHandler           *handler.CourseHandler
 	SemesterHandler         *handler.SemesterHandler
+	InstructorHandler       *handler.InstructorHandler
 	JWTSecretKey            []byte
 }
 
@@ -55,11 +56,8 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	// Protected routes (require authentication)
 	protected := api.Group("", middleware.AuthMiddleware(cfg.JWTSecretKey))
 
-	// Super Admin only routes
-	superAdmin := protected.Group("", middleware.RequireRole("super_admin"))
-
 	// Faculty routes - Super Admin only
-	faculties := superAdmin.Group("/faculties")
+	faculties := protected.Group("/faculties", middleware.RequireRole("super_admin"))
 	faculties.Post("/", cfg.FacultyHandler.CreateFaculty)
 	faculties.Get("/", cfg.FacultyHandler.ListFaculties)
 	faculties.Get("/:id", cfg.FacultyHandler.GetFaculty)
@@ -131,6 +129,7 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	courseInstances := protected.Group("/course-instances", requireAdminRole())
 	courseInstances.Post("/", cfg.CourseInstanceHandler.CreateCourseInstance)
 	courseInstances.Put("/:id", cfg.CourseInstanceHandler.UpdateCourseInstance)
+	courseInstances.Get("/:id", cfg.CourseInstanceHandler.GetCourseInstanceByID)
 	// Nested reads under course-instances (instructors & enrollments)
 	courseInstances.Get("/:id/instructors", cfg.CourseInstructorHandler.GetInstructors)
 	courseInstances.Get("/:id/enrollments", cfg.EnrollmentHandler.GetEnrollments)
@@ -172,6 +171,16 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	semesters.Get("/:id", cfg.SemesterHandler.GetSemester)
 	semesters.Put("/:id", cfg.SemesterHandler.UpdateSemester)
 	semesters.Patch("/:id/deactivate", cfg.SemesterHandler.DeactivateSemester)
+
+	// ─────────────────────────────────────────────────────────────────────────
+	// Instructor-scoped routes (Employee + Admin + Super Admin)
+	// PathPrefix: /api/v1/instructor-courses — routed by Traefik to academic-service
+	// ─────────────────────────────────────────────────────────────────────────
+	instructorCourses := protected.Group("/instructor-courses",
+		middleware.RequireAnyRole("Employee", "Admin", "Super Admin"))
+	instructorCourses.Get("/me", cfg.InstructorHandler.GetMyCourses)
+	instructorCourses.Get("/:id/students", cfg.InstructorHandler.GetMyStudents)
+	instructorCourses.Get("/:id/instructors", cfg.InstructorHandler.GetMyInstructors)
 
 	app.Get("/", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{

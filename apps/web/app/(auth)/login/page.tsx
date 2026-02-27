@@ -30,19 +30,18 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const username = formData.get("username") as string;
+    const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
     try {
       const response = await authApi.login({
-        username,
+        email,
         password,
       });
 
@@ -66,7 +65,7 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Login to your account</CardTitle>
           <CardDescription>
-            Enter your username or email below to login to your account
+            Enter your email address below to login to your account
           </CardDescription>
           {/*<CardAction>
             <Link href="/signup">
@@ -88,15 +87,15 @@ export default function LoginPage() {
               )}
 
               <div className="grid gap-2">
-                <Label htmlFor="username">Username or Email</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="username"
-                  name="username"
-                  type="text"
+                  id="email"
+                  name="email"
+                  type="email"
                   placeholder="superadmin@gradeloop.com"
                   required
                   disabled={isLoading}
-                  autoComplete="username"
+                  autoComplete="email"
                 />
               </div>
 

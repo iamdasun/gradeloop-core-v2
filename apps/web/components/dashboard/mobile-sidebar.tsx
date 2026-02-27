@@ -18,6 +18,8 @@ import {
   Award,
   Landmark,
   ChevronDown,
+  ClipboardList,
+  Users2,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { useLogoutMutation } from "@/lib/hooks/useAuthMutation";
@@ -65,7 +67,7 @@ interface NavGroup {
 
 type NavItem = NavLink | NavGroup;
 
-const navItems: NavItem[] = [
+const adminNavItems: NavItem[] = [
   { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { title: "Users", href: "/admin/users", icon: Users },
   {
@@ -74,10 +76,29 @@ const navItems: NavItem[] = [
     icon: School,
     baseHref: "/admin/academics",
     children: [
-      { title: "Faculties", href: "/admin/academics/faculties", icon: Landmark },
-      { title: "Departments", href: "/admin/academics/departments", icon: Building2 },
+      {
+        title: "Faculties",
+        href: "/admin/academics/faculties",
+        icon: Landmark,
+      },
+      {
+        title: "Departments",
+        href: "/admin/academics/departments",
+        icon: Building2,
+      },
       { title: "Degrees", href: "/admin/academics/degrees", icon: Award },
       { title: "Courses", href: "/admin/academics/courses", icon: BookOpen },
+      {
+        title: "Semesters",
+        href: "/admin/academics/semesters",
+        icon: Calendar,
+      },
+      { title: "Groups", href: "/admin/academics/groups", icon: Users2 },
+      {
+        title: "Enrollment",
+        href: "/admin/academics/enrollment",
+        icon: ClipboardList,
+      },
     ],
   },
   { title: "Assignments", href: "/admin/assignments", icon: FileText },
@@ -85,6 +106,14 @@ const navItems: NavItem[] = [
   { title: "Analytics", href: "/admin/analytics", icon: BarChart3 },
   { title: "Calendar", href: "/admin/calendar", icon: Calendar },
   { title: "Settings", href: "/admin/settings", icon: Settings },
+];
+
+const instructorNavItems: NavItem[] = [
+  { title: "Dashboard", href: "/instructor", icon: LayoutDashboard },
+  { title: "My Courses", href: "/instructor/courses", icon: BookOpen },
+  { title: "Assessments", href: "/instructor/assessments", icon: FileText },
+  { title: "Students", href: "/instructor/students", icon: GraduationCap },
+  { title: "Settings", href: "/instructor/settings", icon: Settings },
 ];
 
 interface MobileSidebarProps {
@@ -97,10 +126,19 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
 
-  const displayName = user?.full_name || user?.username || '—';
+  const isEmployee = user?.role_name?.toLowerCase().trim() === "employee";
+  const navItems = isEmployee ? instructorNavItems : adminNavItems;
+  const homeHref = isEmployee ? "/instructor" : "/admin";
+
+  const displayName = user?.full_name || user?.email || "—";
   const initials = user?.full_name
-    ? user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-    : user?.username?.slice(0, 2).toUpperCase() || '??';
+    ? user.full_name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : user?.email?.slice(0, 2).toUpperCase() || "??";
 
   const [openGroups, setOpenGroups] = React.useState<Set<string>>(() => {
     const initial = new Set<string>();
@@ -130,7 +168,7 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
           {/* Logo Area */}
           <SheetHeader className="h-16 flex-row items-center border-b bg-zinc-50/50 dark:bg-zinc-900/50 px-4">
             <Link
-              href="/admin"
+              href={homeHref}
               className="flex items-center gap-2"
               onClick={() => onOpenChange(false)}
             >
@@ -183,7 +221,9 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
                       >
                         <div className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-zinc-200 pl-2 dark:border-zinc-800">
                           {item.children.map((child) => {
-                            const isChildActive = pathname === child.href || pathname.startsWith(child.href + "/");
+                            const isChildActive =
+                              pathname === child.href ||
+                              pathname.startsWith(child.href + "/");
                             const ChildIcon = child.icon;
                             return (
                               <Link
@@ -259,7 +299,9 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
                     <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <div className="flex flex-1 items-center text-left text-sm">
-                    <span className="font-medium truncate max-w-[150px]">{displayName}</span>
+                    <span className="font-medium truncate max-w-[150px]">
+                      {displayName}
+                    </span>
                   </div>
                 </Button>
               </DropdownMenuTrigger>
@@ -270,7 +312,10 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => { logout(); onOpenChange(false); }}
+                  onClick={() => {
+                    logout();
+                    onOpenChange(false);
+                  }}
                   disabled={isLoggingOut}
                   className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400 gap-2"
                 >

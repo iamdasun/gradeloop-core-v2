@@ -8,31 +8,60 @@
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 export const DEGREE_LEVELS = [
-  'Undergraduate',
-  'Postgraduate',
-  'Doctoral',
-  'Diploma',
-  'Certificate',
+  "Undergraduate",
+  "Postgraduate",
+  "Doctoral",
+  "Diploma",
+  "Certificate",
 ] as const;
 
 export type DegreeLevel = (typeof DEGREE_LEVELS)[number];
 
-export const SEMESTER_TERM_TYPES = ['Fall', 'Spring', 'Summer', 'Winter'] as const;
+export const SEMESTER_TERM_TYPES = [
+  "Fall",
+  "Spring",
+  "Summer",
+  "Winter",
+] as const;
 export type SemesterTermType = (typeof SEMESTER_TERM_TYPES)[number];
 
-export const SEMESTER_STATUSES = ['Planned', 'Active', 'Completed', 'Cancelled'] as const;
+export const SEMESTER_STATUSES = [
+  "Planned",
+  "Active",
+  "Completed",
+  "Cancelled",
+] as const;
 export type SemesterStatus = (typeof SEMESTER_STATUSES)[number];
 
-export const ENROLLMENT_STATUSES = ['Enrolled', 'Dropped', 'Completed', 'Failed'] as const;
+export const ENROLLMENT_STATUSES = [
+  "Enrolled",
+  "Dropped",
+  "Completed",
+  "Failed",
+] as const;
 export type EnrollmentStatus = (typeof ENROLLMENT_STATUSES)[number];
 
-export const BATCH_MEMBER_STATUSES = ['Active', 'Graduated', 'Suspended', 'Withdrawn'] as const;
+export const BATCH_MEMBER_STATUSES = [
+  "Active",
+  "Graduated",
+  "Suspended",
+  "Withdrawn",
+] as const;
 export type BatchMemberStatus = (typeof BATCH_MEMBER_STATUSES)[number];
 
-export const COURSE_INSTANCE_STATUSES = ['Planned', 'Active', 'Completed', 'Cancelled'] as const;
+export const COURSE_INSTANCE_STATUSES = [
+  "Planned",
+  "Active",
+  "Completed",
+  "Cancelled",
+] as const;
 export type CourseInstanceStatus = (typeof COURSE_INSTANCE_STATUSES)[number];
 
-export const INSTRUCTOR_ROLES = ['Lead Instructor', 'Instructor', 'TA'] as const;
+export const INSTRUCTOR_ROLES = [
+  "Lead Instructor",
+  "Instructor",
+  "TA",
+] as const;
 export type InstructorRole = (typeof INSTRUCTOR_ROLES)[number];
 
 // ─── Entity types (match backend DTOs exactly) ───────────────────────────────
@@ -160,13 +189,21 @@ export interface CourseInstance {
 
 export interface CourseInstructor {
   course_instance_id: string;
+  course_code: string;
+  course_title: string;
   user_id: string;
+  designation: string;
+  full_name: string;
+  email: string;
   role: string;
 }
 
 export interface Enrollment {
   course_instance_id: string;
   user_id: string;
+  student_id: string;
+  full_name: string;
+  email: string;
   status: EnrollmentStatus;
   final_grade?: string;
   enrolled_at: string;

@@ -17,7 +17,7 @@ export default function DashboardLayout({
 
   return (
     <AuthGuard>
-      <div className="flex h-screen overflow-hidden bg-zinc-50/30 dark:bg-zinc-900">
+      <div className="flex h-screen overflow-hidden bg-background transition-colors duration-300">
         {/* Desktop Sidebar */}
         <aside className="hidden lg:block">
           <Sidebar
@@ -33,7 +33,7 @@ export default function DashboardLayout({
         <div className="flex flex-1 flex-col overflow-hidden">
           <Topbar onMenuClick={() => setMobileMenuOpen(true)} />
 
-          <main className="flex-1 overflow-hidden bg-gradient-to-br from-zinc-50 via-white to-zinc-50 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-900">
+          <main className="flex-1 overflow-hidden bg-background">
             <ScrollArea className="h-full">
               <div className="container mx-auto p-6 lg:p-8">{children}</div>
             </ScrollArea>

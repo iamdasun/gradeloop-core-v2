@@ -42,6 +42,8 @@ type CreateUserRequest struct {
 	Email       string `json:"email" validate:"required,email"`
 	RoleID      string `json:"role_id" validate:"required"`
 	UserType    string `json:"user_type" validate:"required,oneof=student employee all"`
+	Department  string `json:"department"`
+	Faculty     string `json:"faculty"`
 	StudentID   string `json:"student_id"`
 	Designation string `json:"designation"`
 }

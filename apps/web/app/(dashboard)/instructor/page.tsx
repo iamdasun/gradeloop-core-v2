@@ -1,106 +1,262 @@
 "use client";
 
 import * as React from "react";
+import { useAuthStore } from "@/lib/stores/authStore";
 import {
-    Users,
-    BookOpen,
-    CheckSquare,
-    BarChart3,
-    PlusCircle,
-    MessageSquare
+  BookOpen,
+  FileText,
+  GraduationCap,
+  Users,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { instructorCoursesApi } from "@/lib/api/academics";
+import { instructorAssessmentsApi } from "@/lib/api/assessments";
+import { handleApiError } from "@/lib/api/axios";
+
+// ── Stat card ────────────────────────────────────────────────────────────────
+
+function StatCard({
+  title,
+  icon: Icon,
+  value,
+  sub,
+  locked,
+}: {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  value: React.ReactNode;
+  sub: string;
+  locked?: boolean;
+}) {
+  return (
+    <Card className="border-border/60 shadow-sm">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Icon className="h-5 w-5 text-primary" />
+          </div>
+          {locked && (
+            <Badge
+              variant="outline"
+              className="text-[10px] font-semibold text-muted-foreground"
+            >
+              Admin only
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+          {title}
+        </p>
+        <div className="text-2xl font-black tracking-tight">{value}</div>
+        <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function InstructorDashboardPage() {
-    return (
-        <div className="space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Instructor Dashboard</h1>
-                <p className="text-zinc-500 dark:text-zinc-400 mt-2">
-                    Manage your courses and students effectively.
-                </p>
-            </div>
+  const user = useAuthStore((s) => s.user);
+  const displayName = user?.full_name || user?.email || "Instructor";
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Card className="shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">My Courses</CardTitle>
-                        <BookOpen className="h-4 w-4 text-purple-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">4</div>
-                        <p className="text-xs text-zinc-500 mt-1">1,240 total students</p>
-                    </CardContent>
-                </Card>
+  const [stats, setStats] = React.useState({
+    coursesCount: 0,
+    studentsCount: 0,
+    assignmentsCount: 0,
+  });
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-                <Card className="shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Pending Reviews</CardTitle>
-                        <CheckSquare className="h-4 w-4 text-pink-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">42</div>
-                        <p className="text-xs text-orange-600 font-medium mt-1">12 assignments overdue for grading</p>
-                    </CardContent>
-                </Card>
+  React.useEffect(() => {
+    let mounted = true;
 
-                <Card className="shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Class Attendance</CardTitle>
-                        <BarChart3 className="h-4 w-4 text-green-600" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">94%</div>
-                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">+2% from last week</p>
-                    </CardContent>
-                </Card>
-            </div>
+    async function fetchDashboardStats() {
+      try {
+        setIsLoading(true);
 
-            <div className="grid gap-6 lg:grid-cols-2">
-                <Card className="shadow-sm">
-                    <CardHeader>
-                        <CardTitle>Recent Student Questions</CardTitle>
-                        <CardDescription>Respond to your students' inquiries</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {[
-                                { name: "John Doe", question: "Can I get an extension on the React project?", course: "Web Dev 101" },
-                                { name: "Sarah Smith", question: "Struggling with the SQL join assignment.", course: "Database Systems" }
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-start gap-4 pb-4 last:pb-0 border-b last:border-0 border-zinc-100 dark:border-zinc-800">
-                                    <div className="h-10 w-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                                        <MessageSquare className="h-5 w-5 text-zinc-500" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">{item.name} • {item.course}</p>
-                                        <p className="text-sm text-zinc-500 italic mt-1">&quot;{item.question}&quot;</p>
-                                        <Button variant="link" size="sm" className="px-0 h-auto mt-2">Reply</Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
+        // Fetch assigned courses
+        const courses = await instructorCoursesApi.listMyCourses();
 
-                <Card className="shadow-sm p-6 flex flex-col items-center justify-center text-center gap-4 border-dashed">
-                    <div className="h-12 w-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                        <PlusCircle className="h-6 w-6 text-zinc-400" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-medium">Create New Course Content</h3>
-                        <p className="text-sm text-zinc-500">Add lectures, quizzes, or assignments to your courses.</p>
-                    </div>
-                    <Button>Get Started</Button>
-                </Card>
-            </div>
+        // Fetch assignments created by the instructor cross-courses
+        const assignments = await instructorAssessmentsApi.listMyAssignments();
+
+        // Fetch student count for each course (in parallel)
+        const enrollmentsPromises = courses.map((c) =>
+          instructorCoursesApi.listMyStudents(c.course_instance_id),
+        );
+        const allEnrollments = await Promise.all(enrollmentsPromises);
+
+        // Deduplicate students across all courses to get unique active students.
+        const uniqueStudents = new Set<string>();
+        allEnrollments.flat().forEach((e) => uniqueStudents.add(e.user_id));
+
+        if (mounted) {
+          setStats({
+            coursesCount: courses.length,
+            studentsCount: uniqueStudents.size,
+            assignmentsCount: assignments.length,
+          });
+        }
+      } catch (err) {
+        if (mounted) setError(handleApiError(err));
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    }
+
+    fetchDashboardStats();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-col gap-8 pb-8">
+      {/* Header */}
+      <div className="flex flex-col gap-2 border-b border-border/40 pb-6">
+        <h1 className="text-3xl font-black font-serif tracking-tight lg:text-4xl">
+          Welcome, {displayName.split(" ")[0]}
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          This is your instructor workspace. Course and enrollment data is
+          managed by administrators.
+        </p>
+      </div>
+
+      {error && (
+        <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-800 text-sm">
+          {error}
         </div>
-    );
+      )}
+
+      {/* Backend access notice */}
+      <div className="flex gap-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 p-4">
+        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            Academic data is administrator-managed
+          </p>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+            Courses, enrollments, and assignment definitions are configured by
+            admins. Once assigned to a course, you will be able to view student
+            submissions here.
+          </p>
+        </div>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Assigned Courses"
+          icon={BookOpen}
+          value={
+            isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              stats.coursesCount.toString()
+            )
+          }
+          sub={
+            stats.coursesCount > 0
+              ? "Active semester assignments"
+              : "Awaiting admin assignment"
+          }
+          locked={false}
+        />
+        <StatCard
+          title="Unique Students"
+          icon={GraduationCap}
+          value={
+            isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              stats.studentsCount.toString()
+            )
+          }
+          sub={
+            stats.coursesCount > 0
+              ? "Across all assigned courses"
+              : "Requires course assignment"
+          }
+          locked={false}
+        />
+        <StatCard
+          title="Assignments"
+          icon={FileText}
+          value={
+            isLoading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : (
+              stats.assignmentsCount.toString()
+            )
+          }
+          sub="Created for your courses"
+          locked={false}
+        />
+        <StatCard
+          title="Peer Groups"
+          icon={Users}
+          value="—"
+          sub="Coming soon"
+          locked={true}
+        />
+      </div>
+
+      {/* Quick navigation */}
+      <div>
+        <h2 className="text-lg font-bold mb-4">Quick Access</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            {
+              href: "/instructor/courses",
+              icon: BookOpen,
+              title: "My Courses",
+              desc: "View courses you have been assigned to instruct.",
+            },
+            {
+              href: "/instructor/assessments",
+              icon: FileText,
+              title: "Assessments",
+              desc: "Browse assignments and review student submissions.",
+            },
+            {
+              href: "/instructor/students",
+              icon: GraduationCap,
+              title: "Students",
+              desc: "See enrolled students across your courses.",
+            },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <Card
+                key={item.href}
+                className="group border-border/60 hover:border-primary/30 hover:shadow-md transition-all duration-200 bg-background"
+              >
+                <CardContent className="p-6 flex flex-col gap-4">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold">{item.title}</h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {item.desc}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" className="w-fit" asChild>
+                    <Link href={item.href}>Open</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }

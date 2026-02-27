@@ -3,10 +3,10 @@ package router
 import (
 	"strings"
 
-	"github.com/gofiber/fiber/v3"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/handler"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/middleware"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/utils"
+	"github.com/gofiber/fiber/v3"
 )
 
 // Config holds all handler dependencies required to set up routes.
@@ -15,6 +15,7 @@ type Config struct {
 	AssignmentHandler *handler.AssignmentHandler
 	SubmissionHandler *handler.SubmissionHandler
 	GroupHandler      *handler.GroupHandler
+	InstructorHandler *handler.InstructorHandler
 	JWTSecretKey      []byte
 }
 
@@ -112,6 +113,19 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 
 	// PUT    /api/v1/submissions/:id            — always 405 (submissions are immutable)
 	submissions.Put("/:id", cfg.SubmissionHandler.UpdateSubmission)
+
+	// ── Instructor-scoped routes ────────────────────────────────────────────
+	// Accessible to Employee + Admin + Super Admin.
+	// PathPrefix: /api/v1/instructor-assignments — routed by Traefik
+	// PathPrefix: /api/v1/instructor-submissions — routed by Traefik
+	requireEmployeeOrAdmin := middleware.RequireAnyRole("Employee", "Admin", "Super Admin")
+
+	instructorAssignments := protected.Group("/instructor-assignments", requireEmployeeOrAdmin)
+	instructorAssignments.Get("/me", cfg.InstructorHandler.GetMyAssignments)
+	instructorAssignments.Post("/", cfg.InstructorHandler.CreateAssignment)
+
+	instructorSubmissions := protected.Group("/instructor-submissions", requireEmployeeOrAdmin)
+	instructorSubmissions.Get("/assignment/:id", cfg.InstructorHandler.GetSubmissions)
 
 	// ── Groups ────────────────────────────────────────────────────────────────
 	// Groups are accessible to all authenticated users — a student may create

@@ -38,13 +38,6 @@ services:
     networks:
       - gradeloop-network
 
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cipas -d cipas_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
     logging:
       driver: "json-file"
       options:
@@ -73,11 +66,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - gradeloop-network
-    healthcheck:
-      test: ["CMD", "traefik", "healthcheck"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+  # =============================================================================
 
   # =============================================================================
   # IAM Service (Go Fiber)
@@ -86,6 +75,9 @@ services:
     build:
       context: ./apps/services/iam-service
       dockerfile: Dockerfile
+      target: dev
+    volumes:
+      - ./apps/services/iam-service:/app
     container_name: iam-service
     restart: unless-stopped
     labels:
@@ -141,18 +133,10 @@ services:
       - "8081"
 
     depends_on:
-      minio:
-        condition: service_healthy
+      - minio
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
 
     logging:
       driver: "json-file"
@@ -168,6 +152,9 @@ services:
     build:
       context: ./apps/services/email-service
       dockerfile: Dockerfile
+      target: dev
+    volumes:
+      - ./apps/services/email-service:/app
     container_name: email-service
     restart: unless-stopped
     labels:
@@ -200,10 +187,8 @@ services:
       - "8082"
 
     depends_on:
-      minio:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - minio
+      - rabbitmq
 
     networks:
       - gradeloop-network
@@ -222,11 +207,14 @@ services:
     build:
       context: ./apps/services/academic-service
       dockerfile: Dockerfile
+      target: dev
+    volumes:
+      - ./apps/services/academic-service:/app
     container_name: academic-service
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/departments`) || PathPrefix(`/api/v1/faculties`) || PathPrefix(`/api/v1/degrees`) || PathPrefix(`/api/v1/specializations`) || PathPrefix(`/api/v1/batches`) || PathPrefix(`/api/v1/batch-members`) || PathPrefix(`/api/v1/course-instances`) || PathPrefix(`/api/v1/course-instructors`) || PathPrefix(`/api/v1/enrollments`) || PathPrefix(`/api/v1/courses`) || PathPrefix(`/api/v1/semesters`) || PathPrefix(`/api/v1/debug`)"
+      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/departments`) || PathPrefix(`/api/v1/faculties`) || PathPrefix(`/api/v1/degrees`) || PathPrefix(`/api/v1/specializations`) || PathPrefix(`/api/v1/batches`) || PathPrefix(`/api/v1/batch-members`) || PathPrefix(`/api/v1/course-instances`) || PathPrefix(`/api/v1/course-instructors`) || PathPrefix(`/api/v1/enrollments`) || PathPrefix(`/api/v1/courses`) || PathPrefix(`/api/v1/semesters`) || PathPrefix(`/api/v1/instructor-courses`) || PathPrefix(`/api/v1/debug`)"
       - "traefik.http.routers.academic.priority=100"
       - "traefik.http.routers.academic.entrypoints=web"
       - "traefik.http.services.academic-service.loadbalancer.server.port=8083"
@@ -260,18 +248,10 @@ services:
       - "8083"
 
     depends_on:
-      iam-service:
-        condition: service_healthy
+      - iam-service
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
 
     logging:
       driver: "json-file"
@@ -281,20 +261,21 @@ services:
         compress: "true"
 
   # =============================================================================
-  # Assessment Service (Go Fiber) — under development, excluded from build
+  # Assessment Service (Go Fiber)
   # =============================================================================
   assessment-service:
     build:
       context: ./apps/services/assessment-service
       dockerfile: Dockerfile
+      target: dev
+    volumes:
+      - ./apps/services/assessment-service:/app
     container_name: assessment-service
     restart: unless-stopped
-    profiles:
-      - dev-assessment
     labels:
       - "traefik.enable=true"
-      # Route assignments, submissions, and groups through the assessment service
-      - "traefik.http.routers.assessment.rule=PathPrefix(`/api/v1/assignments`) || PathPrefix(`/api/v1/submissions`) || PathPrefix(`/api/v1/groups`)"
+      # Route assignments, submissions, groups, and instructor-scoped endpoints through the assessment service
+      - "traefik.http.routers.assessment.rule=PathPrefix(`/api/v1/assignments`) || PathPrefix(`/api/v1/submissions`) || PathPrefix(`/api/v1/groups`) || PathPrefix(`/api/v1/instructor-assignments`) || PathPrefix(`/api/v1/instructor-submissions`)"
       - "traefik.http.routers.assessment.priority=100"
       - "traefik.http.routers.assessment.entrypoints=web"
       - "traefik.http.services.assessment-service.loadbalancer.server.port=8084"
@@ -337,22 +318,12 @@ services:
       - "8084"
 
     depends_on:
-      iam-service:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - iam-service
+      - minio
+      - rabbitmq
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
 
     logging:
       driver: "json-file"
@@ -368,6 +339,9 @@ services:
     build:
       context: ./apps/services/cipas-service
       dockerfile: Dockerfile
+    volumes:
+      - ./apps/services/cipas-service/src:/app/src
+    command: [ "/opt/venv/bin/uvicorn", "cipas.main:app", "--host", "0.0.0.0", "--port", "8085", "--loop", "uvloop", "--http", "httptools", "--workers", "1", "--reload" ]
     container_name: cipas-service
     restart: unless-stopped
     labels:
@@ -436,24 +410,10 @@ services:
       - "8085"
 
     depends_on:
-      cipas-postgres:
-        condition: service_healthy
+      - cipas-postgres
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      # Uses the /ready endpoint (readiness probe) which checks both the
-      # process liveness AND the DB connectivity.  If the DB is unreachable
-      # at container start, this probe will fail and Compose will restart.
-      test: ["CMD", "curl", "-f", "http://localhost:8085/api/v1/cipas/ready"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      # Allow 60s for the service to start: poetry env activate + tree-sitter
-      # grammar loading + ProcessPoolExecutor worker warm-up take ~10-30s
-      # on first cold start.
-      start_period: 60s
 
     logging:
       driver: "json-file"
@@ -588,13 +548,6 @@ services:
     networks:
       - gradeloop-network
 
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
     logging:
       driver: "json-file"
       options:
@@ -620,13 +573,6 @@ services:
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
 
     logging:
       driver: "json-file"

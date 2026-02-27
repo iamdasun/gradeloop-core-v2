@@ -1,0 +1,63 @@
+meta {
+  name: Create Assignment (Instructor)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{INSTRUCTOR_ASSIGNMENTS_URL_V1}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "course_instance_id": "{{COURSE_INSTANCE_ID}}",
+    "title": "Instructor Assignment: Data Structures Lab",
+    "description": "Implement a binary search tree with insert, delete, and search operations.",
+    "code": "DS-LAB1",
+    "release_at": "2025-09-01T09:00:00Z",
+    "due_at": "2025-09-15T23:59:00Z",
+    "allow_late_submissions": false,
+    "allow_group_submission": false,
+    "enable_ai_assistant": true,
+    "enable_socratic_feedback": true,
+    "allow_regenerate": false
+  }
+}
+
+script:post-response {
+  if (res.status === 201) {
+    const id = res.body.id;
+    if (id) {
+      bru.setEnvVar("ASSIGNMENT_ID", id);
+      console.log("✅ ASSIGNMENT_ID saved:", id);
+    }
+    console.log("✅ Assignment created by instructor successfully");
+    console.log("   Title:", res.body.title);
+  }
+}
+
+docs {
+  # Create Assignment (Instructor)
+
+  Creates a new assignment. The instructor must be assigned to the
+  course instance specified in the request body.
+
+  ## Endpoint
+  POST /api/v1/instructor-assignments
+
+  ## Authentication
+  Requires Employee, Admin, or Super Admin role.
+  Instructor must be assigned to the specified course instance.
+
+  ## Request Body
+  Same fields as admin POST /assignments — see Assessment Service docs.
+
+  ## Response (201 Created)
+  Standard AssignmentResponse shape.
+}

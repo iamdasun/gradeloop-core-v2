@@ -14,6 +14,7 @@ type CourseInstructorRepository interface {
 	GetByCourseInstance(instanceID uuid.UUID) ([]domain.CourseInstructor, error)
 	GetInstructor(instanceID, userID uuid.UUID) (*domain.CourseInstructor, error)
 	RemoveInstructor(instanceID, userID uuid.UUID) error
+	GetByUserID(userID uuid.UUID) ([]domain.CourseInstructor, error)
 }
 
 // courseInstructorRepository is the concrete GORM-backed implementation.
@@ -66,4 +67,15 @@ func (r *courseInstructorRepository) RemoveInstructor(instanceID, userID uuid.UU
 	return r.db.
 		Where("course_instance_id = ? AND user_id = ?", instanceID, userID).
 		Delete(&domain.CourseInstructor{}).Error
+}
+
+// GetByUserID returns all course instructor assignments for the given user,
+// ordered by course_instance_id. Used by the instructor-scoped endpoints.
+func (r *courseInstructorRepository) GetByUserID(userID uuid.UUID) ([]domain.CourseInstructor, error) {
+	var instructors []domain.CourseInstructor
+	err := r.db.
+		Where("user_id = ?", userID).
+		Order("course_instance_id ASC").
+		Find(&instructors).Error
+	return instructors, err
 }

@@ -15,6 +15,7 @@ import {
   Users,
   UserCheck,
   UserX,
+  FileUp,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CreateUserDialog } from "@/components/admin/create-user-dialog";
+import { BulkImportDialog } from "@/components/admin/bulk-import-dialog";
 import { EditUserDialog } from "@/components/admin/edit-user-dialog";
 import { UserDetailsDialog } from "@/components/admin/user-details-dialog";
 import { RevokeSessionsDialog } from "@/components/admin/revoke-sessions-dialog";
@@ -50,8 +52,8 @@ import type { UserListItem } from "@/types/auth.types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function getInitials(fullName: string, username: string) {
-  const name = fullName || username;
+function getInitials(fullName: string, email: string) {
+  const name = fullName || email;
   return name
     .split(/[.\-_\s@]/)
     .map((p) => p[0]?.toUpperCase() ?? "")
@@ -127,6 +129,7 @@ export default function UsersPage() {
 
   // ── Dialog state ────────────────────────────────────────────────────────
   const [createOpen, setCreateOpen] = React.useState(false);
+  const [importOpen, setImportOpen] = React.useState(false);
   const [editUser, setEditUser] = React.useState<UserListItem | null>(null);
   const [detailsUser, setDetailsUser] = React.useState<UserListItem | null>(
     null,
@@ -156,6 +159,7 @@ export default function UsersPage() {
         page,
         limit: PAGE_LIMIT,
         role_id: roleFilter || undefined,
+        search: debouncedSearch || undefined,
       });
       setUsers(result.data);
       setTotal(result.total);
@@ -164,7 +168,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, roleFilter]);
+  }, [page, roleFilter, debouncedSearch]);
 
   React.useEffect(() => {
     fetchUsers();
@@ -176,19 +180,12 @@ export default function UsersPage() {
   // ── Client-side filtering (search & status only — role filter is server-side) ──
   const displayUsers = React.useMemo(() => {
     return users.filter((u) => {
-      if (debouncedSearch) {
-        const q = debouncedSearch.toLowerCase();
-        if (
-          !u.full_name?.toLowerCase().includes(q) &&
-          !u.email.toLowerCase().includes(q)
-        )
-          return false;
-      }
+      // Status filter is still client-side because backend doesn't support it yet
       if (statusFilter === "active" && !u.is_active) return false;
       if (statusFilter === "inactive" && u.is_active) return false;
       return true;
     });
-  }, [users, debouncedSearch, statusFilter]);
+  }, [users, statusFilter]);
 
   // ── Derived stats ────────────────────────────────────────────────────────────
   const activeCount = users.filter((u) => u.is_active).length;
@@ -217,10 +214,23 @@ export default function UsersPage() {
             Manage accounts, roles, and access.
           </p>
         </div>
-        <Button className="gap-2 shadow-sm" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Add User
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="gap-2 shadow-sm"
+            onClick={() => setImportOpen(true)}
+          >
+            <FileUp className="h-4 w-4" />
+            Bulk Import
+          </Button>
+          <Button
+            className="gap-2 shadow-sm"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Add User
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -371,7 +381,7 @@ export default function UsersPage() {
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9 shrink-0">
                             <AvatarFallback className="bg-zinc-100 dark:bg-zinc-800 text-sm">
-                              {getInitials(user.full_name, user.username)}
+                              {getInitials(user.full_name, user.email)}
                             </AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
@@ -507,6 +517,11 @@ export default function UsersPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSuccess={handleUserCreated}
+      />
+      <BulkImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onSuccess={fetchUsers}
       />
       <EditUserDialog
         user={editUser}

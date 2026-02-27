@@ -1,0 +1,54 @@
+meta {
+  name: Get Assignment Submissions
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{INSTRUCTOR_SUBMISSIONS_URL_V1}}/assignment/{{ASSIGNMENT_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Submissions fetched successfully");
+    console.log("   Count:", res.body.count);
+  }
+}
+
+docs {
+  # Get Assignment Submissions
+
+  Returns all submissions for an assignment that belongs to one of the
+  instructor's assigned course instances.
+
+  ## Endpoint
+  GET /api/v1/instructor-submissions/assignment/:id
+
+  ## Authentication
+  Requires Employee, Admin, or Super Admin role.
+  Instructor must be assigned to the course instance that owns this assignment.
+
+  ## Response (200 OK)
+  ```json
+  {
+    "submissions": [
+      {
+        "id": "uuid",
+        "assignment_id": "uuid",
+        "user_id": "uuid",
+        "status": "pending",
+        "version": 1,
+        "is_latest": true,
+        "submitted_at": "2025-01-01T00:00:00Z"
+      }
+    ],
+    "count": 1
+  }
+  ```
+}

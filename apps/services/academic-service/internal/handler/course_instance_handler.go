@@ -104,6 +104,29 @@ func (h *CourseInstanceHandler) ListCourseInstancesByBatch(c fiber.Ctx) error {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /course-instances/:id
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GetCourseInstanceByID handles GET /course-instances/:id
+func (h *CourseInstanceHandler) GetCourseInstanceByID(c fiber.Ctx) error {
+	id, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	instance, err := h.courseInstanceService.GetCourseInstance(id)
+	if err != nil {
+		return err
+	}
+
+	if instance == nil {
+		return utils.ErrNotFound("course instance not found")
+	}
+
+	return c.Status(fiber.StatusOK).JSON(toCourseInstanceResponse(instance))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Private helpers
 // ─────────────────────────────────────────────────────────────────────────────
 

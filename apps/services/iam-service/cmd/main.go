@@ -120,6 +120,13 @@ func run() error {
 		permissionRepo,
 	)
 
+	bulkImportService := service.NewBulkImportService(
+		db.DB,
+		userRepo,
+		roleRepo,
+		userService,
+	)
+
 	minioStorage, err := storage.NewMinIOStorage(
 		cfg.MinIO.Endpoint,
 		cfg.MinIO.AccessKey,
@@ -144,6 +151,7 @@ func run() error {
 	userHandler := handler.NewUserHandler(userService, minioStorage)
 	roleHandler := handler.NewRoleHandler(roleService)
 	permissionHandler := handler.NewPermissionHandler(permissionService)
+	bulkImportHandler := handler.NewBulkImportHandler(bulkImportService)
 
 	app := fiber.New(fiber.Config{
 		AppName:      "iam-service",
@@ -165,6 +173,7 @@ func run() error {
 		UserHandler:       userHandler,
 		RoleHandler:       roleHandler,
 		PermissionHandler: permissionHandler,
+		BulkImportHandler: bulkImportHandler,
 		JWTSecretKey:      []byte(cfg.JWT.SecretKey),
 	})
 

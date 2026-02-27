@@ -4,8 +4,6 @@ import * as React from "react";
 import {
     BookOpen,
     FileText,
-    GraduationCap,
-    Clock,
     Trophy,
     Calendar
 } from "lucide-react";
@@ -66,7 +64,7 @@ export default function StudentDashboardPage() {
                 <Card className="shadow-sm">
                     <CardHeader>
                         <CardTitle>Upcoming Deadlines</CardTitle>
-                        <CardDescription>Don't miss these important dates</CardDescription>
+                        <CardDescription>Don&apos;t miss these important dates</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">

@@ -11,6 +11,11 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/main.go
 
+# Dev stage for hot-reloading
+FROM builder AS dev
+RUN go install github.com/air-verse/air@latest
+CMD ["air"]
+
 FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates tzdata curl
