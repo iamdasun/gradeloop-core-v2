@@ -1,17 +1,20 @@
 """
 Tree-sitter based Tokenizer for Multi-Language Code Parsing.
 
-This module provides a unified interface for tokenizing source code in Java, C, and Python
+This module provides a unified interface for tokenizing source code in Java, C, C++, and Python
 using Tree-sitter Concrete Syntax Trees (CSTs). It supports:
 - Lexical analysis with token sequence extraction
 - Variable name abstraction to 'V' for Type-2 clone handling
 - Token-to-type conversion using 15 standardized token types
+- CST frequency extraction via post-order traversal
+- PDG-like dependency relationship extraction
 """
 
 import re
 from typing import Optional
 
 import tree_sitter_c as tsc
+import tree_sitter_c_sharp as tscs
 import tree_sitter_java as tsjava
 import tree_sitter_python as tspython
 from tree_sitter import Language, Parser
@@ -21,7 +24,7 @@ class TreeSitterTokenizer:
     """
     Multi-language tokenizer using Tree-sitter CST parsing.
 
-    Supports Java, C, and Python with consistent token type mapping.
+    Supports Java, C, C#, and Python with consistent token type mapping.
     """
 
     def __init__(self):
@@ -34,12 +37,13 @@ class TreeSitterTokenizer:
         try:
             self.parsers["java"] = Parser(Language(tsjava.language()))
             self.parsers["c"] = Parser(Language(tsc.language()))
+            self.parsers["csharp"] = Parser(Language(tscs.language()))
             self.parsers["python"] = Parser(Language(tspython.language()))
 
         except ImportError as e:
             raise ImportError(
                 "Tree-sitter language packages not found. "
-                "Install them with: pip install tree-sitter-java tree-sitter-c tree-sitter-python"
+                "Install them with: pip install tree-sitter-java tree-sitter-c tree-sitter-c-sharp tree-sitter-python"
             ) from e
 
     def tokenize(
