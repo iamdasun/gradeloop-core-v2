@@ -96,7 +96,7 @@
 <body>
     <div class="container">
         <h1>🔍 Type-IV Code Clone Detector - Evaluation Report</h1>
-        <p class="timestamp">Generated: 2026-02-28 19:52:53</p>
+        <p class="timestamp">Generated: 2026-02-28 23:54:24</p>
 
         <h2>📋 Experiment Information</h2>
         <table class="info-table">
@@ -106,11 +106,11 @@
             </tr>
             <tr>
                 <th>Language(S)</th>
-                <td>java, python, c, csharp</td>
+                <td>java</td>
             </tr>
             <tr>
                 <th>Sample Size</th>
-                <td>10000</td>
+                <td>100</td>
             </tr>
             <tr>
                 <th>Clone Ratio</th>
@@ -122,15 +122,19 @@
             </tr>
             <tr>
                 <th>Feature Count</th>
-                <td>218</td>
+                <td>437</td>
+            </tr>
+            <tr>
+                <th>Pruned Feature Count</th>
+                <td>350</td>
             </tr>
             <tr>
                 <th>Train Size</th>
-                <td>8000</td>
+                <td>80</td>
             </tr>
             <tr>
                 <th>Test Size</th>
-                <td>2000</td>
+                <td>20</td>
             </tr>
         </table>
 
@@ -138,23 +142,28 @@
         <div class="metrics-grid">
 
             <div class="metric-card">
-                <div class="metric-value">0.7665</div>
+                <div class="metric-value">0.7000</div>
                 <div class="metric-label">Accuracy</div>
             </div>
 
             <div class="metric-card">
-                <div class="metric-value">0.7580</div>
+                <div class="metric-value">0.7000</div>
                 <div class="metric-label">Precision</div>
             </div>
 
             <div class="metric-card">
-                <div class="metric-value">0.7830</div>
+                <div class="metric-value">0.7000</div>
                 <div class="metric-label">Recall</div>
             </div>
 
             <div class="metric-card">
-                <div class="metric-value">0.7703</div>
+                <div class="metric-value">0.7000</div>
                 <div class="metric-label">F1</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-value">0.8400</div>
+                <div class="metric-label">Roc Auc</div>
             </div>
         </div>
 
@@ -162,27 +171,63 @@
         <table class="info-table">
             <tr>
                 <th>Accuracy</th>
-                <td>0.766500</td>
+                <td>0.700000</td>
             </tr>
             <tr>
                 <th>Precision</th>
-                <td>0.757986</td>
+                <td>0.700000</td>
             </tr>
             <tr>
                 <th>Recall</th>
-                <td>0.783000</td>
+                <td>0.700000</td>
             </tr>
             <tr>
                 <th>F1</th>
-                <td>0.770290</td>
+                <td>0.700000</td>
             </tr>
             <tr>
-                <th>Cv F1 Mean</th>
-                <td>0.741087</td>
+                <th>Roc Auc</th>
+                <td>0.840000</td>
             </tr>
             <tr>
-                <th>Cv F1 Std</th>
-                <td>0.040286</td>
+                <th>Feature Pruning Applied</th>
+                <td>1.000000</td>
+            </tr>
+            <tr>
+                <th>Isotonic Calibration Applied</th>
+                <td>1.000000</td>
+            </tr>
+            <tr>
+                <th>Original Features</th>
+                <td>437.000000</td>
+            </tr>
+            <tr>
+                <th>Pruned Features</th>
+                <td>350.000000</td>
+            </tr>
+            <tr>
+                <th>Optimal Threshold</th>
+                <td>0.660000</td>
+            </tr>
+            <tr>
+                <th>Accuracy Thresholded</th>
+                <td>0.800000</td>
+            </tr>
+            <tr>
+                <th>Precision Thresholded</th>
+                <td>0.875000</td>
+            </tr>
+            <tr>
+                <th>Recall Thresholded</th>
+                <td>0.700000</td>
+            </tr>
+            <tr>
+                <th>F1 Thresholded</th>
+                <td>0.777778</td>
+            </tr>
+            <tr>
+                <th>Macro F1 Thresholded</th>
+                <td>0.797980</td>
             </tr>
         </table>
 

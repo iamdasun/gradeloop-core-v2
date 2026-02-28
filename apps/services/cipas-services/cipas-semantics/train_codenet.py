@@ -639,12 +639,29 @@ def train_codenet(
         # Get predictions for visualization
         from sklearn.model_selection import train_test_split
 
-        X_train, X_test, y_train, y_test = train_test_split(
+        X_train_viz, X_test_viz, y_train_viz, y_test_viz = train_test_split(
             X, y, test_size=test_size, random_state=42, stratify=y
         )
 
-        y_pred = classifier.predict(X_test)
-        y_scores = classifier.predict_proba(X_test)[:, 1]
+        # Apply same feature pruning as during training
+        if classifier.pruned_feature_indices is not None:
+            X_test_viz = X_test_viz[:, classifier.pruned_feature_indices]
+            logger.info(
+                f"Applied feature pruning to visualization data: {X_test_viz.shape[1]} features"
+            )
+
+        y_pred = classifier.predict(X_test_viz)
+        y_scores = classifier.predict_proba(X_test_viz)[:, 1]
+
+        # Create complete report - use pruned feature names
+        if classifier.feature_names:
+            viz_feature_names = classifier.feature_names
+        else:
+            viz_feature_names = feature_names
+            if classifier.pruned_feature_indices is not None:
+                viz_feature_names = [
+                    feature_names[i] for i in classifier.pruned_feature_indices
+                ]
 
         # Create complete report
         extra_info = {
@@ -654,17 +671,18 @@ def train_codenet(
             "clone_ratio": clone_ratio,
             "model_name": model_name,
             "feature_count": X.shape[1],
-            "train_size": len(X_train),
-            "test_size": len(X_test),
+            "pruned_feature_count": classifier.pruned_feature_count,
+            "train_size": len(X_train_viz),
+            "test_size": len(X_test_viz),
         }
 
         report_files = visualizer.create_complete_report(
-            y_true=y_test,
+            y_true=y_test_viz,
             y_pred=y_pred,
             y_scores=y_scores,
             metrics=metrics,
-            feature_names=feature_names,
-            importances=classifier.model.feature_importances_,
+            feature_names=viz_feature_names,
+            importances=classifier.base_model.feature_importances_,  # Use base_model for importances
             extra_info=extra_info,
             report_name=f"training_report_{model_name.replace('.pkl', '')}.html",
         )

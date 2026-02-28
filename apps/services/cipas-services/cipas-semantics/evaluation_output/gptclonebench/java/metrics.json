@@ -1,9 +1,8 @@
 {
-  "accuracy": 0.5099941879564349,
-  "precision": 0.5339736466105731,
-  "recall": 0.9190309212623525,
-  "f1": 0.6754807290010544,
-  "roc_auc": 0.06430228779893295,
-  "threshold_used": 0.33999999999999986,
-  "visualization_path": "evaluation_output/gptclonebench/java/reports/gptclonebench_evaluation_report.html"
+  "accuracy": 0.54,
+  "precision": 1.0,
+  "recall": 0.54,
+  "f1": 0.7012987012987013,
+  "roc_auc": NaN,
+  "threshold_used": 0.6599999999999997
 }

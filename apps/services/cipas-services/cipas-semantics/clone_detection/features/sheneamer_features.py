@@ -394,7 +394,7 @@ class SheneamerFeatureExtractor:
         This implementation uses contrastive features designed to fix the "Clone Zealot"
         bias by explicitly encoding divergence signals:
 
-        Fusion components (total: 413 features):
+        Fusion components (total: 405 features):
         1. Absolute Difference: |f1 - f2| (101 features) - Core signal for divergence
         2. Relative Difference: |f1 - f2| / (f1 + f2 + ε) (101 features) - Handles scaling
         3. Max-Min Ratio: min(f1, f2) / (max(f1, f2) + ε) (101 features) - Structural overlap
@@ -461,12 +461,8 @@ class SheneamerFeatureExtractor:
         Extract traditional code metrics (11 features).
 
         Features:
-        - Lines of code (LOC) - length-normalized
+        - Lines of code (LOC) - length-normalized with log scaling
         - Keyword category counts (normalized by LOC)
-
-        Multi-level normalization:
-        - LOC is log-scaled to reduce dominance of code length
-        - Keyword counts are density-based (per LOC)
 
         Returns:
             List of 11 traditional feature values
@@ -476,11 +472,7 @@ class SheneamerFeatureExtractor:
         # LOC with log scaling for length invariance
         loc = len(code.splitlines())
         loc_normalized = np.log1p(loc)  # log(1 + loc) to handle 0
-
-        if self.use_multi_level_normalization:
-            features.append(loc_normalized / 5.0)  # Normalize assuming max ~150 lines
-        else:
-            features.append(float(loc))
+        features.append(loc_normalized / 5.0)  # Normalize assuming max ~150 lines
 
         # Keyword category counts (density-based)
         code_lower = code.lower()
@@ -488,7 +480,7 @@ class SheneamerFeatureExtractor:
 
         for category, keywords in self.KEYWORD_CATEGORIES.items():
             count = len(tokens & keywords)
-            # Density: count per line (log-scaled)
+            # Density: count per line
             normalized = count / max(loc, 1)
             features.append(normalized)
 

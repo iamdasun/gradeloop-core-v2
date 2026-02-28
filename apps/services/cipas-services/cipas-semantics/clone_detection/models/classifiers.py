@@ -352,8 +352,10 @@ class SemanticClassifier:
         """
         Predict clone labels for feature vectors using calibrated threshold.
 
+        Automatically applies feature pruning if the model was trained with pruning.
+
         Args:
-            X: Feature matrix of shape (n_samples, n_features)
+            X: Feature matrix of shape (n_samples, n_features) - can be original or pruned
             threshold: Optional custom threshold (uses self.decision_threshold if not provided)
 
         Returns:
@@ -361,6 +363,15 @@ class SemanticClassifier:
         """
         if not self.is_trained:
             raise RuntimeError("Model must be trained before prediction")
+
+        # Apply feature pruning if model was trained with pruning (backward compatible)
+        if (
+            hasattr(self, "pruned_feature_indices")
+            and self.pruned_feature_indices is not None
+        ):
+            # Check if features need pruning
+            if X.shape[1] != self.pruned_feature_count:
+                X = X[:, self.pruned_feature_indices]
 
         # Use custom threshold or calibrated threshold
         thresh = threshold if threshold is not None else self.decision_threshold
@@ -377,14 +388,25 @@ class SemanticClassifier:
         """
         Predict clone probabilities.
 
+        Automatically applies feature pruning if the model was trained with pruning.
+
         Args:
-            X: Feature matrix of shape (n_samples, n_features)
+            X: Feature matrix of shape (n_samples, n_features) - can be original or pruned
 
         Returns:
             Probability arrays of shape (n_samples, n_classes)
         """
         if not self.is_trained:
             raise RuntimeError("Model must be trained before prediction")
+
+        # Apply feature pruning if model was trained with pruning (backward compatible)
+        if (
+            hasattr(self, "pruned_feature_indices")
+            and self.pruned_feature_indices is not None
+        ):
+            # Check if features need pruning
+            if X.shape[1] != self.pruned_feature_count:
+                X = X[:, self.pruned_feature_indices]
 
         return self.model.predict_proba(X)
 
