@@ -10,14 +10,17 @@ Usage:
         --model models/type4_xgb.pkl \
         --dataset /path/to/bigclonebench/bigclonebench.jsonl \
         --dataset-format bigclonebench \
-        --language java
+        --language java \
+        --visualize
 
     # Evaluate with TOMA dataset
     poetry run python evaluate_model.py \
         --model models/type4_xgb.pkl \
         --dataset /path/to/toma-dataset \
         --dataset-format toma \
-        --language java
+        --language java \
+        --visualize \
+        --output-dir ./evaluation_output
 
     # Evaluate with JSON dataset
     poetry run python evaluate_model.py \
@@ -30,6 +33,7 @@ Usage:
 import json
 import logging
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -44,9 +48,10 @@ from sklearn.metrics import (
 )
 from tqdm import tqdm
 
-from clone_detection.features.semantic_features import SemanticFeatureExtractor
+from clone_detection.features.sheneamer_features import SheneamerFeatureExtractor
 from clone_detection.models.classifiers import SemanticClassifier
 from clone_detection.utils.common_setup import setup_logging
+from clone_detection.utils.metrics_visualization import MetricsVisualizer
 
 logger = setup_logging(__name__)
 
@@ -220,6 +225,8 @@ def evaluate_model(
     language: str = "java",
     output_report: bool = True,
     sample_size: int | None = None,
+    visualize: bool = True,
+    output_dir: Optional[str] = None,
 ) -> dict:
     """
     Evaluate a trained semantic model.
@@ -231,6 +238,8 @@ def evaluate_model(
         language: Programming language
         output_report: Whether to print detailed report
         sample_size: Optional sample size for evaluation
+        visualize: Whether to generate visualization reports
+        output_dir: Directory for visualization output
 
     Returns:
         Evaluation metrics dictionary
@@ -254,7 +263,7 @@ def evaluate_model(
         raise ValueError(f"Unknown dataset format: {dataset_format}")
 
     logger.info(f"Extracting features for {len(code1_list)} pairs...")
-    extractor = SemanticFeatureExtractor()
+    extractor = SheneamerFeatureExtractor()
     features = []
 
     for code1, code2 in tqdm(
@@ -265,7 +274,7 @@ def evaluate_model(
             features.append(fused)
         except Exception as e:
             logger.warning(f"Feature extraction failed: {e}")
-            features.append(np.zeros(204))
+            features.append(np.zeros(extractor.n_fused_features))
 
     X_test = np.array(features)
     y_test = np.array(labels)
@@ -313,11 +322,44 @@ def evaluate_model(
         for name, score in importance:
             logger.info(f"  {name}: {score:.4f}")
 
+    # Generate visualizations
+    if visualize:
+        logger.info("\nGenerating evaluation visualizations...")
+        visualizer = MetricsVisualizer(output_dir=output_dir)
+
+        # Load feature names
+        feature_names = extractor.get_feature_names(fused=True)
+
+        # Create complete report
+        extra_info = {
+            "dataset": dataset_path,
+            "dataset_format": dataset_format,
+            "language": language,
+            "model_path": model_path,
+            "total_samples": len(y_test),
+            "feature_count": X_test.shape[1],
+        }
+
+        report_files = visualizer.create_complete_report(
+            y_true=y_test,
+            y_pred=y_pred,
+            y_scores=y_proba,
+            metrics=metrics,
+            feature_names=feature_names,
+            importances=model.model.feature_importances_,
+            extra_info=extra_info,
+            report_name=f"evaluation_report_{Path(dataset_path).stem}.html",
+        )
+
+        logger.info(f"Visualizations saved to: {report_files['html_report']}")
+        metrics["visualization_path"] = str(report_files["html_report"])
+
     return metrics
 
 
 if __name__ == "__main__":
     import argparse
+    from typing import Optional
 
     parser = argparse.ArgumentParser(
         description="Evaluate semantic clone detection model"
@@ -345,7 +387,7 @@ if __name__ == "__main__":
         "--language",
         type=str,
         default="java",
-        choices=["java", "c", "python"],
+        choices=["java", "c", "python", "csharp"],
         help="Programming language",
     )
     parser.add_argument(
@@ -359,6 +401,18 @@ if __name__ == "__main__":
         action="store_true",
         help="Disable detailed report output",
     )
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        default=True,
+        help="Generate visualization reports after evaluation",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory for visualization output (default: ./metrics_output)",
+    )
 
     args = parser.parse_args()
 
@@ -369,4 +423,6 @@ if __name__ == "__main__":
         language=args.language,
         output_report=not args.no_report,
         sample_size=args.sample_size,
+        visualize=args.visualize,
+        output_dir=args.output_dir,
     )

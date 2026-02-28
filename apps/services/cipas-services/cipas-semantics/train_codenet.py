@@ -4,32 +4,29 @@ Training Script for Type-IV Code Clone Detector using Project CodeNet Dataset.
 This script trains an XGBoost classifier based on the Sheneamer et al. (2021) framework
 using the Project CodeNet dataset.
 
-CodeNet Dataset Structure:
-- datasets/project-codenet/data/pXXXXX/{language}/{submission_id}.{ext}
-- datasets/project-codenet/metadata/pXXXXX.csv
-
 Usage:
     # Train with CodeNet dataset (Java)
     poetry run python train_codenet.py \
         --dataset ../../../../datasets/project-codenet \
         --language java \
         --model-name type4_xgb_codenet.pkl \
-        --sample-size 10000
+        --sample-size 10000 \
+        --visualize
 
     # Train with multiple languages
     poetry run python train_codenet.py \
         --dataset ../../../../datasets/project-codenet \
         --languages java python csharp \
         --model-name type4_xgb_multilang.pkl \
-        --sample-size 20000
+        --sample-size 20000 \
+        --visualize \
+        --output-dir ./training_output
 
-    # Train using problem-based sampling (solutions to same problem = clones)
+    # Train without visualization (faster)
     poetry run python train_codenet.py \
         --dataset ../../../../datasets/project-codenet \
         --language java \
-        --model-name type4_xgb_codenet.pkl \
-        --sampling-strategy problem \
-        --sample-size 15000
+        --model-name type4_xgb_codenet.pkl
 """
 
 import argparse
@@ -48,6 +45,7 @@ from tqdm import tqdm
 from clone_detection.features.sheneamer_features import SheneamerFeatureExtractor
 from clone_detection.models.classifiers import SemanticClassifier
 from clone_detection.utils.common_setup import get_model_path, setup_logging
+from clone_detection.utils.metrics_visualization import MetricsVisualizer
 
 logger = setup_logging(__name__)
 
@@ -388,8 +386,9 @@ def train_codenet(
 
     # Save feature names
     feature_names_file = get_model_path(f"{model_name}.features.json")
+    feature_names = extractor.get_feature_names(fused=True)
     with open(feature_names_file, "w") as f:
-        json.dump(extractor.get_feature_names(fused=True), f, indent=2)
+        json.dump(feature_names, f, indent=2)
     logger.info(f"Feature names saved to {feature_names_file}")
 
     return metrics
@@ -458,6 +457,18 @@ def main():
         help="Disable cross-validation during training",
     )
     parser.add_argument(
+        "--visualize",
+        action="store_true",
+        default=True,
+        help="Generate visualization reports after training",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory for visualization output (default: ./metrics_output)",
+    )
+    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -491,6 +502,8 @@ def main():
         sampling_strategy=args.sampling_strategy,
         test_size=args.test_size,
         cross_validation=not args.no_cv,
+        visualize=args.visualize,
+        output_dir=args.output_dir,
     )
 
     # Print results
