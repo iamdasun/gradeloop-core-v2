@@ -2,7 +2,7 @@
 Evaluation Script for Semantic Clone Detection Model (Type-4).
 
 Evaluates a trained XGBoost classifier on test datasets.
-Supports BigCloneBench (JSONL) and TOMA dataset formats.
+Supports BigCloneBench (JSONL), TOMA, GPTCloneBench, and JSON dataset formats.
 
 Usage:
     # Evaluate with BigCloneBench dataset
@@ -10,6 +10,14 @@ Usage:
         --model models/type4_xgb.pkl \
         --dataset /path/to/bigclonebench/bigclonebench.jsonl \
         --dataset-format bigclonebench \
+        --language java \
+        --visualize
+
+    # Evaluate with GPTCloneBench dataset
+    poetry run python evaluate_model.py \
+        --model models/type4_xgb.pkl \
+        --dataset ../../../../datasets/gptclonebench/gptclonebench_dataset.jsonl \
+        --dataset-format gptclonebench \
         --language java \
         --visualize
 
@@ -54,6 +62,65 @@ from clone_detection.utils.common_setup import setup_logging
 from clone_detection.utils.metrics_visualization import MetricsVisualizer
 
 logger = setup_logging(__name__)
+
+
+def load_gptclonebench_dataset(
+    dataset_path: str, sample_size: int | None = None
+) -> tuple[list[str], list[str], list[int]]:
+    """
+    Load GPTCloneBench dataset from JSONL file.
+
+    GPTCloneBench format (JSONL):
+    - Each line is a JSON object with:
+      - code1: First code snippet
+      - code2: Second code snippet
+      - semantic: Boolean indicating if they are semantic clones
+      - metadata: {language, prompt, filename, type}
+
+    Args:
+        dataset_path: Path to JSONL file
+        sample_size: Optional sample size for evaluation
+
+    Returns:
+        Tuple of (code1_list, code2_list, labels)
+    """
+    code1_list = []
+    code2_list = []
+    labels = []
+
+    logger.info(f"Loading GPTCloneBench dataset from {dataset_path}...")
+
+    # Count total lines
+    with open(dataset_path, "r", encoding="utf-8") as f:
+        total_lines = sum(1 for _ in f)
+
+    logger.info(f"Found {total_lines} entries in GPTCloneBench")
+
+    # Load data
+    with open(dataset_path, "r", encoding="utf-8") as f:
+        for i, line in enumerate(f):
+            if sample_size and i >= sample_size:
+                break
+
+            try:
+                data = json.loads(line)
+                code1 = data.get("code1", "")
+                code2 = data.get("code2", "")
+                # GPTCloneBench uses 'semantic' boolean for label
+                label = 1 if data.get("semantic", False) else 0
+
+                if code1 and code2:
+                    code1_list.append(code1)
+                    code2_list.append(code2)
+                    labels.append(label)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse line {i}: {e}")
+
+            if (i + 1) % 100 == 0:
+                logger.info(f"  Processed {i + 1} entries")
+
+    logger.info(f"Loaded {len(code1_list)} code pairs from GPTCloneBench")
+    return code1_list, code2_list, labels
 
 
 def load_bigclonebench_dataset(
@@ -234,7 +301,7 @@ def evaluate_model(
     Args:
         model_path: Path to trained model (.pkl file)
         dataset_path: Path to test dataset
-        dataset_format: Dataset format ('bigclonebench', 'toma', or 'json')
+        dataset_format: Dataset format ('bigclonebench', 'gptclonebench', 'toma', or 'json')
         language: Programming language
         output_report: Whether to print detailed report
         sample_size: Optional sample size for evaluation
@@ -251,6 +318,10 @@ def evaluate_model(
 
     if dataset_format == "bigclonebench":
         code1_list, code2_list, labels = load_bigclonebench_dataset(
+            dataset_path, sample_size=sample_size
+        )
+    elif dataset_format == "gptclonebench":
+        code1_list, code2_list, labels = load_gptclonebench_dataset(
             dataset_path, sample_size=sample_size
         )
     elif dataset_format == "toma":
@@ -380,7 +451,7 @@ if __name__ == "__main__":
         "--dataset-format",
         type=str,
         default="bigclonebench",
-        choices=["bigclonebench", "toma", "json"],
+        choices=["bigclonebench", "gptclonebench", "toma", "json"],
         help="Dataset format",
     )
     parser.add_argument(
