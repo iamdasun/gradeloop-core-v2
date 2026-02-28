@@ -238,6 +238,8 @@ def evaluate_gptclonebench(
     clone_type_filter: Optional[str] = None,
     visualize: bool = True,
     output_dir: Optional[str] = None,
+    threshold: Optional[float] = None,
+    threshold_sweep: bool = False,
 ) -> dict:
     """
     Evaluate model on GPTCloneBench dataset.
@@ -250,6 +252,8 @@ def evaluate_gptclonebench(
         clone_type_filter: Optional filter by clone type
         visualize: Whether to generate visualizations
         output_dir: Directory for output files
+        threshold: Custom decision threshold (default: use model's calibrated threshold)
+        threshold_sweep: Whether to perform threshold sweep analysis
 
     Returns:
         Evaluation metrics dictionary
@@ -261,6 +265,13 @@ def evaluate_gptclonebench(
     # Load model
     logger.info(f"Loading model from {model_path}...")
     model = SemanticClassifier.load(Path(model_path).name)
+
+    # Set custom threshold if provided
+    if threshold is not None:
+        model.set_threshold(threshold)
+        logger.info(f"Using custom threshold: {threshold:.3f}")
+    else:
+        logger.info(f"Using model's calibrated threshold: {model.get_threshold():.3f}")
 
     # Load dataset
     code1_list, code2_list, labels, metadata = load_gptclonebench_dataset(
@@ -302,7 +313,44 @@ def evaluate_gptclonebench(
         "recall": recall_score(y_test, y_pred, zero_division=0),
         "f1": f1_score(y_test, y_pred, zero_division=0),
         "roc_auc": roc_auc_score(y_test, y_proba),
+        "threshold_used": model.get_threshold(),
     }
+
+    # Threshold sweep analysis
+    if threshold_sweep:
+        logger.info("\nPerforming threshold sweep analysis...")
+        sweep_results = model.threshold_sweep(X_test, y_test)
+
+        # Find optimal thresholds for different metrics
+        optimal_f1 = model.find_optimal_threshold(X_test, y_test, metric="f1")
+        optimal_precision = model.find_optimal_threshold(
+            X_test, y_test, metric="precision"
+        )
+        optimal_recall = model.find_optimal_threshold(X_test, y_test, metric="recall")
+
+        metrics["threshold_sweep"] = True
+        metrics["optimal_threshold_f1"] = optimal_f1
+        metrics["optimal_threshold_precision"] = optimal_precision
+        metrics["optimal_threshold_recall"] = optimal_recall
+
+        # Save sweep results
+        sweep_csv = results_dir / "threshold_sweep_results.csv"
+        sweep_results.to_csv(sweep_csv, index=False)
+        logger.info(f"Threshold sweep results saved to: {sweep_csv}")
+
+        logger.info("\n" + "=" * 60)
+        logger.info("THRESHOLD SWEEP ANALYSIS")
+        logger.info("=" * 60)
+        logger.info(f"Optimal threshold for F1: {optimal_f1:.3f}")
+        logger.info(f"Optimal threshold for Precision: {optimal_precision:.3f}")
+        logger.info(f"Optimal threshold for Recall: {optimal_recall:.3f}")
+        logger.info(f"Current threshold: {model.get_threshold():.3f}")
+
+        # Show best F1 from sweep
+        best_f1_row = sweep_results.loc[sweep_results["f1"].idxmax()]
+        logger.info(
+            f"\nBest F1 from sweep: {best_f1_row['f1']:.4f} at threshold {best_f1_row['threshold']:.3f}"
+        )
 
     # Print overall results
     logger.info("\n" + "=" * 60)
@@ -450,6 +498,17 @@ def main():
         help="Directory for output files (default: ./gptclonebench_results)",
     )
     parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="Custom decision threshold (default: use model's calibrated threshold)",
+    )
+    parser.add_argument(
+        "--threshold-sweep",
+        action="store_true",
+        help="Perform threshold sweep analysis",
+    )
+    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -471,6 +530,8 @@ def main():
         clone_type_filter=args.clone_type_filter,
         visualize=args.visualize,
         output_dir=args.output_dir,
+        threshold=args.threshold,
+        threshold_sweep=args.threshold_sweep,
     )
 
     logger.info("\n" + "=" * 60)

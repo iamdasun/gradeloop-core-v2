@@ -4,6 +4,11 @@ Evaluation Script for Semantic Clone Detection Model (Type-4).
 Evaluates a trained XGBoost classifier on test datasets.
 Supports BigCloneBench (JSONL), TOMA, GPTCloneBench, and JSON dataset formats.
 
+Enhanced with:
+- Contrastive feature fusion (absolute difference, element-wise product, cosine similarity)
+- Probability threshold calibration
+- Multi-level normalization
+
 Usage:
     # Evaluate with BigCloneBench dataset
     poetry run python evaluate_model.py \
@@ -13,29 +18,23 @@ Usage:
         --language java \
         --visualize
 
-    # Evaluate with GPTCloneBench dataset
+    # Evaluate with custom threshold
     poetry run python evaluate_model.py \
         --model models/type4_xgb.pkl \
         --dataset ../../../../datasets/gptclonebench/gptclonebench_dataset.jsonl \
         --dataset-format gptclonebench \
         --language java \
+        --threshold 0.75 \
         --visualize
 
-    # Evaluate with TOMA dataset
+    # Evaluate with threshold sweep
     poetry run python evaluate_model.py \
         --model models/type4_xgb.pkl \
         --dataset /path/to/toma-dataset \
         --dataset-format toma \
         --language java \
-        --visualize \
-        --output-dir ./evaluation_output
-
-    # Evaluate with JSON dataset
-    poetry run python evaluate_model.py \
-        --model models/type4_xgb.pkl \
-        --dataset /path/to/test_dataset.json \
-        --dataset-format json \
-        --language java
+        --threshold-sweep \
+        --visualize
 """
 
 import json
@@ -294,6 +293,8 @@ def evaluate_model(
     sample_size: int | None = None,
     visualize: bool = True,
     output_dir: Optional[str] = None,
+    threshold: Optional[float] = None,
+    threshold_sweep: bool = False,
 ) -> dict:
     """
     Evaluate a trained semantic model.
@@ -307,12 +308,21 @@ def evaluate_model(
         sample_size: Optional sample size for evaluation
         visualize: Whether to generate visualization reports
         output_dir: Directory for visualization output
+        threshold: Custom decision threshold (default: use model's calibrated threshold)
+        threshold_sweep: Whether to perform threshold sweep analysis
 
     Returns:
         Evaluation metrics dictionary
     """
     logger.info(f"Loading model from {model_path}...")
     model = SemanticClassifier.load(Path(model_path).name)
+
+    # Set custom threshold if provided
+    if threshold is not None:
+        model.set_threshold(threshold)
+        logger.info(f"Using custom threshold: {threshold:.3f}")
+    else:
+        logger.info(f"Using model's calibrated threshold: {model.get_threshold():.3f}")
 
     logger.info(f"Loading test dataset from {dataset_path}...")
 
@@ -361,7 +371,46 @@ def evaluate_model(
         "recall": recall_score(y_test, y_pred, zero_division=0),
         "f1": f1_score(y_test, y_pred, zero_division=0),
         "roc_auc": roc_auc_score(y_test, y_proba),
+        "threshold_used": model.get_threshold(),
     }
+
+    # Threshold sweep analysis
+    if threshold_sweep:
+        logger.info("\nPerforming threshold sweep analysis...")
+        sweep_results = model.threshold_sweep(X_test, y_test)
+
+        # Find optimal thresholds for different metrics
+        optimal_f1 = model.find_optimal_threshold(X_test, y_test, metric="f1")
+        optimal_precision = model.find_optimal_threshold(
+            X_test, y_test, metric="precision"
+        )
+        optimal_recall = model.find_optimal_threshold(X_test, y_test, metric="recall")
+
+        metrics["threshold_sweep"] = True
+        metrics["optimal_threshold_f1"] = optimal_f1
+        metrics["optimal_threshold_precision"] = optimal_precision
+        metrics["optimal_threshold_recall"] = optimal_recall
+
+        # Save sweep results
+        results_dir = Path(output_dir) if output_dir else Path("./metrics_output")
+        results_dir.mkdir(parents=True, exist_ok=True)
+        sweep_csv = results_dir / "threshold_sweep_results.csv"
+        sweep_results.to_csv(sweep_csv, index=False)
+        logger.info(f"Threshold sweep results saved to: {sweep_csv}")
+
+        logger.info("\n" + "=" * 60)
+        logger.info("THRESHOLD SWEEP ANALYSIS")
+        logger.info("=" * 60)
+        logger.info(f"Optimal threshold for F1: {optimal_f1:.3f}")
+        logger.info(f"Optimal threshold for Precision: {optimal_precision:.3f}")
+        logger.info(f"Optimal threshold for Recall: {optimal_recall:.3f}")
+        logger.info(f"Current threshold: {model.get_threshold():.3f}")
+
+        # Show best F1 from sweep
+        best_f1_row = sweep_results.loc[sweep_results["f1"].idxmax()]
+        logger.info(
+            f"\nBest F1 from sweep: {best_f1_row['f1']:.4f} at threshold {best_f1_row['threshold']:.3f}"
+        )
 
     if output_report:
         logger.info("\n" + "=" * 60)
@@ -468,6 +517,17 @@ if __name__ == "__main__":
         help="Sample size for evaluation (optional)",
     )
     parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="Custom decision threshold (default: use model's calibrated threshold)",
+    )
+    parser.add_argument(
+        "--threshold-sweep",
+        action="store_true",
+        help="Perform threshold sweep analysis",
+    )
+    parser.add_argument(
         "--no-report",
         action="store_true",
         help="Disable detailed report output",
@@ -496,4 +556,6 @@ if __name__ == "__main__":
         sample_size=args.sample_size,
         visualize=args.visualize,
         output_dir=args.output_dir,
+        threshold=args.threshold,
+        threshold_sweep=args.threshold_sweep,
     )

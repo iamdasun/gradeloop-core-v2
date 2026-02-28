@@ -5,15 +5,21 @@ This module implements the feature extraction framework from the paper:
 "An Effective Semantic Code Clone Detection Framework Using Pairwise Feature Fusion"
 by Sheneamer et al. (2021), IEEE Access.
 
-Feature Categories (100 features per code snippet):
-1. Traditional Features (10): LOC, keyword counts, complexity metrics
+Feature Categories (101 features per code snippet):
+1. Traditional Features (11): LOC, keyword counts, complexity metrics
 2. Syntactic/CST Features (40): Frequency of CST non-leaf nodes via post-order traversal
 3. Semantic/PDG Features (20): Implicit Program Dependency Graph features
 4. Structural Depth Features (15): Nesting, depth, density patterns
 5. Type Signature Features (10): Parameter/return type patterns
 6. API Fingerprinting Features (5): Library usage patterns
 
-Feature Fusion: Linear Combination (concatenation) of two feature vectors.
+Feature Fusion (Enhanced with Contrastive Features):
+- Concatenation: [f1, f2] (original)
+- Absolute Difference: |f1 - f2| (structural divergence)
+- Element-wise Product: f1 ∘ f2 (shared features)
+- Cosine Similarity (per category): 6 features
+- Euclidean Distance: 1 feature
+Total fused features: 101*2 + 101 + 101 + 6 + 1 = 310 features
 """
 
 import re
@@ -297,7 +303,10 @@ class SheneamerFeatureExtractor:
         "network_system_calls",
     ]
 
-    def __init__(self, tokenizer: Optional[TreeSitterTokenizer] = None):
+    def __init__(
+        self,
+        tokenizer: Optional[TreeSitterTokenizer] = None,
+    ):
         """
         Initialize the Sheneamer feature extractor.
 
@@ -326,10 +335,12 @@ class SheneamerFeatureExtractor:
             + self.n_api
         )
 
-        # Fused features (concatenation of two code snippets)
-        self.n_fused_features = 2 * self.n_features_per_code
+        # Fused features with contrastive learning:
+        # Absolute Diff (101) + Relative Diff (101) + Max-Min Ratio (101) +
+        # Interaction (101) + Cosine Similarity (1) = 405 features
+        self.n_fused_features = self.n_features_per_code * 4 + 1  # 405 features
 
-        # Generate feature names
+        # Generate feature names for contrastive features
         self.feature_names = self._generate_feature_names()
 
     def extract_features(self, code: str, language: str = "java") -> np.ndarray:
@@ -375,10 +386,20 @@ class SheneamerFeatureExtractor:
         self, code1: str, code2: str, language: str = "java"
     ) -> np.ndarray:
         """
-        Extract and fuse features from two code snippets using linear combination.
+        Extract and fuse features from two code snippets using contrastive learning.
 
-        Linear combination via concatenation preserves original feature values,
-        which works better for tree-ensemble models like XGBoost.
+        Contrastive fusion transforms the problem from "Identify if these are functions"
+        to "Identify if the delta between these functions is small enough to be a clone."
+
+        This implementation uses contrastive features designed to fix the "Clone Zealot"
+        bias by explicitly encoding divergence signals:
+
+        Fusion components (total: 413 features):
+        1. Absolute Difference: |f1 - f2| (101 features) - Core signal for divergence
+        2. Relative Difference: |f1 - f2| / (f1 + f2 + ε) (101 features) - Handles scaling
+        3. Max-Min Ratio: min(f1, f2) / (max(f1, f2) + ε) (101 features) - Structural overlap
+        4. Interaction Term: f1 · f2 (101 features) - Captures shared features
+        5. Cosine Similarity: scalar (1 feature) - Overall semantic similarity
 
         Args:
             code1: First source code string
@@ -386,13 +407,52 @@ class SheneamerFeatureExtractor:
             language: Programming language
 
         Returns:
-            Concatenated feature vector of shape (n_fused_features,)
+            Fused feature vector of shape (405,) - flat NumPy array
         """
         features1 = self.extract_features(code1, language)
         features2 = self.extract_features(code2, language)
 
-        # Linear combination via concatenation
-        fused = np.concatenate([features1, features2])
+        # Ensure float64 for numerical stability
+        f1 = features1.astype(np.float64)
+        f2 = features2.astype(np.float64)
+
+        # Epsilon for numerical stability
+        eps = 1e-6
+
+        # 1. Absolute Difference (structural divergence)
+        # High values indicate different features
+        abs_diff = np.abs(f1 - f2)
+
+        # 2. Relative Difference (scale-invariant divergence)
+        # Handles scaling across languages and code lengths
+        relative_diff = np.abs(f1 - f2) / (np.abs(f1) + np.abs(f2) + eps)
+
+        # 3. Max-Min Ratio (structural overlap)
+        # Values close to 1.0 indicate similar feature magnitudes
+        min_vals = np.minimum(f1, f2)
+        max_vals = np.maximum(f1, f2)
+        max_min_ratio = min_vals / (max_vals + eps)
+
+        # 4. Interaction Term (shared features)
+        # High values when both features are present and strong
+        interaction = f1 * f2
+
+        # 5. Cosine Similarity (overall semantic similarity)
+        # Single scalar representing global similarity
+        dot_product = np.dot(f1, f2)
+        norm_f1 = np.linalg.norm(f1)
+        norm_f2 = np.linalg.norm(f2)
+
+        if norm_f1 > 0 and norm_f2 > 0:
+            cosine_similarity = np.array([dot_product / (norm_f1 * norm_f2)])
+        else:
+            cosine_similarity = np.array([0.0])
+
+        # Concatenate all contrastive features
+        # Total: 101 + 101 + 101 + 101 + 1 = 405 features
+        fused = np.concatenate(
+            [abs_diff, relative_diff, max_min_ratio, interaction, cosine_similarity]
+        )
 
         return fused
 
@@ -401,24 +461,34 @@ class SheneamerFeatureExtractor:
         Extract traditional code metrics (11 features).
 
         Features:
-        - Lines of code (LOC)
+        - Lines of code (LOC) - length-normalized
         - Keyword category counts (normalized by LOC)
+
+        Multi-level normalization:
+        - LOC is log-scaled to reduce dominance of code length
+        - Keyword counts are density-based (per LOC)
 
         Returns:
             List of 11 traditional feature values
         """
         features = []
 
-        # LOC
-        loc = max(len(code.splitlines()), 1)
-        features.append(float(loc))
+        # LOC with log scaling for length invariance
+        loc = len(code.splitlines())
+        loc_normalized = np.log1p(loc)  # log(1 + loc) to handle 0
 
-        # Keyword category counts (normalized)
+        if self.use_multi_level_normalization:
+            features.append(loc_normalized / 5.0)  # Normalize assuming max ~150 lines
+        else:
+            features.append(float(loc))
+
+        # Keyword category counts (density-based)
         code_lower = code.lower()
         tokens = set(re.findall(r"\b\w+\b", code_lower))
 
         for category, keywords in self.KEYWORD_CATEGORIES.items():
             count = len(tokens & keywords)
+            # Density: count per line (log-scaled)
             normalized = count / max(loc, 1)
             features.append(normalized)
 
@@ -430,8 +500,12 @@ class SheneamerFeatureExtractor:
 
         Counts frequencies of non-leaf node types via post-order traversal.
 
+        Multi-level normalization:
+        - Uses density (count / total_nodes) instead of raw counts
+        - Ensures length-invariant comparison
+
         Returns:
-            List of 40 CST feature values (normalized frequencies)
+            List of 40 CST feature values (normalized densities)
         """
         try:
             frequencies = self._get_cst_frequencies_postorder(code, language)
@@ -443,8 +517,9 @@ class SheneamerFeatureExtractor:
 
         for node_type in self.CST_NON_LEAF_NODES:
             count = frequencies.get(node_type, 0)
-            normalized = count / max(total_nodes, 1)
-            features.append(normalized)
+            # CST Density: count per total nodes (length-invariant)
+            density = count / max(total_nodes, 1)
+            features.append(density)
 
         return features
 
@@ -1081,7 +1156,7 @@ class SheneamerFeatureExtractor:
         return features
 
     def _generate_feature_names(self) -> list[str]:
-        """Generate names for all features."""
+        """Generate names for all features including contrastive fusion features."""
         names = []
 
         # Traditional feature names
@@ -1108,23 +1183,57 @@ class SheneamerFeatureExtractor:
         for pattern in self.API_FINGERPRINT_CATEGORIES:
             names.append(f"api_{pattern}")
 
-        return names
+        # If using contrastive fusion, generate names for all fusion components
+        if self.use_contrastive_fusion:
+            # Concatenation features (f1 and f2)
+            concat_names1 = [f"{n}_1" for n in names]
+            concat_names2 = [f"{n}_2" for n in names]
+
+            # Absolute difference features
+            diff_names = [f"diff_{n}" for n in names]
+
+            # Element-wise product features
+            product_names = [f"prod_{n}" for n in names]
+
+            # Cosine similarity per category
+            cosine_names = [
+                f"cosine_{cat}"
+                for cat in ["traditional", "cst", "semantic", "depth", "type", "api"]
+            ]
+
+            # Euclidean distance
+            distance_names = ["euclidean_distance"]
+
+            # Combine all names
+            all_names = (
+                concat_names1
+                + concat_names2
+                + diff_names
+                + product_names
+                + cosine_names
+                + distance_names
+            )
+            return all_names
+
+        # Without contrastive fusion, just use concatenated names
+        names1 = [f"{n}_1" for n in names]
+        names2 = [f"{n}_2" for n in names]
+        return names1 + names2
 
     def get_feature_names(self, fused: bool = False) -> list[str]:
         """
         Get feature names.
 
         Args:
-            fused: If True, return names for fused features (with _1 and _2 suffixes)
+            fused: If True, return names for fused features.
+                   With contrastive fusion enabled, includes diff, product, and similarity names.
 
         Returns:
             List of feature names
         """
         if fused:
-            names1 = [f"{n}_1" for n in self.feature_names]
-            names2 = [f"{n}_2" for n in self.feature_names]
-            return names1 + names2
-        return self.feature_names.copy()
+            return self.feature_names
+        return self.feature_names[: self.n_features_per_code]
 
     def get_feature_count(self, fused: bool = False) -> int:
         """

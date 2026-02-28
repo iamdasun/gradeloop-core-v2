@@ -1,0 +1,14 @@
+{
+  "accuracy": 0.75375,
+  "precision": 0.7678100263852242,
+  "recall": 0.7275,
+  "f1": 0.7471116816431322,
+  "cv_f1_mean": 0.7383266948795535,
+  "cv_f1_std": 0.04106666655813314,
+  "optimal_threshold": 0.33999999999999986,
+  "accuracy_thresholded": 0.76125,
+  "precision_thresholded": 0.7317073170731707,
+  "recall_thresholded": 0.825,
+  "f1_thresholded": 0.7755581668625147,
+  "timestamp": "2026-02-28T22:48:42.746227"
+}

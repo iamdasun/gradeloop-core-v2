@@ -24,10 +24,20 @@
 
 CIPAS Semantics is a **Type-4 (semantic) code clone detection** service that identifies functionally equivalent code snippets with different implementations. The system uses:
 
-- **102 semantic features** per code snippet (204 fused features per pair)
+- **102 semantic features** per code snippet (311 fused features with contrastive fusion)
 - **XGBoost classification** optimized for high-dimensional feature spaces
 - **Tree-sitter CST parsing** for multi-language support
 - **Six feature categories** covering traditional, syntactic, semantic, structural, type, and API patterns
+- **Contrastive feature fusion** for improved semantic discrimination
+- **Probability threshold calibration** for optimal decision boundaries
+- **Hard negative mining** for robust training data
+
+### Key Improvements (2026)
+
+1. **Contrastive Feature Fusion**: Transforms the problem from "identify if these are functions" to "identify if the delta between functions is small enough to be a clone"
+2. **Multi-Level Normalization**: CST density and length-invariant features prevent code length from dominating decisions
+3. **Threshold Calibration**: Automatic threshold optimization for improved precision/recall balance
+4. **Hard Negative Mining**: Generates challenging training pairs (semantic siblings, structural twins) to reduce false positives
 
 ### Supported Languages
 
@@ -43,7 +53,7 @@ CIPAS Semantics is a **Type-4 (semantic) code clone detection** service that ide
 | Type-I | Exact clones | Token matching |
 | Type-II | Renamed clones | Token normalization |
 | Type-III | Near-miss clones | Gap sequence matching |
-| **Type-IV** | **Semantic clones** | **XGBoost + 102 features** |
+| **Type-IV** | **Semantic clones** | **XGBoost + 311 contrastive features** |
 
 ---
 

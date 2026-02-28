@@ -109,6 +109,17 @@ Examples:
         action="store_true",
         help="Disable visualization generation",
     )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="Custom decision threshold (default: use model's calibrated threshold)",
+    )
+    parser.add_argument(
+        "--threshold-sweep",
+        action="store_true",
+        help="Perform threshold sweep analysis",
+    )
 
     # Logging
     parser.add_argument(
@@ -192,6 +203,8 @@ Examples:
                         sample_size=args.sample_size,
                         visualize=not args.no_visualize,
                         output_dir=output_subdir,
+                        threshold=args.threshold,
+                        threshold_sweep=args.threshold_sweep,
                     )
                 else:
                     # Use standard evaluator
@@ -203,6 +216,8 @@ Examples:
                         sample_size=args.sample_size,
                         visualize=not args.no_visualize,
                         output_dir=output_subdir,
+                        threshold=args.threshold,
+                        threshold_sweep=args.threshold_sweep,
                     )
 
                 key = f"{dataset_name}_{language}"
