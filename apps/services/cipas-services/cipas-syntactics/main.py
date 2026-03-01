@@ -21,19 +21,32 @@ from fastapi import APIRouter, FastAPI, status
 
 from clone_detection.utils.common_setup import setup_logging
 from routes import (
+    cluster_assignment,
     compare_codes,
     compare_codes_batch,
+    get_collusion_report,
     get_feature_importance,
     get_health,
+    get_index_status,
+    ingest_submission,
+    register_template,
     tokenize_code,
 )
 from schemas import (
+    AssignmentClusterRequest,
+    AssignmentClusterResponse,
     BatchComparisonRequest,
     BatchComparisonResult,
+    CollusionReportResponse,
     ComparisonRequest,
     ComparisonResult,
     FeatureImportanceResponse,
     HealthResponse,
+    IndexStatusResponse,
+    IngestionResponse,
+    SubmissionIngestRequest,
+    TemplateRegisterRequest,
+    TemplateRegisterResponse,
     TokenizeRequest,
     TokenizeResponse,
 )
@@ -307,6 +320,138 @@ async def readiness_check():
             "models_loaded": False,
             "details": models,
         }
+
+
+# ── Phase 1–4 Pipeline Endpoints ────────────────────────────────────────────
+
+@api_router.post(
+    "/submissions/ingest",
+    response_model=IngestionResponse,
+    tags=["Pipeline"],
+    summary="Ingest a student submission",
+    responses={
+        200: {"description": "Submission processed successfully"},
+        500: {"description": "Ingestion failed"},
+    },
+)
+async def ingest_submission_endpoint(request: SubmissionIngestRequest):
+    """
+    Run a student submission through the full Phase 1–4 pipeline:
+
+    1. **Segmentation** — structural blocks + sliding windows
+    2. **Template Filtering** — discard instructor skeleton fragments
+    3. **LSH Indexing** — 128-permutation MinHash signature + bucket insertion
+    4. **Candidate Retrieval** — query LSH buckets (O(1), ~95 % reduction)
+    5. **Cascade Detection** — Type-1 → Type-2 → Type-3 (XGBoost)
+    6. **Graph Update** — add confirmed edges to the collusion graph
+
+    Returns fragment count, candidate pairs, and confirmed clone matches.
+    """
+    return ingest_submission(request)
+
+
+@api_router.post(
+    "/templates/register",
+    response_model=TemplateRegisterResponse,
+    tags=["Pipeline"],
+    summary="Register instructor skeleton code",
+)
+async def register_template_endpoint(request: TemplateRegisterRequest):
+    """
+    Register instructor-provided skeleton / starter code for an assignment.
+
+    Student fragments whose abstract token Jaccard similarity against any
+    template fragment is ≥ 0.90 are silently discarded during ingestion,
+    preventing false positives from shared starter code.
+    """
+    return register_template(request)
+
+
+@api_router.get(
+    "/collusion-report",
+    response_model=CollusionReportResponse,
+    tags=["Pipeline"],
+    summary="Get collusion groups (connected components)",
+)
+async def collusion_report_endpoint(
+    assignment_id: str | None = None,
+    min_confidence: float = 0.0,
+):
+    """
+    Compute connected components of the student clone graph.
+
+    Each group represents a **potential collusion ring**: students whose
+    submissions share confirmed clone fragments (Type-1, 2, or 3).
+
+    Groups are ordered by size (largest first) then by maximum edge confidence.
+
+    - ``min_confidence`` — filter out low-confidence edges (e.g. set 0.7 to
+      see only high-confidence Type-3 matches).
+    """
+    return get_collusion_report(assignment_id=assignment_id, min_confidence=min_confidence)
+
+
+@api_router.get(
+    "/index/status",
+    response_model=IndexStatusResponse,
+    tags=["Pipeline"],
+    summary="MinHash LSH index statistics",
+)
+async def index_status_endpoint():
+    """
+    Return statistics about the in-memory MinHash LSH index.
+
+    Shows how many fragments are indexed, the Jaccard threshold used for
+    bucketing, and the number of permutations in each signature.
+    """
+    return get_index_status()
+
+
+@api_router.post(
+    "/assignments/cluster",
+    response_model=AssignmentClusterResponse,
+    tags=["Pipeline"],
+    summary="Cluster all submissions for an assignment",
+    responses={
+        200: {"description": "Clustering completed successfully"},
+        500: {"description": "Clustering failed"},
+    },
+)
+async def cluster_assignment_endpoint(request: AssignmentClusterRequest):
+    """
+    Send all student submissions for one assignment and receive back
+    the **clone clusters** (potential collusion groups).
+
+    ## Pipeline (per submission)
+    1. **Segmentation** — split into structural blocks + sliding windows
+    2. **Template Filtering** — discard fragments matching the instructor template
+    3. **LSH Indexing** — 128-permutation MinHash + bucket insertion
+    4. **Candidate Retrieval** — O(1) LSH query (~95 % workload reduction)
+    5. **Cascade Detection** — Type-1 → Type-2 → Type-3 (XGBoost)
+    6. **Graph Update** — confirmed pairs added to an isolated collusion graph
+
+    Each call uses a **fresh, isolated pipeline** — results are self-contained
+    and do not affect the global incremental-ingestion index.
+
+    ## Example
+    ```json
+    {
+      "assignment_id": "hw3",
+      "language": "java",
+      "instructor_template": "public class Solution { /* starter */ }",
+      "submissions": [
+        { "submission_id": "s1", "student_id": "alice", "source_code": "..." },
+        { "submission_id": "s2", "student_id": "bob",   "source_code": "..." }
+      ]
+    }
+    ```
+
+    ## Response
+    - `collusion_groups` — connected components of the clone graph; each group
+      lists the students and the clone edges between them.
+    - `per_submission` — fragment / candidate / clone counts per student.
+    """
+    return cluster_assignment(request)
 
 
 # Include router in app

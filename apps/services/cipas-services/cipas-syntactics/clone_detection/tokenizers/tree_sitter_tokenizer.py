@@ -46,6 +46,14 @@ class TreeSitterTokenizer:
                 "Install them with: pip install tree-sitter-java tree-sitter-c tree-sitter-python"
             ) from e
 
+        # Optional: C# support via tree-sitter-c-sharp
+        try:
+            import tree_sitter_c_sharp as tscsharp  # type: ignore[import]
+            self.parsers["csharp"] = Parser(Language(tscsharp.language()))
+            self.parsers["c#"] = self.parsers["csharp"]
+        except (ImportError, Exception):
+            pass  # C# support is optional; preprocessor falls back to regex
+
     def tokenize(
         self,
         code: str,

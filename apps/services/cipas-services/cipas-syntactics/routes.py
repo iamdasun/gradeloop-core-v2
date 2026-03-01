@@ -8,6 +8,12 @@ using the automatic cascade detection pipeline:
   Type-2 → Phase One (NiCAD-style) : Blinded CST comparison  (threshold ≥ 0.95, token delta ≤ 5 %)
   Type-3 → Phase Two (ToMa + XGB)  : Hybrid String + AST features → XGBoost classifier
   Non-Syntactic → returned when no syntactic clone is confirmed
+
+Phase 1–4 endpoints:
+  POST /submissions/ingest      → segment + index + cascade + graph update
+  POST /templates/register      → register instructor skeleton code
+  GET  /collusion-report        → connected components (collusion rings)
+  GET  /index/status            → LSH index statistics
 """
 
 import logging
@@ -15,7 +21,15 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 
+from clone_detection.cascade_worker import (
+    CascadeWorker,
+    CloneMatch,
+    InMemoryDB,
+    IngestionResult,
+)
+from clone_detection.collusion_graph import CollusionGraph
 from clone_detection.features.syntactic_features import SyntacticFeatureExtractor
+from clone_detection.lsh_index import MinHashIndexer
 from clone_detection.models.classifiers import SyntacticClassifier
 from clone_detection.normalizers.structural_normalizer import (
     NormalizationLevel,
@@ -25,24 +39,38 @@ from clone_detection.pipelines import (
     TieredDetectionResult,
     TieredPipeline,
 )
+from clone_detection.preprocessor import Fragmenter, TemplateFilter
 from clone_detection.tokenizers.tree_sitter_tokenizer import TreeSitterTokenizer
 from clone_detection.utils.common_setup import get_model_path
 from schemas import (
+    AssignmentClusterRequest,
+    AssignmentClusterResponse,
     BatchComparisonRequest,
     BatchComparisonResult,
+    CloneMatchSchema,
+    CollusionEdgeSchema,
+    CollusionGroupSchema,
+    CollusionReportResponse,
     ComparisonRequest,
     ComparisonResult,
     FeatureImportanceResponse,
     HealthResponse,
+    IndexStatusResponse,
+    IngestionResponse,
     ModelStatus,
+    SubmissionClusterResult,
+    SyntacticFeatures,
+    TemplateRegisterRequest,
+    TemplateRegisterResponse,
     TokenizeRequest,
     TokenizeResponse,
+    SubmissionIngestRequest,
 )
 
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# Global Model Instances (lazy loaded)
+# Global Singletons (lazy loaded)
 # ============================================================================
 
 _syntactic_model: Optional[SyntacticClassifier] = None
@@ -51,9 +79,15 @@ _syntactic_extractor: Optional[SyntacticFeatureExtractor] = None
 _normalizer: Optional[StructuralNormalizer] = None
 _tiered_pipeline: Optional[TieredPipeline] = None
 
+# Phase 1–4 singletons
+_db: Optional[InMemoryDB] = None
+_indexer: Optional[MinHashIndexer] = None
+_graph: Optional[CollusionGraph] = None
+_worker: Optional[CascadeWorker] = None
+_tpl_filter: Optional[TemplateFilter] = None
+
 
 def _get_tokenizer() -> TreeSitterTokenizer:
-    """Get or create tokenizer instance."""
     global _tokenizer
     if _tokenizer is None:
         _tokenizer = TreeSitterTokenizer()
@@ -61,7 +95,6 @@ def _get_tokenizer() -> TreeSitterTokenizer:
 
 
 def _get_syntactic_extractor() -> SyntacticFeatureExtractor:
-    """Get or create syntactic feature extractor."""
     global _syntactic_extractor
     if _syntactic_extractor is None:
         _syntactic_extractor = SyntacticFeatureExtractor()
@@ -69,7 +102,6 @@ def _get_syntactic_extractor() -> SyntacticFeatureExtractor:
 
 
 def _get_normalizer() -> StructuralNormalizer:
-    """Get or create structural normalizer."""
     global _normalizer
     if _normalizer is None:
         _normalizer = StructuralNormalizer()
@@ -77,20 +109,14 @@ def _get_normalizer() -> StructuralNormalizer:
 
 
 def _get_tiered_pipeline() -> TieredPipeline:
-    """Get or create tiered pipeline with loaded classifier."""
     global _tiered_pipeline, _syntactic_model
-
     if _tiered_pipeline is None:
-        # Load syntactic model (Type-3)
         syntactic_classifier = _load_syntactic_model()
-
         _tiered_pipeline = TieredPipeline(classifier=syntactic_classifier)
-
     return _tiered_pipeline
 
 
 def _load_syntactic_model() -> Optional[SyntacticClassifier]:
-    """Load the Type-3 XGBoost model if available."""
     global _syntactic_model
     if _syntactic_model is None:
         try:
@@ -110,22 +136,65 @@ def _load_syntactic_model() -> Optional[SyntacticClassifier]:
 
 
 def _get_model_status() -> dict[str, ModelStatus]:
-    """Get status of all models."""
     models = {}
-
-    # Type-3 XGBoost model
     model_path = get_model_path("type3_xgb.pkl")
     available = model_path.exists()
     loaded = _syntactic_model is not None and _syntactic_model.is_trained
-
     models["syntactic_type3"] = ModelStatus(
         model_name="type3_xgb.pkl",
         available=available,
         loaded=loaded,
         error=None if available else "Model file not found — run train.py",
     )
-
     return models
+
+
+# ── Phase 1–4 singleton accessors ──────────────────────────────────────────
+
+def _get_db() -> InMemoryDB:
+    global _db
+    if _db is None:
+        _db = InMemoryDB()
+    return _db
+
+
+def _get_indexer() -> MinHashIndexer:
+    global _indexer
+    if _indexer is None:
+        _indexer = MinHashIndexer(num_perm=128, threshold=0.3)
+    return _indexer
+
+
+def _get_graph() -> CollusionGraph:
+    global _graph
+    if _graph is None:
+        _graph = CollusionGraph()
+    return _graph
+
+
+def _get_tpl_filter() -> TemplateFilter:
+    global _tpl_filter
+    if _tpl_filter is None:
+        _tpl_filter = TemplateFilter()
+    return _tpl_filter
+
+
+def _get_worker() -> CascadeWorker:
+    global _worker
+    if _worker is None:
+        _worker = CascadeWorker(
+            db=_get_db(),
+            indexer=_get_indexer(),
+            graph=_get_graph(),
+            pipeline=_get_tiered_pipeline(),
+            tpl_filter=_get_tpl_filter(),
+        )
+    return _worker
+
+
+# ============================================================================
+# Existing endpoints (pairwise comparison, health, etc.)
+# ============================================================================
 
 
 def compare_codes(
@@ -307,4 +376,341 @@ def tokenize_code(request: TokenizeRequest) -> TokenizeResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Tokenization failed: {str(e)}",
+        )
+
+
+# ============================================================================
+# Phase 1–4 Pipeline Endpoints
+# ============================================================================
+
+
+def ingest_submission(request: SubmissionIngestRequest) -> IngestionResponse:
+    """
+    Ingest a student submission through all four pipeline phases:
+
+    Phase 1 — Segmentation + Template Filtering
+    Phase 2 — MinHash LSH Indexing + Candidate Retrieval
+    Phase 3 — CIPAS Syntactic Cascade (Type-1/2/3)
+    Phase 4 — Collusion Graph Update (Connected Components)
+
+    Returns a summary of fragments, candidate pairs, and confirmed clone matches.
+    """
+    try:
+        worker = _get_worker()
+        result = worker.process_submission(
+            source_code=request.source_code,
+            language=request.language.value,
+            submission_id=request.submission_id,
+            student_id=request.student_id,
+            assignment_id=request.assignment_id,
+        )
+
+        matches_out = [
+            CloneMatchSchema(
+                id=m.id,
+                frag_a_id=m.frag_a_id,
+                frag_b_id=m.frag_b_id,
+                student_a=m.student_a,
+                student_b=m.student_b,
+                clone_type=m.clone_type,
+                confidence=m.confidence,
+                is_clone=m.is_clone,
+                features=m.features,
+                normalized_code_a=m.normalized_code_a,
+                normalized_code_b=m.normalized_code_b,
+            )
+            for m in result.clone_matches
+        ]
+
+        return IngestionResponse(
+            submission_id=result.submission_id,
+            student_id=result.student_id,
+            assignment_id=result.assignment_id,
+            fragment_count=result.fragment_count,
+            candidate_pair_count=result.candidate_pair_count,
+            confirmed_clone_count=result.confirmed_clone_count,
+            clone_matches=matches_out,
+            errors=result.errors,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Ingestion failed for submission %s: %s", request.submission_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ingestion failed: {exc}",
+        )
+
+
+def register_template(request: TemplateRegisterRequest) -> TemplateRegisterResponse:
+    """
+    Register instructor skeleton (starter) code as a template for an assignment.
+
+    Fragments in future student submissions that closely match the template
+    (Jaccard ≥ 0.90) are discarded before LSH indexing.
+    """
+    try:
+        tpl_filter = _get_tpl_filter()
+        count = tpl_filter.register_template(
+            assignment_id=request.assignment_id,
+            source=request.source_code,
+            language=request.language.value,
+        )
+        # Persist token sets in the DB for persistence across restarts
+        db = _get_db()
+        from clone_detection.preprocessor import Fragmenter
+        fragmenter = Fragmenter(request.language.value)
+        frags = fragmenter.segment(
+            request.source_code,
+            submission_id="template",
+            student_id="instructor",
+            assignment_id=request.assignment_id,
+        )
+        token_sets = [frozenset(f.abstract_tokens) for f in frags]
+        db.register_template_tokens(request.assignment_id, token_sets)
+
+        return TemplateRegisterResponse(
+            assignment_id=request.assignment_id,
+            template_fragment_count=count,
+        )
+    except Exception as exc:
+        logger.error("Template registration failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Template registration failed: {exc}",
+        )
+
+
+def get_collusion_report(
+    assignment_id: Optional[str] = None,
+    min_confidence: float = 0.0,
+) -> CollusionReportResponse:
+    """
+    Return connected-component collusion groups.
+
+    Each group represents a set of students likely involved in code sharing.
+    Groups are sorted by size (descending) then by max confidence (descending).
+
+    Parameters
+    ----------
+    assignment_id:  Filter graph edges by assignment (informational; the
+                    shared in-memory graph contains all assignments).
+    min_confidence: Only include edges with confidence ≥ this value.
+    """
+    try:
+        graph = _get_graph()
+        groups = graph.connected_components(
+            min_group_size=2,
+            min_confidence=min_confidence,
+        )
+
+        groups_out = []
+        for g in groups:
+            edges_out = [
+                CollusionEdgeSchema(
+                    student_a=e.student_a,
+                    student_b=e.student_b,
+                    clone_type=e.clone_type,
+                    confidence=e.confidence,
+                    match_count=e.match_count,
+                )
+                for e in g.edges
+            ]
+            groups_out.append(
+                CollusionGroupSchema(
+                    group_id=g.group_id,
+                    member_ids=g.member_ids,
+                    member_count=g.size,
+                    max_confidence=g.max_confidence,
+                    dominant_type=g.dominant_type,
+                    edge_count=len(g.edges),
+                    edges=edges_out,
+                )
+            )
+
+        total_students = sum(g.size for g in groups)
+
+        return CollusionReportResponse(
+            assignment_id=assignment_id,
+            group_count=len(groups_out),
+            total_flagged_students=total_students,
+            groups=groups_out,
+        )
+
+    except Exception as exc:
+        logger.error("Collusion report failed: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Collusion report failed: {exc}",
+        )
+
+
+def get_index_status() -> IndexStatusResponse:
+    """
+    Return statistics about the in-memory MinHash LSH index.
+    """
+    indexer = _get_indexer()
+    return IndexStatusResponse(
+        indexed_fragment_count=indexer.size(),
+        lsh_threshold=indexer._threshold,
+        num_permutations=indexer._num_perm,
+    )
+
+
+def cluster_assignment(request: AssignmentClusterRequest) -> AssignmentClusterResponse:
+    """
+    Process all submissions for an assignment through an **isolated** Phase 1–4
+    pipeline and return the clone clusters.
+
+    A fresh DB / LSH index / collusion graph is created for each call so that:
+    - Concurrent requests cannot pollute each other's results.
+    - The global incremental-ingestion index (used by /submissions/ingest) is
+      not affected.
+
+    Steps
+    -----
+    1. Optionally register instructor template (suppresses starter-code matches).
+    2. Ingest each submission: segment → template-filter → LSH index → cascade → graph.
+    3. Compute connected components of the resulting collusion graph.
+    4. Return per-submission summaries + collusion groups.
+    """
+    try:
+        # ── Isolated pipeline ─────────────────────────────────────────────
+        isolated_db = InMemoryDB()
+        isolated_indexer = MinHashIndexer(num_perm=128, threshold=request.lsh_threshold)
+        isolated_graph = CollusionGraph()
+        isolated_tpl_filter = TemplateFilter()
+        isolated_worker = CascadeWorker(
+            db=isolated_db,
+            indexer=isolated_indexer,
+            graph=isolated_graph,
+            pipeline=_get_tiered_pipeline(),
+            tpl_filter=isolated_tpl_filter,
+        )
+
+        # ── Optional instructor template ──────────────────────────────────
+        if request.instructor_template:
+            try:
+                isolated_tpl_filter.register_template(
+                    assignment_id=request.assignment_id,
+                    source=request.instructor_template,
+                    language=request.language.value,
+                )
+                fragmenter = Fragmenter(request.language.value)
+                tpl_frags = fragmenter.segment(
+                    request.instructor_template,
+                    submission_id="template",
+                    student_id="instructor",
+                    assignment_id=request.assignment_id,
+                )
+                isolated_db.register_template_tokens(
+                    request.assignment_id,
+                    [frozenset(f.abstract_tokens) for f in tpl_frags],
+                )
+                logger.info(
+                    "Registered instructor template for %s (%d fragments)",
+                    request.assignment_id, len(tpl_frags),
+                )
+            except Exception as exc:
+                logger.warning("Template registration failed (continuing): %s", exc)
+
+        # ── Ingest each submission ────────────────────────────────────────
+        per_submission: list[SubmissionClusterResult] = []
+        processed = 0
+        failed = 0
+        total_clone_pairs = 0
+
+        for sub in request.submissions:
+            try:
+                result = isolated_worker.process_submission(
+                    source_code=sub.source_code,
+                    language=request.language.value,
+                    submission_id=sub.submission_id,
+                    student_id=sub.student_id,
+                    assignment_id=request.assignment_id,
+                )
+                per_submission.append(
+                    SubmissionClusterResult(
+                        submission_id=result.submission_id,
+                        student_id=result.student_id,
+                        fragment_count=result.fragment_count,
+                        candidate_pair_count=result.candidate_pair_count,
+                        confirmed_clone_count=result.confirmed_clone_count,
+                        errors=result.errors,
+                    )
+                )
+                total_clone_pairs += result.confirmed_clone_count
+                processed += 1
+            except Exception as exc:
+                logger.warning(
+                    "Submission %s failed during clustering: %s",
+                    sub.submission_id, exc,
+                )
+                per_submission.append(
+                    SubmissionClusterResult(
+                        submission_id=sub.submission_id,
+                        student_id=sub.student_id,
+                        fragment_count=0,
+                        candidate_pair_count=0,
+                        confirmed_clone_count=0,
+                        errors=[str(exc)],
+                    )
+                )
+                failed += 1
+
+        # ── Collusion groups ──────────────────────────────────────────────
+        groups = isolated_graph.connected_components(
+            min_group_size=2,
+            min_confidence=request.min_confidence,
+        )
+
+        groups_out = []
+        for g in groups:
+            edges_out = [
+                CollusionEdgeSchema(
+                    student_a=e.student_a,
+                    student_b=e.student_b,
+                    clone_type=e.clone_type,
+                    confidence=e.confidence,
+                    match_count=e.match_count,
+                )
+                for e in g.edges
+            ]
+            groups_out.append(
+                CollusionGroupSchema(
+                    group_id=g.group_id,
+                    member_ids=g.member_ids,
+                    member_count=g.size,
+                    max_confidence=g.max_confidence,
+                    dominant_type=g.dominant_type,
+                    edge_count=len(g.edges),
+                    edges=edges_out,
+                )
+            )
+
+        logger.info(
+            "Assignment %s clustered: %d/%d submissions, %d clone pairs, %d groups",
+            request.assignment_id, processed, len(request.submissions),
+            total_clone_pairs, len(groups_out),
+        )
+
+        return AssignmentClusterResponse(
+            assignment_id=request.assignment_id,
+            language=request.language.value,
+            submission_count=len(request.submissions),
+            processed_count=processed,
+            failed_count=failed,
+            total_clone_pairs=total_clone_pairs,
+            collusion_groups=groups_out,
+            per_submission=per_submission,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Assignment clustering failed for %s: %s", request.assignment_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Assignment clustering failed: {exc}",
         )
