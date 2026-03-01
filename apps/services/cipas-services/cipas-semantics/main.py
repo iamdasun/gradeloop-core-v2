@@ -24,6 +24,7 @@ from clone_detection.utils.common_setup import setup_logging
 from routes import (
     compare_codes,
     compare_codes_batch,
+    detect_clones,
     get_feature_importance,
     get_health,
     tokenize_code,
@@ -31,6 +32,8 @@ from routes import (
 from schemas import (
     BatchComparisonRequest,
     BatchComparisonResult,
+    CloneDetectionRequest,
+    CloneDetectionResponse,
     ComparisonRequest,
     ComparisonResult,
     FeatureImportanceResponse,
@@ -183,11 +186,11 @@ async def health_check():
 )
 async def compare_two_codes(request: ComparisonRequest):
     """
-    Compare two code snippets to detect if they are semantic clones (Type-4).
+    Compare two code snippets to detect if they are semantic clones (Type-IV).
 
     ## Features:
-    - **Multi-language**: Java, C, Python
-    - **Semantic analysis**: 100+ features per code snippet
+    - **Multi-language**: Java, C, C#, Python
+    - **Semantic analysis**: 101 features per code snippet (Sheneamer et al. 2021)
     - **XGBoost classification**: High-dimensional feature space
     - **Confidence score**: XGBoost probability
 
@@ -200,10 +203,78 @@ async def compare_two_codes(request: ComparisonRequest):
     }
     ```
 
-    These snippets are semantically equivalent (Type-4 clones) despite
+    These snippets are semantically equivalent (Type-IV clones) despite
     different implementations.
     """
     return compare_codes(request)
+
+
+@api_router.post(
+    "/detect-clones",
+    response_model=CloneDetectionResponse,
+    tags=["Clone Detection"],
+    summary="Detect Type-IV code clones (Sheneamer et al. 2021)",
+    responses={
+        200: {"description": "Successful clone detection"},
+        503: {"description": "Model not available"},
+        500: {"description": "Detection failed"},
+    },
+)
+async def detect_clones_endpoint(request: CloneDetectionRequest):
+    """
+    Detect Type-IV (semantic) code clones using the Sheneamer et al. (2021) framework.
+
+    ## Features:
+    - **101 features per code snippet** across 6 categories:
+      - Traditional (11): LOC, keyword counts
+      - Syntactic/CST (40): Non-leaf node frequencies via post-order traversal
+      - Semantic/PDG (20): Implicit program dependency relationships
+      - Structural Depth (15): Nesting, depth, density metrics
+      - Type Signatures (10): Parameter/return type patterns
+      - API Fingerprinting (5): Library usage patterns
+    - **Feature Fusion**: Linear combination (concatenation) of two feature vectors
+    - **XGBoost classifier**: Pre-trained model outputs boolean 'is_clone' and 'clone_type' (1-4)
+    - **Multi-language**: Java, C, C#, Python
+
+    ## Clone Types:
+    - **Type-I**: Exact clones (not detected by this endpoint)
+    - **Type-II**: Renamed clones (not detected by this endpoint)
+    - **Type-III**: Near-miss clones (not detected by this endpoint)
+    - **Type-IV**: Semantic clones (detected by this endpoint)
+
+    ## Example:
+    ```json
+    {
+        "code1": "int sum(int a, int b) { return a + b; }",
+        "code2": "int add(int x, int y) { int result = x + y; return result; }",
+        "language": "java"
+    }
+    ```
+
+    ## Response:
+    ```json
+    {
+        "is_clone": true,
+        "confidence": 0.92,
+        "clone_type": 4,
+        "clone_type_label": "Type-IV (Semantic)",
+        "pipeline_used": "Sheneamer et al. (2021) Type-IV Detector",
+        "features_extracted": 202,
+        "feature_categories": {
+            "traditional": 11,
+            "syntactic_cst": 40,
+            "semantic_pdg": 20,
+            "structural_depth": 15,
+            "type_signatures": 10,
+            "api_fingerprinting": 5
+        },
+        "tokens1_count": 12,
+        "tokens2_count": 18,
+        "model_available": true
+    }
+    ```
+    """
+    return detect_clones(request)
 
 
 @api_router.post(

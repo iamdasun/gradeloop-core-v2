@@ -2,7 +2,12 @@
 Evaluation Script for Semantic Clone Detection Model (Type-4).
 
 Evaluates a trained XGBoost classifier on test datasets.
-Supports BigCloneBench (JSONL) and TOMA dataset formats.
+Supports BigCloneBench (JSONL), TOMA, GPTCloneBench, and JSON dataset formats.
+
+Enhanced with:
+- Contrastive feature fusion (absolute difference, element-wise product, cosine similarity)
+- Probability threshold calibration
+- Multi-level normalization
 
 Usage:
     # Evaluate with BigCloneBench dataset
@@ -10,26 +15,32 @@ Usage:
         --model models/type4_xgb.pkl \
         --dataset /path/to/bigclonebench/bigclonebench.jsonl \
         --dataset-format bigclonebench \
-        --language java
+        --language java \
+        --visualize
 
-    # Evaluate with TOMA dataset
+    # Evaluate with custom threshold
+    poetry run python evaluate_model.py \
+        --model models/type4_xgb.pkl \
+        --dataset ../../../../datasets/gptclonebench/gptclonebench_dataset.jsonl \
+        --dataset-format gptclonebench \
+        --language java \
+        --threshold 0.75 \
+        --visualize
+
+    # Evaluate with threshold sweep
     poetry run python evaluate_model.py \
         --model models/type4_xgb.pkl \
         --dataset /path/to/toma-dataset \
         --dataset-format toma \
-        --language java
-
-    # Evaluate with JSON dataset
-    poetry run python evaluate_model.py \
-        --model models/type4_xgb.pkl \
-        --dataset /path/to/test_dataset.json \
-        --dataset-format json \
-        --language java
+        --language java \
+        --threshold-sweep \
+        --visualize
 """
 
 import json
 import logging
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -44,11 +55,71 @@ from sklearn.metrics import (
 )
 from tqdm import tqdm
 
-from clone_detection.features.semantic_features import SemanticFeatureExtractor
+from clone_detection.features.sheneamer_features import SheneamerFeatureExtractor
 from clone_detection.models.classifiers import SemanticClassifier
 from clone_detection.utils.common_setup import setup_logging
+from clone_detection.utils.metrics_visualization import MetricsVisualizer
 
 logger = setup_logging(__name__)
+
+
+def load_gptclonebench_dataset(
+    dataset_path: str, sample_size: int | None = None
+) -> tuple[list[str], list[str], list[int]]:
+    """
+    Load GPTCloneBench dataset from JSONL file.
+
+    GPTCloneBench format (JSONL):
+    - Each line is a JSON object with:
+      - code1: First code snippet
+      - code2: Second code snippet
+      - semantic: Boolean indicating if they are semantic clones
+      - metadata: {language, prompt, filename, type}
+
+    Args:
+        dataset_path: Path to JSONL file
+        sample_size: Optional sample size for evaluation
+
+    Returns:
+        Tuple of (code1_list, code2_list, labels)
+    """
+    code1_list = []
+    code2_list = []
+    labels = []
+
+    logger.info(f"Loading GPTCloneBench dataset from {dataset_path}...")
+
+    # Count total lines
+    with open(dataset_path, "r", encoding="utf-8") as f:
+        total_lines = sum(1 for _ in f)
+
+    logger.info(f"Found {total_lines} entries in GPTCloneBench")
+
+    # Load data
+    with open(dataset_path, "r", encoding="utf-8") as f:
+        for i, line in enumerate(f):
+            if sample_size and i >= sample_size:
+                break
+
+            try:
+                data = json.loads(line)
+                code1 = data.get("code1", "")
+                code2 = data.get("code2", "")
+                # GPTCloneBench uses 'semantic' boolean for label
+                label = 1 if data.get("semantic", False) else 0
+
+                if code1 and code2:
+                    code1_list.append(code1)
+                    code2_list.append(code2)
+                    labels.append(label)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse line {i}: {e}")
+
+            if (i + 1) % 100 == 0:
+                logger.info(f"  Processed {i + 1} entries")
+
+    logger.info(f"Loaded {len(code1_list)} code pairs from GPTCloneBench")
+    return code1_list, code2_list, labels
 
 
 def load_bigclonebench_dataset(
@@ -220,6 +291,10 @@ def evaluate_model(
     language: str = "java",
     output_report: bool = True,
     sample_size: int | None = None,
+    visualize: bool = True,
+    output_dir: Optional[str] = None,
+    threshold: Optional[float] = None,
+    threshold_sweep: bool = False,
 ) -> dict:
     """
     Evaluate a trained semantic model.
@@ -227,10 +302,14 @@ def evaluate_model(
     Args:
         model_path: Path to trained model (.pkl file)
         dataset_path: Path to test dataset
-        dataset_format: Dataset format ('bigclonebench', 'toma', or 'json')
+        dataset_format: Dataset format ('bigclonebench', 'gptclonebench', 'toma', or 'json')
         language: Programming language
         output_report: Whether to print detailed report
         sample_size: Optional sample size for evaluation
+        visualize: Whether to generate visualization reports
+        output_dir: Directory for visualization output
+        threshold: Custom decision threshold (default: use model's calibrated threshold)
+        threshold_sweep: Whether to perform threshold sweep analysis
 
     Returns:
         Evaluation metrics dictionary
@@ -238,10 +317,21 @@ def evaluate_model(
     logger.info(f"Loading model from {model_path}...")
     model = SemanticClassifier.load(Path(model_path).name)
 
+    # Set custom threshold if provided
+    if threshold is not None:
+        model.set_threshold(threshold)
+        logger.info(f"Using custom threshold: {threshold:.3f}")
+    else:
+        logger.info(f"Using model's calibrated threshold: {model.get_threshold():.3f}")
+
     logger.info(f"Loading test dataset from {dataset_path}...")
 
     if dataset_format == "bigclonebench":
         code1_list, code2_list, labels = load_bigclonebench_dataset(
+            dataset_path, sample_size=sample_size
+        )
+    elif dataset_format == "gptclonebench":
+        code1_list, code2_list, labels = load_gptclonebench_dataset(
             dataset_path, sample_size=sample_size
         )
     elif dataset_format == "toma":
@@ -254,7 +344,7 @@ def evaluate_model(
         raise ValueError(f"Unknown dataset format: {dataset_format}")
 
     logger.info(f"Extracting features for {len(code1_list)} pairs...")
-    extractor = SemanticFeatureExtractor()
+    extractor = SheneamerFeatureExtractor()
     features = []
 
     for code1, code2 in tqdm(
@@ -265,7 +355,7 @@ def evaluate_model(
             features.append(fused)
         except Exception as e:
             logger.warning(f"Feature extraction failed: {e}")
-            features.append(np.zeros(204))
+            features.append(np.zeros(extractor.n_fused_features))
 
     X_test = np.array(features)
     y_test = np.array(labels)
@@ -281,7 +371,46 @@ def evaluate_model(
         "recall": recall_score(y_test, y_pred, zero_division=0),
         "f1": f1_score(y_test, y_pred, zero_division=0),
         "roc_auc": roc_auc_score(y_test, y_proba),
+        "threshold_used": model.get_threshold(),
     }
+
+    # Threshold sweep analysis
+    if threshold_sweep:
+        logger.info("\nPerforming threshold sweep analysis...")
+        sweep_results = model.threshold_sweep(X_test, y_test)
+
+        # Find optimal thresholds for different metrics
+        optimal_f1 = model.find_optimal_threshold(X_test, y_test, metric="f1")
+        optimal_precision = model.find_optimal_threshold(
+            X_test, y_test, metric="precision"
+        )
+        optimal_recall = model.find_optimal_threshold(X_test, y_test, metric="recall")
+
+        metrics["threshold_sweep"] = True
+        metrics["optimal_threshold_f1"] = optimal_f1
+        metrics["optimal_threshold_precision"] = optimal_precision
+        metrics["optimal_threshold_recall"] = optimal_recall
+
+        # Save sweep results
+        results_dir = Path(output_dir) if output_dir else Path("./metrics_output")
+        results_dir.mkdir(parents=True, exist_ok=True)
+        sweep_csv = results_dir / "threshold_sweep_results.csv"
+        sweep_results.to_csv(sweep_csv, index=False)
+        logger.info(f"Threshold sweep results saved to: {sweep_csv}")
+
+        logger.info("\n" + "=" * 60)
+        logger.info("THRESHOLD SWEEP ANALYSIS")
+        logger.info("=" * 60)
+        logger.info(f"Optimal threshold for F1: {optimal_f1:.3f}")
+        logger.info(f"Optimal threshold for Precision: {optimal_precision:.3f}")
+        logger.info(f"Optimal threshold for Recall: {optimal_recall:.3f}")
+        logger.info(f"Current threshold: {model.get_threshold():.3f}")
+
+        # Show best F1 from sweep
+        best_f1_row = sweep_results.loc[sweep_results["f1"].idxmax()]
+        logger.info(
+            f"\nBest F1 from sweep: {best_f1_row['f1']:.4f} at threshold {best_f1_row['threshold']:.3f}"
+        )
 
     if output_report:
         logger.info("\n" + "=" * 60)
@@ -313,11 +442,44 @@ def evaluate_model(
         for name, score in importance:
             logger.info(f"  {name}: {score:.4f}")
 
+    # Generate visualizations
+    if visualize:
+        logger.info("\nGenerating evaluation visualizations...")
+        visualizer = MetricsVisualizer(output_dir=output_dir)
+
+        # Load feature names
+        feature_names = extractor.get_feature_names(fused=True)
+
+        # Create complete report
+        extra_info = {
+            "dataset": dataset_path,
+            "dataset_format": dataset_format,
+            "language": language,
+            "model_path": model_path,
+            "total_samples": len(y_test),
+            "feature_count": X_test.shape[1],
+        }
+
+        report_files = visualizer.create_complete_report(
+            y_true=y_test,
+            y_pred=y_pred,
+            y_scores=y_proba,
+            metrics=metrics,
+            feature_names=feature_names,
+            importances=model.model.feature_importances_,
+            extra_info=extra_info,
+            report_name=f"evaluation_report_{Path(dataset_path).stem}.html",
+        )
+
+        logger.info(f"Visualizations saved to: {report_files['html_report']}")
+        metrics["visualization_path"] = str(report_files["html_report"])
+
     return metrics
 
 
 if __name__ == "__main__":
     import argparse
+    from typing import Optional
 
     parser = argparse.ArgumentParser(
         description="Evaluate semantic clone detection model"
@@ -338,14 +500,14 @@ if __name__ == "__main__":
         "--dataset-format",
         type=str,
         default="bigclonebench",
-        choices=["bigclonebench", "toma", "json"],
+        choices=["bigclonebench", "gptclonebench", "toma", "json"],
         help="Dataset format",
     )
     parser.add_argument(
         "--language",
         type=str,
         default="java",
-        choices=["java", "c", "python"],
+        choices=["java", "c", "python", "csharp"],
         help="Programming language",
     )
     parser.add_argument(
@@ -355,9 +517,32 @@ if __name__ == "__main__":
         help="Sample size for evaluation (optional)",
     )
     parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        help="Custom decision threshold (default: use model's calibrated threshold)",
+    )
+    parser.add_argument(
+        "--threshold-sweep",
+        action="store_true",
+        help="Perform threshold sweep analysis",
+    )
+    parser.add_argument(
         "--no-report",
         action="store_true",
         help="Disable detailed report output",
+    )
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        default=True,
+        help="Generate visualization reports after evaluation",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory for visualization output (default: ./metrics_output)",
     )
 
     args = parser.parse_args()
@@ -369,4 +554,8 @@ if __name__ == "__main__":
         language=args.language,
         output_report=not args.no_report,
         sample_size=args.sample_size,
+        visualize=args.visualize,
+        output_dir=args.output_dir,
+        threshold=args.threshold,
+        threshold_sweep=args.threshold_sweep,
     )

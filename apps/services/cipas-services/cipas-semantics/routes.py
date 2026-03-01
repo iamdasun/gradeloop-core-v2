@@ -2,12 +2,13 @@
 CIPAS Semantics API Routes for Semantic Code Clone Detection.
 
 This module implements REST API endpoints for comparing code snippets
-using semantic analysis for Type-4 clone detection.
+using semantic analysis for Type-IV clone detection based on Sheneamer et al. (2021).
 
-Semantic Detection (Type-4):
-- Uses 100+ semantic features per code snippet
-- XGBoost classification with fused feature vectors
+Semantic Detection (Type-IV):
+- Uses 100 semantic features per code snippet (Sheneamer framework)
+- XGBoost classification with fused feature vectors (202 features total)
 - Detects clones with similar functionality but different implementation
+- Supports Java, C, C#, and Python
 """
 
 import logging
@@ -15,13 +16,15 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 
-from clone_detection.features.semantic_features import SemanticFeatureExtractor
+from clone_detection.features.sheneamer_features import SheneamerFeatureExtractor
 from clone_detection.models.classifiers import SemanticClassifier
 from clone_detection.tokenizers.tree_sitter_tokenizer import TreeSitterTokenizer
 from clone_detection.utils.common_setup import get_model_path
 from schemas import (
     BatchComparisonRequest,
     BatchComparisonResult,
+    CloneDetectionRequest,
+    CloneDetectionResponse,
     ComparisonRequest,
     ComparisonResult,
     FeatureImportanceResponse,
@@ -40,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 _semantic_model: Optional[SemanticClassifier] = None
 _tokenizer: Optional[TreeSitterTokenizer] = None
-_semantic_extractor: Optional[SemanticFeatureExtractor] = None
+_feature_extractor: Optional[SheneamerFeatureExtractor] = None
 
 
 def _get_tokenizer() -> TreeSitterTokenizer:
@@ -51,12 +54,12 @@ def _get_tokenizer() -> TreeSitterTokenizer:
     return _tokenizer
 
 
-def _get_semantic_extractor() -> SemanticFeatureExtractor:
-    """Get or create semantic feature extractor."""
-    global _semantic_extractor
-    if _semantic_extractor is None:
-        _semantic_extractor = SemanticFeatureExtractor()
-    return _semantic_extractor
+def _get_feature_extractor() -> SheneamerFeatureExtractor:
+    """Get or create Sheneamer feature extractor."""
+    global _feature_extractor
+    if _feature_extractor is None:
+        _feature_extractor = SheneamerFeatureExtractor()
+    return _feature_extractor
 
 
 def _load_semantic_model() -> Optional[SemanticClassifier]:
@@ -97,11 +100,11 @@ def compare_codes(
     request: ComparisonRequest,
 ) -> ComparisonResult:
     """
-    Compare two code snippets for semantic clone detection (Type-4).
+    Compare two code snippets for semantic clone detection (Type-IV).
 
-    Semantic Detection (Type-4):
-    - Extracts 100+ semantic features from each code snippet
-    - Fuses features using concatenation (204 features total)
+    Semantic Detection (Type-IV) based on Sheneamer et al. (2021):
+    - Extracts 101 semantic features from each code snippet
+    - Fuses features using concatenation (202 features total)
     - Uses XGBoost classification for clone detection
     - Detects clones with similar functionality but different implementation
 
@@ -122,11 +125,11 @@ def compare_codes(
         tokens1 = tokenizer.tokenize(request.code1, language, abstract_identifiers=True)
         tokens2 = tokenizer.tokenize(request.code2, language, abstract_identifiers=True)
 
-        # Get semantic extractor
-        semantic_extractor = _get_semantic_extractor()
+        # Get feature extractor
+        feature_extractor = _get_feature_extractor()
 
         # Extract fused semantic features
-        fused_features = semantic_extractor.extract_fused_features(
+        fused_features = feature_extractor.extract_fused_features(
             request.code1, request.code2, language
         )
 
@@ -146,8 +149,8 @@ def compare_codes(
             result = ComparisonResult(
                 is_clone=is_clone,
                 confidence=confidence,
-                clone_type="Type-4" if is_clone else None,
-                pipeline_used="Semantic XGBoost (Type-4)",
+                clone_type="Type-IV" if is_clone else None,
+                pipeline_used="Sheneamer et al. (2021) Type-IV Detector",
                 normalization_level="Token-based",
                 tokens1_count=len(tokens1),
                 tokens2_count=len(tokens2),
@@ -167,15 +170,15 @@ def compare_codes(
                 linalg.norm(features1) * linalg.norm(features2)
             )
 
-            # Heuristic threshold for Type-4
+            # Heuristic threshold for Type-IV
             is_clone = cosine_sim > 0.85
             confidence = float(cosine_sim) if is_clone else 1.0 - float(cosine_sim)
 
             result = ComparisonResult(
                 is_clone=is_clone,
                 confidence=confidence,
-                clone_type="Type-4" if is_clone else None,
-                pipeline_used="Semantic Heuristic (Type-4)",
+                clone_type="Type-IV" if is_clone else None,
+                pipeline_used="Sheneamer Heuristic (Type-IV)",
                 normalization_level="Token-based",
                 tokens1_count=len(tokens1),
                 tokens2_count=len(tokens2),
@@ -296,4 +299,114 @@ def tokenize_code(request: TokenizeRequest) -> TokenizeResponse:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Tokenization failed: {str(e)}",
+        )
+
+
+def detect_clones(request: CloneDetectionRequest) -> CloneDetectionResponse:
+    """
+    Detect Type-IV code clones using Sheneamer et al. (2021) framework.
+
+    This endpoint accepts two code snippets and returns:
+    - is_clone: Boolean indicating if the codes are semantic clones
+    - clone_type: Integer (1-4) indicating clone type (always 4 for this detector)
+    - confidence: XGBoost probability score
+
+    Feature Extraction (101 features per code snippet):
+    - Traditional (11): LOC, keyword category counts
+    - Syntactic/CST (40): Non-leaf node frequencies via post-order traversal
+    - Semantic/PDG (20): Implicit program dependency relationships
+    - Structural Depth (15): Nesting, depth, density metrics
+    - Type Signatures (10): Parameter/return type patterns
+    - API Fingerprinting (5): Library usage patterns
+
+    Feature Fusion: Linear combination (concatenation) of two feature vectors.
+
+    Args:
+        request: Clone detection request with two code snippets
+
+    Returns:
+        Clone detection response with prediction results
+
+    Raises:
+        HTTPException: If detection fails
+    """
+    tokenizer = _get_tokenizer()
+    language = request.language.value
+
+    try:
+        # Tokenize for metadata
+        tokens1 = tokenizer.tokenize(request.code1, language, abstract_identifiers=True)
+        tokens2 = tokenizer.tokenize(request.code2, language, abstract_identifiers=True)
+
+        # Get feature extractor
+        feature_extractor = _get_feature_extractor()
+
+        # Extract fused features (202 total: 101 per code snippet)
+        fused_features = feature_extractor.extract_fused_features(
+            request.code1, request.code2, language
+        )
+
+        # Load pre-trained XGBoost model
+        semantic_model = _load_semantic_model()
+        model_available = semantic_model is not None and semantic_model.is_trained
+
+        # Predict using XGBoost
+        if model_available:
+            prediction = semantic_model.predict(fused_features.reshape(1, -1))[0]
+            probabilities = semantic_model.predict_proba(fused_features.reshape(1, -1))[
+                0
+            ]
+
+            is_clone = bool(prediction == 1)
+            confidence = float(probabilities[1]) if len(probabilities) > 1 else 0.0
+
+            # Clone type: 4 for Type-IV (semantic)
+            clone_type = 4 if is_clone else None
+            clone_type_label = "Type-IV (Semantic)" if is_clone else None
+
+        else:
+            # Fallback: cosine similarity heuristic
+            n_features = len(fused_features) // 2
+            features1 = fused_features[:n_features]
+            features2 = fused_features[n_features:]
+
+            from numpy import dot, linalg
+
+            cosine_sim = dot(features1, features2) / (
+                linalg.norm(features1) * linalg.norm(features2)
+            )
+
+            # Heuristic threshold for Type-IV
+            is_clone = cosine_sim > 0.85
+            confidence = float(cosine_sim) if is_clone else 1.0 - float(cosine_sim)
+            clone_type = 4 if is_clone else None
+            clone_type_label = "Type-IV (Semantic)" if is_clone else None
+
+        return CloneDetectionResponse(
+            is_clone=is_clone,
+            confidence=confidence,
+            clone_type=clone_type,
+            clone_type_label=clone_type_label,
+            pipeline_used="Sheneamer et al. (2021) Type-IV Detector",
+            features_extracted=len(fused_features),
+            feature_categories={
+                "traditional": feature_extractor.n_traditional,
+                "syntactic_cst": feature_extractor.n_cst,
+                "semantic_pdg": feature_extractor.n_semantic,
+                "structural_depth": feature_extractor.n_depth,
+                "type_signatures": feature_extractor.n_type,
+                "api_fingerprinting": feature_extractor.n_api,
+            },
+            tokens1_count=len(tokens1),
+            tokens2_count=len(tokens2),
+            model_available=model_available,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Clone detection failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Clone detection failed: {str(e)}",
         )

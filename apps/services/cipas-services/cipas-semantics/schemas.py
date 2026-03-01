@@ -15,6 +15,7 @@ class LanguageEnum(str, Enum):
 
     JAVA = "java"
     C = "c"
+    CSHARP = "csharp"
     PYTHON = "python"
 
 
@@ -123,3 +124,83 @@ class TokenizeResponse(BaseModel):
     tokens: list[str] = Field(..., description="List of tokens")
     token_count: int = Field(..., description="Number of tokens")
     language: str = Field(..., description="Programming language used")
+
+
+class CloneDetectionRequest(BaseModel):
+    """
+    Request model for Type-IV code clone detection.
+
+    Accepts two code snippets and returns clone prediction with type.
+    """
+
+    code1: str = Field(
+        ...,
+        description="First code snippet to analyze",
+        min_length=1,
+        examples=["int sum(int a, int b) { return a + b; }"],
+    )
+    code2: str = Field(
+        ...,
+        description="Second code snippet to analyze",
+        min_length=1,
+        examples=["int add(int x, int y) { int result = x + y; return result; }"],
+    )
+    language: LanguageEnum = Field(
+        default=LanguageEnum.JAVA,
+        description="Programming language of the code snippets",
+    )
+
+
+class CloneDetectionResponse(BaseModel):
+    """
+    Response model for Type-IV code clone detection.
+
+    Returns prediction results including is_clone boolean and clone_type (1-4).
+    """
+
+    is_clone: bool = Field(..., description="Whether the codes are semantic clones")
+    confidence: float = Field(..., description="Confidence score (0-1)", ge=0.0, le=1.0)
+    clone_type: Optional[int] = Field(
+        None,
+        description="Type of clone detected (1=Type-I, 2=Type-II, 3=Type-III, 4=Type-IV)",
+        ge=1,
+        le=4,
+    )
+    clone_type_label: Optional[str] = Field(
+        None,
+        description="Human-readable clone type label",
+        examples=["Type-IV (Semantic)"],
+    )
+    pipeline_used: str = Field(
+        ...,
+        description="Detection pipeline used",
+        examples=["Sheneamer et al. (2021) Type-IV Detector"],
+    )
+
+    # Feature extraction metadata
+    features_extracted: int = Field(
+        ..., description="Total number of features extracted (fused)"
+    )
+    feature_categories: dict[str, int] = Field(
+        ...,
+        description="Breakdown of features by category",
+        examples=[
+            {
+                "traditional": 11,
+                "syntactic_cst": 40,
+                "semantic_pdg": 20,
+                "structural_depth": 15,
+                "type_signatures": 10,
+                "api_fingerprinting": 5,
+            }
+        ],
+    )
+
+    # Tokenization metadata
+    tokens1_count: Optional[int] = Field(None, description="Number of tokens in code1")
+    tokens2_count: Optional[int] = Field(None, description="Number of tokens in code2")
+
+    # Model information
+    model_available: bool = Field(
+        ..., description="Whether pre-trained XGBoost model was available"
+    )
