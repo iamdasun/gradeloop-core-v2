@@ -348,7 +348,22 @@ services:
       - ./apps/services/cipas-service/src:/app/src
       # Mount models directory to access pre-trained models
       - ./apps/services/cipas-service/clone_detection/models:/app/clone_detection/models:ro
-    command: [ "/opt/venv/bin/uvicorn", "cipas.main:app", "--host", "0.0.0.0", "--port", "8085", "--loop", "uvloop", "--http", "httptools", "--workers", "1", "--reload" ]
+    command:
+      [
+        "/opt/venv/bin/uvicorn",
+        "cipas.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8085",
+        "--loop",
+        "uvloop",
+        "--http",
+        "httptools",
+        "--workers",
+        "1",
+        "--reload",
+      ]
     container_name: cipas-service
     restart: unless-stopped
     labels:
@@ -514,7 +529,12 @@ services:
 
     healthcheck:
       test:
-        ["CMD", "curl", "-f", "http://localhost:${CIPAS_SEM_SVC_PORT}/api/v1/semantics/ready"]
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:${CIPAS_SEM_SVC_PORT}/api/v1/semantics/ready",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -562,24 +582,24 @@ services:
       - SERVICE_HOST=0.0.0.0
       - LOG_LEVEL=${ACAFS_LOG_LEVEL:-INFO}
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      
+
       # RabbitMQ
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - RABBITMQ_EXCHANGE=${ACAFS_RABBITMQ_EXCHANGE:-submissions}
       - RABBITMQ_QUEUE=${ACAFS_RABBITMQ_QUEUE:-acafs.evaluation}
       - RABBITMQ_ROUTING_KEY=${ACAFS_RABBITMQ_ROUTING_KEY:-submission.created}
       - RABBITMQ_CONCURRENCY=${ACAFS_RABBITMQ_CONCURRENCY:-4}
-      
+
       # PostgreSQL (shared with assessment service)
       - DATABASE_URL=postgresql://${GRA_DB_USER}:${GRA_DB_PASSWORD}@${GRA_DB_HOST}:${GRA_DB_PORT}/${ASSESSMENT_SVC_DB_NAME}
-      
+
       # MinIO
       - MINIO_ENDPOINT=minio:9000
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - MINIO_BUCKET=${MINIO_BUCKET:-submissions}
       - MINIO_USE_SSL=false
-      
+
       # AST Parser
       - AST_MAX_LINES=${ACAFS_AST_MAX_LINES:-5000}
       - AST_TIMEOUT_SECONDS=${ACAFS_AST_TIMEOUT_SECONDS:-2}
@@ -595,7 +615,13 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/api/v1/acafs/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8086/api/v1/acafs/health')",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
