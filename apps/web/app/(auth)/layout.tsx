@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
 /**
  * Auth layout – wraps /login, /forgot-password, /reset-password.
- * 
+ *
  * Provides a common structure for authentication pages with:
  * - A vibrant, brand-aligned animated background
  * - Top navigation (Home link, Help Center)
@@ -10,14 +10,14 @@
  * - Footer with legal and support links
  */
 
-import React, { useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
-import { GraduationCap } from 'lucide-react';
-import { useAuthStore } from '@/lib/stores/authStore';
-import { BackgroundGradientAnimation } from '@/components/ui/background-gradient-animation';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import React, { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
+import { GraduationCap } from "lucide-react";
+import { useAuthStore } from "@/lib/stores/authStore";
+import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default function AuthLayout({
   children,
@@ -50,7 +50,7 @@ export default function AuthLayout({
     );
   }
 
-  const isLoginPage = pathname === '/login';
+  const isLoginPage = pathname === "/login";
 
   return (
     <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
@@ -58,20 +58,22 @@ export default function AuthLayout({
       <div className="fixed inset-0 -z-10 h-full w-full">
         <BackgroundGradientAnimation
           containerClassName="!h-full !w-full"
-          className="opacity-40"
-          firstColor="99, 102, 241"   /* --primary: 248 89% 63% */
-          secondColor="139, 92, 246"  /* Vibrant Violet */
-          thirdColor="245, 243, 255"  /* --secondary: 252 100% 96% */
+          className="opacity-40 dark:opacity-20"
+          firstColor="99, 102, 241" /* --primary: 248 89% 63% */
+          secondColor="139, 92, 246" /* Vibrant Violet */
+          thirdColor="245, 243, 255" /* --secondary: 252 100% 96% */
           fourthColor="255, 255, 255" /* Pure White */
-          fifthColor="224, 231, 255"  /* Indigo-100 */
+          fifthColor="224, 231, 255" /* Indigo-100 */
           pointerColor="99, 102, 241"
           gradientBackgroundStart="rgba(255, 255, 255, 1)"
           gradientBackgroundEnd="rgba(245, 243, 255, 0.5)"
         />
+        {/* Dark mode overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-background/95 to-primary/5 dark:from-background dark:via-background/90 dark:to-primary/10" />
       </div>
 
       {/* Subtle Grid Overlay per Design Pattern */}
-      <div className="fixed inset-0 -z-10 pointer-events-none bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-30" />
+      <div className="fixed inset-0 -z-10 pointer-events-none bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#3f3f46_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-30 dark:opacity-20" />
 
       {/* Navigation Header */}
       <header className="z-50 flex items-center justify-between px-6 py-4 md:px-12 md:py-8 lg:px-24">
@@ -88,7 +90,10 @@ export default function AuthLayout({
         </Link>
 
         <div className="flex items-center gap-4 md:gap-8">
-          <Link href="/help" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
+          <Link
+            href="/help"
+            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden sm:block"
+          >
             Help Center
           </Link>
           {!isLoginPage && (
@@ -110,20 +115,30 @@ export default function AuthLayout({
       <footer className="z-20 w-full px-6 py-12 md:px-12 lg:px-24">
         <div className="flex flex-col items-center justify-center gap-6">
           <nav className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
-            <Link href="/privacy" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              href="/privacy"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
               Privacy Policy
             </Link>
-            <Link href="/terms" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              href="/terms"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
               Terms of Service
             </Link>
-            <Link href="/contact" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link
+              href="/contact"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
               Contact Support
             </Link>
           </nav>
 
           <div className="flex flex-col items-center gap-1.5">
             <p className="text-xs font-medium text-muted-foreground/60 tracking-wider uppercase">
-              &copy; {new Date().getFullYear()} Gradeloop LMS. All rights reserved.
+              &copy; {new Date().getFullYear()} Gradeloop LMS. All rights
+              reserved.
             </p>
           </div>
         </div>
@@ -131,4 +146,3 @@ export default function AuthLayout({
     </div>
   );
 }
-
