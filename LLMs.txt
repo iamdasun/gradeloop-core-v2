@@ -28,6 +28,26 @@ This project is an AI-integrated Learning Management System (LMS) built with a m
 ### Frontend implementation rules (technology-aware)
 
 - Use only libraries already installed in `apps/web/package.json` unless explicitly asked to add new one
+- Follow the design token system in `apps/web/app/globals.css` for consistent theming
+
+### Design Token System
+
+**Brand Palette** (HSL values for CSS variables):
+- **Primary**: `248 89% 63%` — Vibrant Indigo/Purple for buttons, links, interactive elements
+- **Secondary**: `252 100% 96%` — Soft Lavender for tags, subtle backgrounds
+- **Muted**: `220 14% 96%` — Light gray for muted elements, sidebar backgrounds
+- **Accent**: `220 14% 96%` — Hover states and subtle icons
+- **Background**: `0 0% 100%` — Pure white (light mode)
+- **Foreground**: `224 71.4% 4.1%` — Deep navy text
+- **Border/Input**: `220 13% 91%` — Light gray borders
+- **Ring**: `248 89% 63%` — Indigo focus rings
+
+**Dark Mode**:
+- **Background**: `224 71% 4%` — Deep navy canvas
+- **Primary**: `248 89% 70%` — Luminous indigo
+- **Card**: `224 71% 7%` — Slightly lighter navy
+
+All shadcn/ui components automatically use these CSS variables for theming.
 
 ---
 

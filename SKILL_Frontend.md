@@ -29,6 +29,19 @@ Then implement working code (HTML/CSS/JS, React, Vue, etc.) that is:
 Focus on:
 - **Typography**: Choose fonts that are beautiful, unique, and interesting. Avoid generic fonts like Arial and Inter; opt instead for distinctive choices that elevate the frontend's aesthetics; unexpected, characterful font choices. Pair a distinctive display font with a refined body font.
 - **Color & Theme**: Commit to a cohesive aesthetic. Use CSS variables for consistency. Dominant colors with sharp accents outperform timid, evenly-distributed palettes.
+
+  **GradeLoop Core V2 Brand Palette** (defined in `apps/web/app/globals.css`):
+  - **Primary**: `248 89% 63%` — Vibrant Indigo/Purple (#6366F1) for buttons, links, and key interactive elements
+  - **Secondary**: `252 100% 96%` — Soft Lavender (#F5F3FF) for tags, subtle backgrounds
+  - **Muted**: `220 14% 96%` — Light gray for "Not Urgent" tags, sidebar backgrounds
+  - **Accent**: `220 14% 96%` — Hover states and subtle icons
+  - **Background**: `0 0% 100%` — Pure white canvas
+  - **Foreground**: `224 71.4% 4.1%` — Deep navy text
+  - **Border**: `220 13% 91%` — Light gray borders
+  - **Ring**: `248 89% 63%` — Indigo focus rings
+
+  Dark mode variants use deeper navy bases (`224 71% 4%`) with luminous indigo accents (`248 89% 70%`).
+
 - **Motion**: Use animations for effects and micro-interactions. Prioritize CSS-only solutions for HTML. Use Motion library for React when available. Focus on high-impact moments: one well-orchestrated page load with staggered reveals (animation-delay) creates more delight than scattered micro-interactions. Use scroll-triggering and hover states that surprise.
 - **Spatial Composition**: Unexpected layouts. Asymmetry. Overlap. Diagonal flow. Grid-breaking elements. Generous negative space OR controlled density.
 - **Backgrounds & Visual Details**: Create atmosphere and depth rather than defaulting to solid colors. Add contextual effects and textures that match the overall aesthetic. Apply creative forms like gradient meshes, noise textures, geometric patterns, layered transparencies, dramatic shadows, decorative borders, custom cursors, and grain overlays.
