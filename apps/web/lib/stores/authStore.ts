@@ -1,21 +1,21 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import type { User } from '@/types/auth.types';
-import { decodeJwtPayload } from '@/lib/auth/jwt-decode';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
+import type { User } from "@/types/auth.types";
+import { decodeJwtPayload } from "@/lib/auth/jwt-decode";
 
 // ---------------------------------------------------------------------------
 // Role → dashboard path map
 // ---------------------------------------------------------------------------
 const ROLE_DASHBOARD_MAP: Record<string, string> = {
-  super_admin: '/admin',
-  admin: '/admin',
-  administrator: '/admin',
-  superadmin: '/admin',
-  employee: '/instructor',
-  instructor: '/instructor',
-  teacher: '/instructor',
-  student: '/student',
-  learner: '/student',
+  super_admin: "/admin",
+  admin: "/admin",
+  administrator: "/admin",
+  superadmin: "/admin",
+  employee: "/instructor",
+  instructor: "/instructor",
+  teacher: "/instructor",
+  student: "/student",
+  learner: "/student",
 };
 
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ export const useAuthStore = create<AuthState>()(
           id: claims.user_id,
           username: claims.username,
           full_name: claims.full_name,
-          role_name: claims.role_name ?? '',
+          role_name: claims.role_name ?? "",
           permissions: claims.permissions ?? [],
         };
         set({ accessToken: token, user, isAuthenticated: true });
@@ -90,14 +90,14 @@ export const useAuthStore = create<AuthState>()(
       setSession: (token) => {
         const claims = decodeJwtPayload(token);
         if (!claims) {
-          console.error('[AuthStore] setSession: failed to decode JWT');
+          console.error("[AuthStore] setSession: failed to decode JWT");
           return;
         }
         const user: User = {
           id: claims.user_id,
           username: claims.username,
           full_name: claims.full_name,
-          role_name: claims.role_name ?? '',
+          role_name: claims.role_name ?? "",
           permissions: claims.permissions ?? [],
         };
         set({
@@ -120,12 +120,19 @@ export const useAuthStore = create<AuthState>()(
       // ------------------------------------------------------------------ //
       hydrateSession: async () => {
         if (get().isLoading) return;
+
+        // If already authenticated with access token, skip refresh
+        if (get().accessToken && get().isAuthenticated) {
+          set({ isLoading: false, isHydrated: true });
+          return;
+        }
+
         set({ isLoading: true });
 
         try {
-          const { default: axiosBase } = await import('axios');
+          const { default: axiosBase } = await import("axios");
           const API_URL =
-            process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
           // The refresh token lives in an HttpOnly cookie set by the server.
           // withCredentials ensures the browser sends it automatically.
@@ -147,7 +154,7 @@ export const useAuthStore = create<AuthState>()(
             id: claims.user_id,
             username: claims.username,
             full_name: claims.full_name,
-            role_name: claims.role_name ?? '',
+            role_name: claims.role_name ?? "",
             permissions: claims.permissions ?? [],
           };
 
@@ -175,15 +182,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       getRedirectPath: () => {
-        const roleName = get().user?.role_name?.toLowerCase() ?? '';
-        return ROLE_DASHBOARD_MAP[roleName] ?? '/admin';
+        const roleName = get().user?.role_name?.toLowerCase() ?? "";
+        return ROLE_DASHBOARD_MAP[roleName] ?? "/admin";
       },
     }),
 
     {
-      name: 'auth-storage',
+      name: "auth-storage",
       storage: createJSONStorage(() => {
-        if (typeof window === 'undefined') {
+        if (typeof window === "undefined") {
           return {
             getItem: () => null,
             setItem: () => undefined,
