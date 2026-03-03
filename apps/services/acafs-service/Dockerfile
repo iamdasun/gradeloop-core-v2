@@ -82,10 +82,12 @@ FROM builder AS development
 
 WORKDIR /app
 
+# Install dev dependencies (system-wide, no venv)
 RUN poetry install --no-interaction --no-ansi --no-root
 
 COPY app/ ./app/
 
 EXPOSE 8086
 
+# Use system uvicorn (poetry installed to system Python)
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8086", "--reload"]

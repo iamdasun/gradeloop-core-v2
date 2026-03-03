@@ -34,6 +34,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 # -----------------------------------------------------------------------------
 FROM builder AS dev
 RUN go install github.com/air-verse/air@latest
+# Use -mod=mod to ignore vendor directory during development
+ENV GOFLAGS="-mod=mod"
 CMD ["air"]
 
 # -----------------------------------------------------------------------------
