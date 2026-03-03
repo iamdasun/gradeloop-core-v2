@@ -16,6 +16,7 @@ import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
+import { BackgroundLines } from "@/components/ui/background-lines";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -53,12 +54,12 @@ export default function AuthLayout({
   const isLoginPage = pathname === "/login";
 
   return (
-    <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-indigo-100 selection:text-indigo-900">
-      {/* Dynamic Brand Background Animation */}
-      <div className="fixed inset-0 -z-10 h-full w-full">
+    <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 dark:selection:bg-indigo-900 dark:selection:text-indigo-100">
+      {/* Light Mode: Dynamic Brand Background Animation */}
+      <div className="fixed inset-0 -z-10 h-full w-full block dark:hidden">
         <BackgroundGradientAnimation
           containerClassName="!h-full !w-full"
-          className="opacity-40 dark:opacity-20"
+          className="opacity-40"
           firstColor="99, 102, 241" /* --primary: 248 89% 63% */
           secondColor="139, 92, 246" /* Vibrant Violet */
           thirdColor="245, 243, 255" /* --secondary: 252 100% 96% */
@@ -68,8 +69,13 @@ export default function AuthLayout({
           gradientBackgroundStart="rgba(255, 255, 255, 1)"
           gradientBackgroundEnd="rgba(245, 243, 255, 0.5)"
         />
-        {/* Dark mode overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-background via-background/95 to-primary/5 dark:from-background dark:via-background/90 dark:to-primary/10" />
+      </div>
+
+      {/* Dark Mode: Aceternity Background Lines */}
+      <div className="fixed inset-0 -z-10 h-full w-full hidden dark:block">
+        <BackgroundLines>
+          <div className="absolute inset-0 bg-gradient-to-br from-background via-background/90 to-primary/10" />
+        </BackgroundLines>
       </div>
 
       {/* Subtle Grid Overlay per Design Pattern */}
