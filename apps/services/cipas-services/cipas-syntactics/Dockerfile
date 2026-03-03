@@ -1,56 +1,94 @@
-FROM python:3.14-slim AS builder
+# =============================================================================
+# CIPAS Syntactics Service - Optimized Dockerfile
+# Target Image Size: <150MB
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Builder
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files
-COPY pyproject.toml .
-
 # Install Poetry
-RUN pip install --no-cache-dir poetry
+RUN pip install --no-cache-dir poetry==1.7.1
+
+# Copy dependency files first for layer caching
+COPY pyproject.toml poetry.lock* ./
 
 # Install dependencies
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --no-root
+    && poetry install --no-interaction --no-ansi --no-root --only main
 
 # Copy application code
-COPY . .
+COPY src/ ./src/
 
-# Build tree-sitter parsers (optional, parsers are loaded from pip packages)
-RUN python -c "from clone_detection.tokenizers.tree_sitter_tokenizer import TreeSitterTokenizer; t = TreeSitterTokenizer(); print('Parsers loaded successfully')" 2>/dev/null || true
+# Verify tree-sitter tokenizer installation
+RUN python -c "from clone_detection.tokenizers.tree_sitter_tokenizer import TreeSitterTokenizer; TreeSitterTokenizer(); print('Tree-sitter parsers loaded successfully')" 2>/dev/null || true
 
-# =============================================================================
-# Runtime stage
-# =============================================================================
-FROM python:3.14-slim
+# -----------------------------------------------------------------------------
+# Stage 2: Production Runtime
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim AS production
 
 WORKDIR /app
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Copy installed dependencies from builder
-COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+# Copy installed packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY --from=builder /app .
+COPY --from=builder /app/src ./src
 
-# Create models directory
-RUN mkdir -p /app/models
+# Create models directory and non-root user
+RUN mkdir -p /app/models \
+    && useradd --create-home --uid 1000 cipas-syntactics \
+    && chown -R cipas-syntactics:cipas-syntactics /app
 
-# Expose port (default 8086)
+USER cipas-syntactics
+
+# Expose port
 EXPOSE 8086
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8086/health || exit 1
 
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8086", "--workers", "1"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8086", "--workers", "1"]
+
+# -----------------------------------------------------------------------------
+# Stage 3: Development
+# -----------------------------------------------------------------------------
+FROM builder AS development
+
+WORKDIR /app
+
+RUN poetry install --no-interaction --no-ansi --no-root
+
+COPY src/ ./src/
+
+EXPOSE 8086
+
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8086", "--reload"]
