@@ -55,24 +55,27 @@ export default function AuthLayout({
 
   return (
     <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 dark:selection:bg-indigo-900 dark:selection:text-indigo-100">
-      {/* Light Mode: Animated Background with Lines + Gradient */}
+      {/* Light Mode: Animated Background with Lines + Interactive Gradient */}
       <div className="fixed inset-0 -z-10 h-full w-full block dark:hidden">
         {/* Animated Lines Layer */}
         <BackgroundLines>
-          <div className="absolute inset-0 bg-gradient-to-br from-white via-background/80 to-primary/5" />
+          <div className="absolute inset-0 bg-gradient-to-br from-white via-background/90 to-primary/5" />
         </BackgroundLines>
-        {/* Gradient Orbs Layer */}
+        {/* Interactive Gradient Orbs Layer */}
         <BackgroundGradientAnimation
           containerClassName="!h-full !w-full"
-          className="opacity-30"
-          firstColor="99, 102, 241" /* --primary: 248 89% 63% */
-          secondColor="139, 92, 246" /* Vibrant Violet */
-          thirdColor="245, 243, 255" /* --secondary: 252 100% 96% */
-          fourthColor="224, 231, 255" /* Indigo-100 */
-          fifthColor="167, 139, 250" /* Light Purple */
+          className="opacity-25"
+          firstColor="99, 102, 241" /* Primary indigo */
+          secondColor="167, 139, 250" /* Light purple */
+          thirdColor="139, 92, 246" /* Violet */
+          fourthColor="245, 243, 255" /* Soft lavender */
+          fifthColor="224, 231, 255" /* Indigo-100 */
           pointerColor="99, 102, 241"
-          gradientBackgroundStart="rgba(255, 255, 255, 0.8)"
-          gradientBackgroundEnd="rgba(245, 243, 255, 0.3)"
+          size="70%"
+          blendingValue="soft-light"
+          gradientBackgroundStart="rgba(255, 255, 255, 1)"
+          gradientBackgroundEnd="rgba(245, 243, 255, 0.5)"
+          interactive={true}
         />
       </div>
 
