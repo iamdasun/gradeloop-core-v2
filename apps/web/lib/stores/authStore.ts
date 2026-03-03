@@ -78,7 +78,7 @@ export const useAuthStore = create<AuthState>()(
         if (!claims) return;
         const user: User = {
           id: claims.user_id,
-          username: claims.username,
+          email: claims.email,
           full_name: claims.full_name,
           role_name: claims.role_name ?? "",
           permissions: claims.permissions ?? [],
@@ -95,7 +95,7 @@ export const useAuthStore = create<AuthState>()(
         }
         const user: User = {
           id: claims.user_id,
-          username: claims.username,
+          email: claims.email,
           full_name: claims.full_name,
           role_name: claims.role_name ?? "",
           permissions: claims.permissions ?? [],
@@ -152,7 +152,7 @@ export const useAuthStore = create<AuthState>()(
 
           const user: User = {
             id: claims.user_id,
-            username: claims.username,
+            email: claims.email,
             full_name: claims.full_name,
             role_name: claims.role_name ?? "",
             permissions: claims.permissions ?? [],
@@ -161,9 +161,12 @@ export const useAuthStore = create<AuthState>()(
           set({ accessToken: newToken, user, isAuthenticated: true });
         } catch {
           // No cookie / expired — user must log in. This is expected on first load.
-          // Guard against races where a real login finished while hydration was in-flight.
-          if (!get().isAuthenticated) {
-            set({ accessToken: null, isAuthenticated: false });
+          // Guard against races: only clear if no access token was set concurrently
+          // (e.g. by a login on another tab). Checking accessToken is safer than
+          // isAuthenticated because stale localStorage can leave isAuthenticated=true
+          // even when there is no valid token.
+          if (!get().accessToken) {
+            set({ accessToken: null, isAuthenticated: false, user: null });
           }
         } finally {
           set({ isLoading: false, isHydrated: true });
