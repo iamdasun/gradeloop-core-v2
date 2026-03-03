@@ -2,6 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import {
+  Mail,
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -35,8 +43,7 @@ export default function ForgotPasswordPage() {
       await authApi.forgotPassword({ email: emailValue });
       setIsSubmitted(true);
     } catch (err) {
-      const errorMessage = handleApiError(err);
-      setError(errorMessage);
+      setError(handleApiError(err));
     } finally {
       setIsLoading(false);
     }
@@ -44,16 +51,12 @@ export default function ForgotPasswordPage() {
 
   const handleResend = async () => {
     if (!email) return;
-
     setError(null);
     setIsLoading(true);
-
     try {
       await authApi.forgotPassword({ email });
-      // Keep the submitted state, just show success
     } catch (err) {
-      const errorMessage = handleApiError(err);
-      setError(errorMessage);
+      setError(handleApiError(err));
     } finally {
       setIsLoading(false);
     }
@@ -61,44 +64,45 @@ export default function ForgotPasswordPage() {
 
   if (isSubmitted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-zinc-900">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle className="text-2xl">Check your email</CardTitle>
-            <CardDescription>
-              We&apos;ve sent password reset instructions to{" "}
-              <span className="font-medium text-zinc-900 dark:text-zinc-50">
-                {email}
-              </span>
-            </CardDescription>
+      <div className="w-full max-w-md animate-in fade-in zoom-in duration-500">
+        <Card className="border-none shadow-2xl shadow-indigo-200/50 dark:shadow-none bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
+          <CardHeader className="space-y-4 pb-8 text-center border-b border-muted/50 mb-6">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-success">
+              <CheckCircle2 className="h-10 w-10" />
+            </div>
+            <div className="space-y-1">
+              <CardTitle className="text-3xl font-bold tracking-tight">Check your email</CardTitle>
+              <CardDescription className="text-base">
+                We&apos;ve sent instructions to <span className="font-bold text-foreground">{email}</span>
+              </CardDescription>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <CardContent className="space-y-6">
+            <div className="rounded-xl border border-muted/50 bg-muted/30 p-5">
+              <p className="text-sm text-center text-muted-foreground leading-relaxed">
                 Click the link in the email to reset your password. If you
                 don&apos;t see it, check your spam folder.
               </p>
             </div>
             {error && (
-              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950">
-                <p className="text-sm text-red-800 dark:text-red-200">
-                  {error}
-                </p>
+              <div className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-destructive animate-in slide-in-from-top-2">
+                <AlertCircle className="h-4 w-4" />
+                <p className="text-sm font-medium">{error}</p>
               </div>
             )}
           </CardContent>
-          <CardFooter className="flex-col gap-2">
+          <CardFooter className="flex flex-col gap-4">
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full h-12 rounded-xl font-bold border-2"
               onClick={handleResend}
               disabled={isLoading}
             >
               {isLoading ? "Sending..." : "Resend Email"}
             </Button>
             <Link href="/login" className="w-full">
-              <Button variant="ghost" className="w-full text-sm">
-                Back to Login
+              <Button variant="ghost" className="w-full h-12 rounded-xl font-semibold gap-2">
+                <ArrowLeft className="h-4 w-4" /> Back to Login
               </Button>
             </Link>
           </CardFooter>
@@ -108,40 +112,47 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-zinc-900">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Forgot your password?</CardTitle>
-          <CardDescription>
-            Enter your email address and we&apos;ll send you a link to reset
-            your password
+    <div className="w-full max-w-md animate-in fade-in zoom-in duration-500">
+      <Card className="border-none shadow-2xl shadow-indigo-200/50 dark:shadow-none bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
+        <CardHeader className="space-y-2 pb-8 text-center">
+          <CardTitle className="text-3xl font-bold tracking-tight">Forgot Password?</CardTitle>
+          <CardDescription className="text-base">
+            Don&apos;t worry! It happens. Please enter your email to receive a reset link.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} id="forgot-password-form">
-            <div className="flex flex-col gap-6">
+            <div className="space-y-5">
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950">
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    {error}
-                  </p>
+                <div className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-destructive animate-in slide-in-from-top-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <p className="text-sm font-medium">{error}</p>
                 </div>
               )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                  disabled={isLoading}
-                  autoComplete="email"
-                />
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-semibold">
+                  Email Address
+                </Label>
+                <div className="relative group">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                    <Mail className="h-4 w-4" />
+                  </div>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="name@example.com"
+                    required
+                    disabled={isLoading}
+                    className="pl-10 h-12 bg-muted/50 border-muted-foreground/10 focus:bg-background transition-all rounded-xl"
+                    autoComplete="email"
+                  />
+                </div>
               </div>
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
+
+              <div className="rounded-xl border border-primary/10 bg-primary/5 p-4">
+                <p className="text-xs text-center text-primary font-medium leading-relaxed">
                   You will receive an email with instructions on how to reset
                   your password in a few minutes.
                 </p>
@@ -149,18 +160,22 @@ export default function ForgotPasswordPage() {
             </div>
           </form>
         </CardContent>
-        <CardFooter className="flex-col gap-2">
+        <CardFooter className="flex flex-col gap-4 mt-2">
           <Button
             type="submit"
             form="forgot-password-form"
-            className="w-full"
+            className="w-full h-12 rounded-xl font-bold text-base shadow-lg shadow-primary/25 hover:shadow-primary/35 transition-all active:scale-[0.98]"
             disabled={isLoading}
           >
-            {isLoading ? "Sending..." : "Send Reset Link"}
+            {isLoading ? "Sending link..." : (
+              <span className="flex items-center gap-2">
+                Send Reset Link <ArrowRight className="h-4 w-4" />
+              </span>
+            )}
           </Button>
           <Link href="/login" className="w-full">
-            <Button variant="ghost" className="w-full text-sm">
-              Back to Login
+            <Button variant="ghost" className="w-full h-12 rounded-xl font-semibold gap-2 text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" /> Back to Login
             </Button>
           </Link>
         </CardFooter>
