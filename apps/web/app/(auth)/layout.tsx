@@ -16,7 +16,6 @@ import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
-import { BackgroundLines } from "@/components/ui/background-lines";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -55,39 +54,29 @@ export default function AuthLayout({
 
   return (
     <div className="relative min-h-screen flex flex-col overflow-hidden selection:bg-indigo-100 selection:text-indigo-900 dark:selection:bg-indigo-900 dark:selection:text-indigo-100">
-      {/* Light Mode: Animated Background with Lines + Interactive Gradient */}
-      <div className="fixed inset-0 -z-10 h-full w-full block dark:hidden">
-        {/* Animated Lines Layer */}
-        <BackgroundLines>
-          <div className="absolute inset-0 bg-gradient-to-br from-white via-background/90 to-primary/5" />
-        </BackgroundLines>
-        {/* Interactive Gradient Orbs Layer */}
+      {/* Animated Gradient Background */}
+      <div className="fixed inset-0 -z-10 h-full w-full">
         <BackgroundGradientAnimation
           containerClassName="!h-full !w-full"
-          className="opacity-25"
+          className="opacity-40 dark:opacity-30"
           firstColor="99, 102, 241" /* Primary indigo */
           secondColor="167, 139, 250" /* Light purple */
           thirdColor="139, 92, 246" /* Violet */
           fourthColor="245, 243, 255" /* Soft lavender */
           fifthColor="224, 231, 255" /* Indigo-100 */
           pointerColor="99, 102, 241"
-          size="70%"
+          size="80%"
           blendingValue="soft-light"
           gradientBackgroundStart="rgba(255, 255, 255, 1)"
-          gradientBackgroundEnd="rgba(245, 243, 255, 0.5)"
+          gradientBackgroundEnd="rgba(245, 243, 255, 0.8)"
           interactive={true}
         />
-      </div>
-
-      {/* Dark Mode: Aceternity Background Lines */}
-      <div className="fixed inset-0 -z-10 h-full w-full hidden dark:block">
-        <BackgroundLines>
-          <div className="absolute inset-0 bg-gradient-to-br from-background via-background/90 to-primary/10" />
-        </BackgroundLines>
+        {/* Dark mode gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/90 to-primary/20 dark:from-background dark:via-background/85 dark:to-primary/15" />
       </div>
 
       {/* Subtle Grid Overlay per Design Pattern */}
-      <div className="fixed inset-0 -z-10 pointer-events-none bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#3f3f46_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-30 dark:opacity-20" />
+      <div className="fixed inset-0 -z-10 pointer-events-none bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#3f3f46_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-25 dark:opacity-20" />
 
       {/* Navigation Header */}
       <header className="z-50 flex items-center justify-between px-6 py-4 md:px-12 md:py-8 lg:px-24">
