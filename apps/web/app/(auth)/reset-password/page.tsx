@@ -12,7 +12,7 @@ import {
   ArrowRight,
   ShieldCheck,
   ShieldAlert,
-  XCircle
+  XCircle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -105,7 +105,9 @@ function ResetPasswordContent() {
               <XCircle className="h-10 w-10" />
             </div>
             <div className="space-y-1">
-              <CardTitle className="text-3xl font-bold tracking-tight">Invalid Link</CardTitle>
+              <CardTitle className="text-3xl font-bold tracking-tight">
+                Invalid Link
+              </CardTitle>
               <CardDescription className="text-base text-muted-foreground">
                 This password reset link is invalid or has expired.
               </CardDescription>
@@ -118,7 +120,10 @@ function ResetPasswordContent() {
               </Button>
             </Link>
             <Link href="/login" className="w-full">
-              <Button variant="ghost" className="w-full h-11 rounded-xl font-semibold text-muted-foreground hover:text-foreground">
+              <Button
+                variant="ghost"
+                className="w-full h-11 rounded-xl font-semibold text-muted-foreground hover:text-foreground"
+              >
                 Back to Login
               </Button>
             </Link>
@@ -137,7 +142,9 @@ function ResetPasswordContent() {
               <CheckCircle2 className="h-10 w-10" />
             </div>
             <div className="space-y-1">
-              <CardTitle className="text-3xl font-bold tracking-tight text-foreground">Success!</CardTitle>
+              <CardTitle className="text-3xl font-bold tracking-tight text-foreground">
+                Success!
+              </CardTitle>
               <CardDescription className="text-base text-muted-foreground">
                 Your password has been successfully reset.
               </CardDescription>
@@ -146,11 +153,16 @@ function ResetPasswordContent() {
           <CardContent className="space-y-6 pb-2">
             <div className="rounded-xl border border-success/20 bg-success/5 p-4 flex items-center gap-3 text-success">
               <ShieldCheck className="h-5 w-5" />
-              <p className="text-sm font-medium">Security settings updated successfully.</p>
+              <p className="text-sm font-medium">
+                Security settings updated successfully.
+              </p>
             </div>
           </CardContent>
           <CardFooter className="pb-10 pt-4 px-6">
-            <Button onClick={() => router.push("/login")} className="w-full h-12 rounded-xl font-bold text-base shadow-lg shadow-primary/25">
+            <Button
+              onClick={() => router.push("/login")}
+              className="w-full h-12 rounded-xl font-bold text-base shadow-lg shadow-primary/25"
+            >
               Secure Sign In
             </Button>
           </CardFooter>
@@ -163,7 +175,9 @@ function ResetPasswordContent() {
     <div className="w-full max-w-md animate-in fade-in zoom-in duration-500 px-4">
       <Card className="border-none shadow-2xl shadow-indigo-200/50 dark:shadow-none bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
         <CardHeader className="space-y-1 pb-6 pt-8 text-center text-balance">
-          <CardTitle className="text-3xl font-bold tracking-tight">Reset Password</CardTitle>
+          <CardTitle className="text-3xl font-bold tracking-tight">
+            Reset Password
+          </CardTitle>
           <CardDescription className="text-base text-muted-foreground">
             Please choose a strong new password.
           </CardDescription>
@@ -179,14 +193,22 @@ function ResetPasswordContent() {
               )}
 
               {validationError && (
-                <div className="flex items-center gap-2 rounded-xl border border-warning/20 bg-warning/5 p-4 text-warning-foreground animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-2 rounded-xl border border-warning/20 bg-warning/5 p-4 animate-in slide-in-from-top-2">
                   <ShieldAlert className="h-4 w-4 text-warning" />
-                  <p className="text-sm font-medium">{validationError}</p>
+                  <p className="text-sm font-medium text-warning">
+                    {validationError}
+                  </p>
                 </div>
               )}
 
               <div className="space-y-1.5 focus-within:z-10">
-                <Label htmlFor="password" title="password" className="text-sm font-semibold ml-1">New Password</Label>
+                <Label
+                  htmlFor="password"
+                  title="password"
+                  className="text-sm font-semibold ml-1"
+                >
+                  New Password
+                </Label>
                 <div className="relative group">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
                     <Lock className="h-4 w-4" />
@@ -210,18 +232,29 @@ function ResetPasswordContent() {
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors outline-none"
                     disabled={isLoading}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
 
                 {password && (
                   <div className="space-y-2 pt-1.5 animate-in fade-in slide-in-from-top-1 duration-300">
                     <div className="flex items-center justify-between text-[10px] font-bold tracking-widest px-1">
-                      <span className="text-muted-foreground uppercase">Strength</span>
-                      <span className={cn(
-                        strength.label === "STRONG" ? "text-success" :
-                          strength.label === "MEDIUM" ? "text-warning" : "text-destructive"
-                      )}>
+                      <span className="text-muted-foreground uppercase">
+                        Strength
+                      </span>
+                      <span
+                        className={cn(
+                          strength.label === "STRONG"
+                            ? "text-success"
+                            : strength.label === "MEDIUM"
+                              ? "text-warning"
+                              : "text-destructive",
+                        )}
+                      >
                         {strength.label}
                       </span>
                     </div>
@@ -231,7 +264,9 @@ function ResetPasswordContent() {
                           key={step}
                           className={cn(
                             "h-full flex-1 rounded-full transition-all duration-500",
-                            step <= strength.score ? strength.color : "bg-muted/50"
+                            step <= strength.score
+                              ? strength.color
+                              : "bg-muted/50",
                           )}
                         />
                       ))}
@@ -241,7 +276,12 @@ function ResetPasswordContent() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="confirmPassword" className="text-sm font-semibold ml-1">Confirm New Password</Label>
+                <Label
+                  htmlFor="confirmPassword"
+                  className="text-sm font-semibold ml-1"
+                >
+                  Confirm New Password
+                </Label>
                 <div className="relative group">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
                     <Lock className="h-4 w-4" />
@@ -265,13 +305,18 @@ function ResetPasswordContent() {
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors outline-none"
                     disabled={isLoading}
                   >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>
 
               <p className="text-[11px] text-muted-foreground/80 leading-relaxed px-1">
-                Use at least 8 characters with letters, numbers and symbols for better security.
+                Use at least 8 characters with letters, numbers and symbols for
+                better security.
               </p>
             </div>
           </form>
@@ -310,12 +355,16 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="flex flex-col items-center gap-3">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
-        <p className="text-sm font-medium text-muted-foreground">Initializing secure session...</p>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+          <p className="text-sm font-medium text-muted-foreground">
+            Initializing secure session...
+          </p>
+        </div>
+      }
+    >
       <ResetPasswordContent />
     </Suspense>
   );
