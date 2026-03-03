@@ -22,15 +22,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install --no-cache-dir poetry==1.7.1
-
 # Copy dependency files first for layer caching
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml ./
 
-# Install dependencies
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --no-root --only main
+# Install dependencies directly with pip
+RUN pip install --no-cache-dir -e "."
 
 # Copy application code
 COPY main.py routes.py schemas.py ./
@@ -57,7 +53,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # Copy installed packages from builder
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
@@ -87,7 +83,8 @@ FROM builder AS development
 
 WORKDIR /app
 
-RUN poetry install --no-interaction --no-ansi --no-root
+# Install dev dependencies
+RUN pip install --no-cache-dir -e ".[dev]" 2>/dev/null || pip install --no-cache-dir -e "."
 
 COPY main.py routes.py schemas.py ./
 COPY clone_detection/ ./clone_detection/
