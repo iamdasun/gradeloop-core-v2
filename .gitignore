@@ -296,7 +296,4 @@ ci_summary.txt
 final_status.txt
 .mcp.json
 
-
-# CIPAS
-#apps/services/cipas-service/datasets
-#datasets
+datasets/
