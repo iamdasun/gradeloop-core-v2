@@ -184,8 +184,8 @@ func (h *InstructorHandler) GetSubmissions(c fiber.Ctx) error {
 		return utils.ErrForbidden("you are not assigned to this course instance")
 	}
 
-	// List all submissions (nil user/group = all submissions)
-	submissions, err := h.submissionService.ListSubmissions(assignmentID, nil, nil)
+	// List all submissions across all owners (instructor-scoped: no user/group filter).
+	submissions, err := h.submissionService.ListAllSubmissionsForAssignment(assignmentID)
 	if err != nil {
 		return err
 	}
