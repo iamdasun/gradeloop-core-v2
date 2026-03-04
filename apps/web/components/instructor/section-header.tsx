@@ -28,7 +28,7 @@ export function SectionHeader({
                     </div>
                 )}
                 <div className="flex flex-col gap-1">
-                    <h1 className="text-2xl sm:text-3xl font-black font-heading tracking-tight text-foreground">
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">
                         {title}
                     </h1>
                     {description && (

@@ -27,32 +27,39 @@ export function StatsCard({
 }: StatsCardProps) {
     return (
         <Card className={cn("border-border/60 shadow-sm transition-all duration-200 hover:shadow-md hover:border-primary/20", className)} {...props}>
-            <CardContent className="p-6 flex flex-col h-full">
-                <div className="flex items-start justify-between mb-4">
-                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Icon className="h-5 w-5 text-primary" />
+            <CardContent className="p-6">
+                <div className="flex items-center justify-between gap-4">
+                    {/* Left: label + value + subtitle */}
+                    <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            {title}
+                        </p>
+                        <div className="text-3xl font-black tracking-tight text-foreground mt-1 tabular-nums">
+                            {isLoading ? (
+                                <Loader2 className="h-7 w-7 animate-spin text-muted-foreground/50 mt-1" />
+                            ) : (
+                                value
+                            )}
+                        </div>
+                        {subtitle && (
+                            <p className="text-xs text-muted-foreground mt-1.5 line-clamp-1" title={subtitle}>
+                                {subtitle}
+                            </p>
+                        )}
                     </div>
-                    {badge && (
-                        <Badge variant={badgeVariant} className="text-[10px] font-semibold">
-                            {badge}
-                        </Badge>
-                    )}
+
+                    {/* Right: icon + optional badge */}
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                        <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center">
+                            <Icon className="h-5 w-5 text-primary" />
+                        </div>
+                        {badge && (
+                            <Badge variant={badgeVariant} className="text-[10px] font-semibold">
+                                {badge}
+                            </Badge>
+                        )}
+                    </div>
                 </div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                    {title}
-                </p>
-                <div className="text-2xl md:text-3xl font-black tracking-tight text-foreground flex-1">
-                    {isLoading ? (
-                        <Loader2 className="h-6 w-6 lg:h-8 lg:w-8 animate-spin text-muted-foreground/50 mt-1" />
-                    ) : (
-                        value
-                    )}
-                </div>
-                {subtitle && (
-                    <p className="text-xs text-muted-foreground mt-2 line-clamp-1" title={subtitle}>
-                        {subtitle}
-                    </p>
-                )}
             </CardContent>
         </Card>
     );
