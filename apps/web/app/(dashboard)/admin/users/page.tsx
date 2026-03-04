@@ -39,6 +39,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CreateUserDialog } from "@/components/admin/create-user-dialog";
 import { BulkImportDialog } from "@/components/admin/bulk-import-dialog";
@@ -126,6 +132,7 @@ export default function UsersPage() {
   const [debouncedSearch, setDebouncedSearch] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("");
+  const [userTypeFilter, setUserTypeFilter] = React.useState("all");
 
   // ── Dialog state ────────────────────────────────────────────────────────
   const [createOpen, setCreateOpen] = React.useState(false);
@@ -148,7 +155,7 @@ export default function UsersPage() {
 
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, roleFilter, statusFilter]);
+  }, [debouncedSearch, roleFilter, statusFilter, userTypeFilter]);
 
   // ── Fetch users ──────────────────────────────────────────────────────────
   const fetchUsers = React.useCallback(async () => {
@@ -160,6 +167,7 @@ export default function UsersPage() {
         limit: PAGE_LIMIT,
         role_id: roleFilter || undefined,
         search: debouncedSearch || undefined,
+        user_type: userTypeFilter === "all" ? undefined : userTypeFilter,
       });
       setUsers(result.data);
       setTotal(result.total);
@@ -168,7 +176,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, roleFilter, debouncedSearch]);
+  }, [page, roleFilter, debouncedSearch, userTypeFilter]);
 
   React.useEffect(() => {
     fetchUsers();
@@ -232,6 +240,15 @@ export default function UsersPage() {
           </Button>
         </div>
       </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="all" value={userTypeFilter} onValueChange={setUserTypeFilter}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="all">All Users</TabsTrigger>
+          <TabsTrigger value="student">Students</TabsTrigger>
+          <TabsTrigger value="employee">Employees</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
