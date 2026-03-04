@@ -113,7 +113,7 @@ func run() error {
 	batchMemberService := service.NewBatchMemberService(batchRepo, batchMemberRepo, auditClient, iamClient, logger)
 	courseInstanceService := service.NewCourseInstanceService(batchRepo, courseInstanceRepo, auditClient, logger)
 	courseInstructorService := service.NewCourseInstructorService(courseInstanceRepo, courseInstructorRepo, auditClient, logger)
-	enrollmentService := service.NewEnrollmentService(courseInstanceRepo, batchMemberRepo, enrollmentRepo, auditClient, logger)
+	enrollmentService := service.NewEnrollmentService(courseInstanceRepo, batchMemberRepo, enrollmentRepo, auditClient, iamClient, logger)
 
 	// Initialize handlers
 	healthHandler := handler.NewHealthHandler()

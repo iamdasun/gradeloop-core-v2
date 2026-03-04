@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/gradeloop/academic-service/internal/domain"
 	"github.com/gradeloop/academic-service/internal/dto"
@@ -58,14 +60,13 @@ func (h *EnrollmentHandler) GetEnrollments(c fiber.Ctx) error {
 		return err
 	}
 
-	enrollments, err := h.enrollmentService.GetEnrollments(instanceID)
+	// Extract authorization token for IAM user lookup
+	token := c.Get("Authorization")
+
+	// Use GetEnrollmentsDetailed to fetch user info from IAM
+	responses, err := h.enrollmentService.GetEnrollmentsDetailed(context.Background(), instanceID, token)
 	if err != nil {
 		return err
-	}
-
-	responses := make([]dto.EnrollmentResponse, len(enrollments))
-	for i, e := range enrollments {
-		responses[i] = *toEnrollmentResponse(&e)
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
