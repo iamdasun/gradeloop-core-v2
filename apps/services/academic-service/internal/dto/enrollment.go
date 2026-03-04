@@ -105,6 +105,7 @@ type EnrollmentRequest struct {
 	CourseInstanceID uuid.UUID `json:"course_instance_id"`
 	UserID           uuid.UUID `json:"user_id"`
 	Status           string    `json:"status"`
+	AllowIndividual  bool      `json:"allow_individual"` // Skip batch membership check for individual enrollments
 }
 
 // UpdateEnrollmentRequest is the payload for PUT /enrollments/:instanceID/:userID

@@ -79,15 +79,18 @@ func (s *enrollmentService) EnrollStudent(
 		return nil, utils.ErrNotFound("course instance not found")
 	}
 
-	// 3. Validate the student belongs to the batch that owns this course instance.
+	// 3. Validate the student belongs to the batch that owns this course instance,
+	//    unless allow_individual is explicitly set (for individual enrollments outside batch).
 	//    batch_members.batch_id = instance.batch_id AND user_id = req.UserID
-	membership, err := s.batchMemberRepo.GetMember(instance.BatchID, req.UserID)
-	if err != nil {
-		s.logger.Error("failed to check batch membership", zap.Error(err))
-		return nil, utils.ErrInternal("failed to check batch membership", err)
-	}
-	if membership == nil {
-		return nil, utils.ErrBadRequest("student not in batch")
+	if !req.AllowIndividual {
+		membership, err := s.batchMemberRepo.GetMember(instance.BatchID, req.UserID)
+		if err != nil {
+			s.logger.Error("failed to check batch membership", zap.Error(err))
+			return nil, utils.ErrInternal("failed to check batch membership", err)
+		}
+		if membership == nil {
+			return nil, utils.ErrBadRequest("student not in batch")
+		}
 	}
 
 	// 4. Guard against duplicate enrollment

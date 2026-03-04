@@ -1016,6 +1016,7 @@ export function EnrollStudentsDialog({
           course_instance_id: courseInstanceId,
           user_id: student.id,
           status: 'Enrolled',
+          allow_individual: true, // Allow enrolling students outside of batch
         } satisfies EnrollStudentRequest);
       } catch {
         errors.push(student.full_name || student.email);
@@ -1453,6 +1454,8 @@ export function AddIndividualStudentDialog({
           enrollmentsApi.enroll({
             course_instance_id: instanceId,
             user_id: student.id,
+            status: 'Enrolled',
+            allow_individual: true, // Allow enrolling students outside of batch
           })
         )
       );

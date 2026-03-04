@@ -373,6 +373,7 @@ export interface EnrollStudentRequest {
   course_instance_id: string;
   user_id: string;
   status: EnrollmentStatus;
+  allow_individual?: boolean; // Skip batch membership check for individual enrollments
 }
 
 export interface UpdateEnrollmentRequest {
