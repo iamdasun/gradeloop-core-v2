@@ -41,7 +41,7 @@ export function DeleteUserDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Delete User"
-      description={`Are you sure you want to permanently delete ${user?.username ?? "this user"}? This action cannot be undone and will remove all associated data.`}
+      description={`Are you sure you want to permanently delete ${user?.full_name ?? "this user"}? This action cannot be undone and will remove all associated data.`}
       confirmLabel="Delete User"
       onConfirm={handleConfirm}
       loading={loading}
