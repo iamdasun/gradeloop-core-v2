@@ -49,7 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { StudentCourseNav } from "@/components/dashboard/student-course-nav";
+import { CheckCircle2 } from "lucide-react";
 
 interface SubNavLink {
   title: string;
@@ -116,20 +116,11 @@ const instructorNavItems: NavItem[] = [
     title: "My Courses",
     href: "/instructor/courses",
     icon: BookOpen,
-  },
-  {
-    title: "Assessments",
-    href: "/instructor/assessments",
-    icon: FileText,
     subItems: [
-      { title: "Assignments", href: "/instructor/assessments", icon: FileText },
-      { title: "Viva Dashboard", href: "/instructor/assessments/dashboard", icon: Mic2 },
+      { title: "All Courses", href: "/instructor/courses", icon: BookOpen },
+      { title: "Assessments", href: "/instructor/assessments", icon: FileText },
+      { title: "Students", href: "/instructor/students", icon: GraduationCap },
     ],
-  },
-  {
-    title: "Students",
-    href: "/instructor/students",
-    icon: GraduationCap,
   },
   {
     title: "Settings",
@@ -212,9 +203,8 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
       return false;
     }) || navItems[0];
 
-  const hasSecondaryContent =
-    (activeRoot?.subItems && activeRoot.subItems.length > 0) ||
-    activeRoot?.hasDynamicSecondary === true;
+  const hasSecondaryContent = activeRoot?.subItems && activeRoot.subItems.length > 0;
+  const isCreateAssignment = pathname.includes('/assignments/create');
   const [isHovered, setIsHovered] = React.useState(false);
 
   const isPrimaryCollapsed = hasSecondaryContent ? !isHovered : collapsed;
@@ -382,44 +372,92 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
           >
             <div className={cn("flex h-16 items-center w-full px-6")}>
               <h2 className="text-lg font-semibold tracking-tight text-foreground font-heading">
-                {activeRoot?.title || "Overview"}
+                {isCreateAssignment ? "Create Assignment" : activeRoot?.title || "Overview"}
               </h2>
             </div>
             <ScrollArea className={cn("flex-1 w-full px-4")}>
               <div className="flex flex-col gap-3 py-2 w-full items-center">
-                {/* Contextual Sub-navigation */}
-                <div className="flex flex-col gap-1 w-full">
-                  {activeRoot.hasDynamicSecondary ? (
-                    <StudentCourseNav />
-                  ) : (
-                    activeRoot.subItems!.map((subItem) => {
-                      const isChildActive =
-                        pathname === subItem.href ||
-                        pathname.startsWith(subItem.href + "/");
+                {isCreateAssignment ? (
+                  <div className="w-full flex flex-col gap-4 mt-2 relative">
+                    {/* Vertical Progress Line */}
+                    <div className="absolute left-[15px] top-6 bottom-6 w-0.5 bg-border -z-10" />
+                    <div
+                      className="absolute left-[15px] top-6 w-0.5 bg-primary -z-10 transition-all duration-300"
+                      style={{ height: `calc(${((currentStep - 1) / (steps.length - 1)) * 100}% - 12px)` }}
+                    />
+
+                    {steps.map((step, idx) => {
+                      const stepNumber = idx + 1;
+                      const isCompleted = stepNumber < currentStep;
+                      const isCurrent = stepNumber === currentStep;
+                      const isAccessible = stepNumber <= highestStepVisited || isCompleted;
+
                       return (
-                        <Link
-                          key={subItem.title}
-                          href={subItem.href}
-                          className="w-full text-left"
+                        <button
+                          key={step.id}
+                          className={cn(
+                            "flex items-start gap-3 w-full group text-left transition-all",
+                            isAccessible ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+                          )}
+                          onClick={() => {
+                            if (isAccessible) setStep(stepNumber);
+                          }}
+                          disabled={!isAccessible}
                         >
+                          <div
+                            className={cn(
+                              "flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-semibold transition-colors duration-200 shrink-0 bg-background",
+                              isCompleted
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : isCurrent
+                                  ? "border-primary text-primary ring-4 ring-primary/20"
+                                  : "border-muted-foreground/30 text-muted-foreground group-hover:border-muted-foreground/50"
+                            )}
+                          >
+                            {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : stepNumber}
+                          </div>
+                          <div className="flex flex-col pt-1.5">
+                            <span
+                              className={cn(
+                                "text-sm font-semibold transition-colors",
+                                isCurrent || isCompleted ? "text-foreground" : "text-muted-foreground group-hover:text-foreground/80"
+                              )}
+                            >
+                              {step.title}
+                            </span>
+                            {step.description && (
+                              <span className="text-xs text-muted-foreground line-clamp-1">
+                                {step.description}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Contextual Sub-navigation */
+                  <div className="flex flex-col gap-1 w-full">
+                    {activeRoot.subItems!.map((subItem) => {
+                      const isChildActive = pathname === subItem.href || pathname.startsWith(subItem.href + "/");
+                      return (
+                        <Link key={subItem.title} href={subItem.href} className="w-full text-left">
                           <Button
                             variant="ghost"
                             className={cn(
                               "h-10 w-full flex items-center rounded-lg transition-colors justify-start px-3",
                               isChildActive
                                 ? "bg-primary/10 text-primary font-medium"
-                                : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+                                : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
                             )}
                           >
-                            <span className="truncate text-sm">
-                              {subItem.title}
-                            </span>
+                            <span className="truncate text-sm">{subItem.title}</span>
                           </Button>
                         </Link>
-                      );
-                    })
-                  )}
-                </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </ScrollArea>
           </div>
