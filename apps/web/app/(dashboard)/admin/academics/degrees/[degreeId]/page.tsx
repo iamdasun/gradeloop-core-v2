@@ -41,6 +41,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { degreesApi, specializationsApi, departmentsApi } from '@/lib/api/academics';
+import { useUIStore } from '@/lib/stores/uiStore';
 import { handleApiError } from '@/lib/api/axios';
 import { useAcademicsAccess } from '@/lib/hooks/useAcademicsAccess';
 import { toast } from '@/lib/hooks/use-toast';
@@ -117,6 +118,8 @@ export default function DegreeDetailPage() {
   const params = useParams<{ degreeId: string }>();
   const { canAccess, canWrite } = useAcademicsAccess();
 
+  const setPageTitle = useUIStore((s) => s.setPageTitle);
+
   const [degree, setDegree] = React.useState<Degree | null>(null);
   const [department, setDepartment] = React.useState<Department | null>(null);
   const [specializations, setSpecializations] = React.useState<Specialization[]>([]);
@@ -144,6 +147,7 @@ export default function DegreeDetailPage() {
       ]);
       setDegree(deg);
       setSpecializations(specs);
+      setPageTitle(deg.name);
       // Lazily fetch department info
       if (deg.department_id) {
         departmentsApi.get(deg.department_id).then(setDepartment).catch(() => {});
@@ -156,6 +160,8 @@ export default function DegreeDetailPage() {
   }, [params.degreeId]);
 
   React.useEffect(() => { load(); }, [load]);
+
+  React.useEffect(() => () => setPageTitle(null), [setPageTitle]);
 
   async function handleToggleSpec(spec: Specialization) {
     try {

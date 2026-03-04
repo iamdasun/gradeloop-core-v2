@@ -40,6 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { facultiesApi, departmentsApi } from '@/lib/api/academics';
+import { useUIStore } from '@/lib/stores/uiStore';
 import { handleApiError } from '@/lib/api/axios';
 import { useAcademicsAccess } from '@/lib/hooks/useAcademicsAccess';
 import { toast } from '@/lib/hooks/use-toast';
@@ -104,6 +105,8 @@ export default function FacultyDetailPage() {
   const params = useParams<{ facultyId: string }>();
   const { canAccess, canWrite, isSuperAdmin } = useAcademicsAccess();
 
+  const setPageTitle = useUIStore((s) => s.setPageTitle);
+
   const [faculty, setFaculty] = React.useState<Faculty | null>(null);
   const [departments, setDepartments] = React.useState<Department[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -130,6 +133,7 @@ export default function FacultyDetailPage() {
       ]);
       setFaculty(fac);
       setDepartments(depts);
+      setPageTitle(fac.name);
     } catch (err) {
       setError(handleApiError(err));
     } finally {
@@ -138,6 +142,8 @@ export default function FacultyDetailPage() {
   }, [params.facultyId]);
 
   React.useEffect(() => { load(); }, [load]);
+
+  React.useEffect(() => () => setPageTitle(null), [setPageTitle]);
 
   async function handleToggleDept(dept: Department) {
     try {
