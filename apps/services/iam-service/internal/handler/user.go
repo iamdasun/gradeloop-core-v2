@@ -166,6 +166,20 @@ func (h *UserHandler) UpdateAvatar(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+func (h *UserHandler) GetUsersByIDs(c fiber.Ctx) error {
+	var req dto.GetUsersByIDsRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return fiber.ErrBadRequest
+	}
+
+	response, err := h.userService.GetUsersByIDs(c.RequestCtx(), req.IDs)
+	if err != nil {
+		return handleUserError(err)
+	}
+
+	return c.JSON(response)
+}
+
 func handleUserError(err error) error {
 	switch err {
 	case service.ErrUnauthorized:

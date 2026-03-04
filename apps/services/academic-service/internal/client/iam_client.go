@@ -184,3 +184,55 @@ func (c *IAMClient) GetUserInfo(ctx context.Context, token, userID string) (*Use
 
 	return &userResp, nil
 }
+
+// GetUsersInfo retrieves information for multiple users by their IDs
+func (c *IAMClient) GetUsersInfo(ctx context.Context, token string, userIDs []string) ([]UserInfoResponse, error) {
+	if len(userIDs) == 0 {
+		return []UserInfoResponse{}, nil
+	}
+
+	url := fmt.Sprintf("%s/api/v1/users/bulk", c.baseURL)
+	reqBody := map[string][]string{"ids": userIDs}
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		httpReq.Header.Set("Authorization", token)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("sending request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errResp IAMErrorResponse
+		if err := json.Unmarshal(respBody, &errResp); err != nil {
+			return nil, fmt.Errorf("IAM service returned status %d: %s", resp.StatusCode, string(respBody))
+		}
+		return nil, fmt.Errorf("IAM service error: %s", errResp.Message)
+	}
+
+	var usersResp struct {
+		Users []UserInfoResponse `json:"users"`
+	}
+	if err := json.Unmarshal(respBody, &usersResp); err != nil {
+		return nil, fmt.Errorf("unmarshaling response: %w", err)
+	}
+
+	return usersResp.Users, nil
+}

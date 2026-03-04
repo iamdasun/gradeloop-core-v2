@@ -43,3 +43,6 @@ type UpdateUserResponse struct {
 	IsActive bool      `json:"is_active"`
 	Message  string    `json:"message"`
 }
+type GetUsersByIDsRequest struct {
+	IDs []string `json:"ids"`
+}

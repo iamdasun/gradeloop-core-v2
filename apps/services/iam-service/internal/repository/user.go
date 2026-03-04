@@ -17,6 +17,7 @@ type UserRepository interface {
 	RestoreUser(ctx context.Context, userID uuid.UUID) error
 	GetUsers(ctx context.Context, offset, limit int, userType string, roleID string, search string) ([]*domain.User, error)
 	CountUsers(ctx context.Context, userType string, roleID string, search string) (int64, error)
+	GetUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]*domain.User, error)
 	RoleExists(ctx context.Context, roleID uuid.UUID) (bool, error)
 	CreateStudentProfile(ctx context.Context, profile *domain.UserProfileStudent) error
 	CreateEmployeeProfile(ctx context.Context, profile *domain.UserProfileEmployee) error
@@ -175,6 +176,17 @@ func (r *userRepository) CountUsers(ctx context.Context, userType string, roleID
 		return 0, err
 	}
 	return count, nil
+}
+
+func (r *userRepository) GetUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]*domain.User, error) {
+	var users []*domain.User
+	if err := r.db.WithContext(ctx).
+		Preload("Role").
+		Where("id IN ? AND deleted_at IS NULL", ids).
+		Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func (r *userRepository) RoleExists(ctx context.Context, roleID uuid.UUID) (bool, error) {

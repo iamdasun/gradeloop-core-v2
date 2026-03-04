@@ -28,6 +28,8 @@ import type {
   Batch,
   BatchTreeNode,
   BatchMember,
+  BatchMemberDetail,
+  BulkAddBatchMembersRequest,
   Semester,
   CourseInstance,
   CourseInstructor,
@@ -448,6 +450,16 @@ export const batchesApi = {
     return [];
   },
 
+  getMembersDetailed: async (batchId: string): Promise<BatchMemberDetail[]> => {
+    const { data } = await axiosInstance.get(
+      `/batches/${batchId}/members/detailed`,
+    );
+    if (Array.isArray(data)) return data as BatchMemberDetail[];
+    if (Array.isArray(data?.members))
+      return data.members as BatchMemberDetail[];
+    return [];
+  },
+
   getCourseInstances: async (batchId: string): Promise<CourseInstance[]> => {
     const { data } = await axiosInstance.get(
       `/batches/${batchId}/course-instances`,
@@ -472,6 +484,10 @@ export const batchMembersApi = {
 
   remove: async (batchId: string, userId: string): Promise<void> => {
     await axiosInstance.delete(`/batch-members/${batchId}/${userId}`);
+  },
+
+  addBulk: async (req: BulkAddBatchMembersRequest): Promise<void> => {
+    await axiosInstance.post("/batch-members/bulk", req);
   },
 };
 

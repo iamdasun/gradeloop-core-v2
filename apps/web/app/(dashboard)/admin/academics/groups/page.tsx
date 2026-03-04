@@ -17,6 +17,7 @@ import {
     XCircle,
     ChevronLeft,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -197,10 +198,15 @@ export default function GroupsPage() {
                                         {getInitials(batch.code)}
                                     </AvatarFallback>
                                 </Avatar>
-                                <div className="flex flex-col min-w-0">
-                                    <span className="font-semibold text-sm truncate text-zinc-900 dark:text-zinc-100">{batch.name}</span>
+                                <Link
+                                    href={`/admin/academics/groups/${batch.id}`}
+                                    className="flex flex-col min-w-0 hover:opacity-70 transition-opacity"
+                                >
+                                    <span className="font-semibold text-sm truncate text-zinc-900 dark:text-zinc-100 group-hover:text-primary transition-colors">
+                                        {batch.name}
+                                    </span>
                                     <span className="text-[11px] text-zinc-500 font-medium">{batch.code}</span>
-                                </div>
+                                </Link>
                             </div>
                         </div>
                     </TableCell>

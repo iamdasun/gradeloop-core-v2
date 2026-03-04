@@ -28,6 +28,7 @@ type UserService interface {
 	RestoreUser(ctx context.Context, id string) error
 	GetProfile(ctx context.Context, userID string) (*dto.UserResponse, error)
 	GetUserByID(ctx context.Context, userID string) (*dto.UserResponse, error)
+	GetUsersByIDs(ctx context.Context, ids []string) (*dto.GetUsersResponse, error)
 	UpdateAvatar(ctx context.Context, userID string, avatarURL string) (*dto.UpdateAvatarResponse, error)
 }
 
@@ -479,6 +480,78 @@ func (s *userService) GetUserByID(ctx context.Context, userID string) (*dto.User
 		Designation: designation,
 		IsActive:    user.IsActive,
 		CreatedAt:   user.CreatedAt.Format(time.RFC3339),
+	}, nil
+}
+
+func (s *userService) GetUsersByIDs(ctx context.Context, ids []string) (*dto.GetUsersResponse, error) {
+	var uuids []uuid.UUID
+	for _, id := range ids {
+		u, err := uuid.Parse(id)
+		if err == nil {
+			uuids = append(uuids, u)
+		}
+	}
+
+	if len(uuids) == 0 {
+		return &dto.GetUsersResponse{Users: []dto.UserResponse{}, TotalCount: 0}, nil
+	}
+
+	users, err := s.userRepo.GetUsersByIDs(ctx, uuids)
+	if err != nil {
+		return nil, fmt.Errorf("fetching users by ids: %w", err)
+	}
+
+	var userResponses []dto.UserResponse
+	for _, user := range users {
+		roleName := ""
+		if user.Role != nil {
+			roleName = user.Role.Name
+		}
+
+		var roleID uuid.UUID
+		if user.RoleID != nil {
+			roleID = *user.RoleID
+		}
+
+		resolvedUserType := "all"
+		studentID := ""
+		designation := ""
+
+		// Check for profiles
+		var student domain.UserProfileStudent
+		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
+			resolvedUserType = "student"
+			studentID = student.StudentID
+		} else {
+			var employee domain.UserProfileEmployee
+			if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&employee).Error; err == nil {
+				resolvedUserType = "employee"
+				designation = employee.Designation
+			}
+		}
+
+		userResponses = append(userResponses, dto.UserResponse{
+			ID:          user.ID,
+			Email:       user.Email,
+			FullName:    user.FullName,
+			AvatarURL:   user.AvatarURL,
+			RoleID:      roleID,
+			RoleName:    roleName,
+			UserType:    resolvedUserType,
+			Faculty:     user.Faculty,
+			Department:  user.Department,
+			StudentID:   studentID,
+			Designation: designation,
+			IsActive:    user.IsActive,
+			CreatedAt:   user.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	return &dto.GetUsersResponse{
+		Users:      userResponses,
+		TotalCount: int64(len(userResponses)),
+		Page:       1,
+		Limit:      len(userResponses),
 	}, nil
 }
 

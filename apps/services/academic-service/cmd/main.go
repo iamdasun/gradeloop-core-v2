@@ -69,6 +69,9 @@ func run() error {
 	// Initialize audit client
 	auditClient := client.NewAuditClient(cfg.IAMServiceURL, logger)
 
+	// Initialize IAM client for user profile lookups
+	iamClient := client.NewIAMClient(cfg.IAMServiceURL)
+
 	// Initialize repositories
 	facultyRepo := repository.NewFacultyRepository(db.DB)
 	leadershipRepo := repository.NewFacultyLeadershipRepository(db.DB)
@@ -107,7 +110,7 @@ func run() error {
 	enrollmentRepo := repository.NewEnrollmentRepository(db.DB)
 
 	// Initialize services for enrollment management
-	batchMemberService := service.NewBatchMemberService(batchRepo, batchMemberRepo, auditClient, logger)
+	batchMemberService := service.NewBatchMemberService(batchRepo, batchMemberRepo, auditClient, iamClient, logger)
 	courseInstanceService := service.NewCourseInstanceService(batchRepo, courseInstanceRepo, auditClient, logger)
 	courseInstructorService := service.NewCourseInstructorService(courseInstanceRepo, courseInstructorRepo, auditClient, logger)
 	enrollmentService := service.NewEnrollmentService(courseInstanceRepo, batchMemberRepo, enrollmentRepo, auditClient, logger)
@@ -129,9 +132,6 @@ func run() error {
 	// Initialize handlers for course catalog & academic calendar
 	courseHandler := handler.NewCourseHandler(courseService, logger)
 	semesterHandler := handler.NewSemesterHandler(semesterService, logger)
-
-	// Initialize IAM client for user profile lookups
-	iamClient := client.NewIAMClient(cfg.IAMServiceURL)
 
 	// Initialize handler for instructor-scoped endpoints
 	instructorHandler := handler.NewInstructorHandler(courseInstructorService, enrollmentService, courseService, iamClient, logger)

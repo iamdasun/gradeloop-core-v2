@@ -35,12 +35,23 @@ func (h *BatchHandler) CreateBatch(c fiber.Ctx) error {
 		return utils.ErrBadRequest("invalid request body")
 	}
 
-	username := requireUsername(c)
-	if username == "" {
+	userIDRaw, ok := c.Locals("user_id").(string)
+	if !ok || userIDRaw == "" {
 		return utils.ErrUnauthorized("user not authenticated")
 	}
 
-	batch, err := h.batchService.CreateBatch(&req, username, c.IP(), c.Get("User-Agent"))
+	creatorID, err := uuid.Parse(userIDRaw)
+	if err != nil {
+		h.logger.Error("failed to parse user_id from context", zap.Error(err), zap.String("user_id", userIDRaw))
+		return utils.ErrUnauthorized("invalid user session")
+	}
+
+	username, ok := c.Locals("username").(string)
+	if !ok || username == "" {
+		return utils.ErrUnauthorized("user not authenticated")
+	}
+
+	batch, err := h.batchService.CreateBatch(&req, creatorID, username, c.IP(), c.Get("User-Agent"))
 	if err != nil {
 		return err
 	}
@@ -211,6 +222,7 @@ func (h *BatchHandler) toBatchResponse(b *domain.Batch) *dto.BatchResponse {
 		StartYear:        b.StartYear,
 		EndYear:          b.EndYear,
 		IsActive:         b.IsActive,
+		CreatedBy:        b.CreatedBy,
 		CreatedAt:        b.CreatedAt,
 		UpdatedAt:        b.UpdatedAt,
 	}

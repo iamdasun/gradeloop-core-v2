@@ -139,6 +139,7 @@ export interface Batch {
   start_year: number;
   end_year: number;
   is_active: boolean;
+  created_by: string;
   created_at: string;
   updated_at: string;
 }
@@ -153,6 +154,7 @@ export interface BatchTreeNode {
   start_year: number;
   end_year: number;
   is_active: boolean;
+  created_by: string;
   children: BatchTreeNode[];
 }
 
@@ -161,6 +163,21 @@ export interface BatchMember {
   user_id: string;
   status: BatchMemberStatus;
   enrolled_at: string;
+}
+
+export interface BatchMemberDetail {
+  user_id: string;
+  student_id: string;
+  full_name: string;
+  email: string;
+  avatar_url: string;
+  status: BatchMemberStatus;
+  enrolled_at: string;
+}
+
+export interface BulkAddBatchMembersRequest {
+  batch_id: string;
+  user_ids: string[];
 }
 
 export interface Semester {

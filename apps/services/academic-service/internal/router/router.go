@@ -117,10 +117,12 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	// ─────────────────────────────────────────────────────────────────────────
 	batchMembers := protected.Group("/batch-members", requireAdminRole())
 	batchMembers.Post("/", cfg.BatchMemberHandler.AddBatchMember)
+	batchMembers.Post("/bulk", cfg.BatchMemberHandler.AddMembersToBatch)
 	batchMembers.Delete("/:batchID/:userID", cfg.BatchMemberHandler.RemoveBatchMember)
 
 	// Nested under /batches/:id  (shares the already-protected batches group)
 	batches.Get("/:id/members", cfg.BatchMemberHandler.GetBatchMembers)
+	batches.Get("/:id/members/detailed", cfg.BatchMemberHandler.GetBatchMembersDetailed)
 	batches.Get("/:id/course-instances", cfg.CourseInstanceHandler.ListCourseInstancesByBatch)
 
 	// ─────────────────────────────────────────────────────────────────────────

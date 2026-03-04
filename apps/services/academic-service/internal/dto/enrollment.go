@@ -25,6 +25,23 @@ type BatchMemberResponse struct {
 	EnrolledAt time.Time `json:"enrolled_at"`
 }
 
+// BatchMemberDetailResponse is returned when we include student details from IAM
+type BatchMemberDetailResponse struct {
+	UserID     uuid.UUID `json:"user_id"`
+	StudentID  string    `json:"student_id"`
+	FullName   string    `json:"full_name"`
+	Email      string    `json:"email"`
+	AvatarURL  string    `json:"avatar_url"`
+	Status     string    `json:"status"`
+	EnrolledAt time.Time `json:"enrolled_at"`
+}
+
+// BulkAddBatchMembersRequest is the payload for POST /batch-members/bulk
+type BulkAddBatchMembersRequest struct {
+	BatchID uuid.UUID   `json:"batch_id"`
+	UserIDs []uuid.UUID `json:"user_ids"`
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Course Instance DTOs
 // ─────────────────────────────────────────────────────────────────────────────
