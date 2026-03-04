@@ -16,6 +16,7 @@ type CourseInstanceService interface {
 	UpdateCourseInstance(id uuid.UUID, req *dto.UpdateCourseInstanceRequest, username, ipAddress, userAgent string) (*domain.CourseInstance, error)
 	GetCourseInstance(id uuid.UUID) (*domain.CourseInstance, error)
 	ListCourseInstancesByBatch(batchID uuid.UUID) ([]domain.CourseInstance, error)
+	ListCourseInstancesByCourse(courseID uuid.UUID) ([]domain.CourseInstance, error)
 }
 
 // courseInstanceService is the concrete implementation.
@@ -246,5 +247,18 @@ func (s *courseInstanceService) ListCourseInstancesByBatch(batchID uuid.UUID) ([
 		return nil, utils.ErrInternal("failed to list course instances", err)
 	}
 
+	return instances, nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ListCourseInstancesByCourse
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (s *courseInstanceService) ListCourseInstancesByCourse(courseID uuid.UUID) ([]domain.CourseInstance, error) {
+	instances, err := s.courseInstanceRepo.ListByCourse(courseID)
+	if err != nil {
+		s.logger.Error("failed to list course instances by course", zap.Error(err))
+		return nil, utils.ErrInternal("failed to list course instances", err)
+	}
 	return instances, nil
 }

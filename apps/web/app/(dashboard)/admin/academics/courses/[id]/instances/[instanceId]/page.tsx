@@ -177,7 +177,7 @@ export default function CourseInstancePage() {
     const pageTitle = course ? `${course.code}: ${course.title}` : `Instance ${instanceId.slice(0, 8)}`;
 
     return (
-        <div className="space-y-6 max-w-[1200px]">
+        <div className="space-y-6">
             {/* Header */}
             <div className="space-y-4">
                 <Button

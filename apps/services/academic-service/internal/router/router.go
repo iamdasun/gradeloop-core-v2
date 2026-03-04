@@ -163,6 +163,7 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	courses.Post("/:id/prerequisites", cfg.CourseHandler.AddPrerequisite)
 	courses.Get("/:id/prerequisites", cfg.CourseHandler.ListPrerequisites)
 	courses.Delete("/:id/prerequisites/:prereqID", cfg.CourseHandler.RemovePrerequisite)
+	courses.Get("/:id/course-instances", cfg.CourseInstanceHandler.ListCourseInstancesByCourse)
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Semester routes

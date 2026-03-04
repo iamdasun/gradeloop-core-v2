@@ -77,6 +77,33 @@ func (h *CourseInstanceHandler) UpdateCourseInstance(c fiber.Ctx) error {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /courses/:id/course-instances
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ListCourseInstancesByCourse handles GET /courses/:id/course-instances
+func (h *CourseInstanceHandler) ListCourseInstancesByCourse(c fiber.Ctx) error {
+	courseID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	instances, err := h.courseInstanceService.ListCourseInstancesByCourse(courseID)
+	if err != nil {
+		return err
+	}
+
+	responses := make([]dto.CourseInstanceResponse, len(instances))
+	for i, inst := range instances {
+		responses[i] = *toCourseInstanceResponse(&inst)
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"course_instances": responses,
+		"count":            len(responses),
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /batches/:id/course-instances
 // ─────────────────────────────────────────────────────────────────────────────
 
