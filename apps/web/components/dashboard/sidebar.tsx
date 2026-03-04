@@ -27,7 +27,10 @@ import {
   Archive,
   LayoutTemplate,
   Star,
-  Plus
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Menu
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -138,11 +141,13 @@ const instructorNavItems: NavItem[] = [
 ];
 
 interface SidebarProps {
-  collapsed: boolean;
-  onCollapsedChange: (collapsed: boolean) => void;
+  primaryCollapsed: boolean;
+  onPrimaryCollapsedChange: (collapsed: boolean) => void;
+  secondaryCollapsed: boolean;
+  onSecondaryCollapsedChange: (collapsed: boolean) => void;
 }
 
-export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
+export function Sidebar({ primaryCollapsed, onPrimaryCollapsedChange, secondaryCollapsed, onSecondaryCollapsedChange }: SidebarProps) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
@@ -172,15 +177,34 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
 
   return (
     <div className="flex h-screen overflow-hidden text-sidebar-foreground transition-all duration-300">
-      {/* Primary Sidebar (Far Left) */}
-      <div className="relative z-20 flex w-16 flex-col items-center border-r bg-sidebar-primary text-sidebar-primary-foreground py-4">
+      {/* Primary Sidebar */}
+      <div className={cn(
+        "relative z-20 flex flex-col items-center border-r bg-sidebar text-sidebar-foreground py-4 transition-all duration-300",
+        primaryCollapsed ? "w-16" : "w-64 items-start"
+      )}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onPrimaryCollapsedChange(!primaryCollapsed)}
+          className="absolute -right-3 top-6 z-50 h-6 w-6 rounded-full border bg-background text-foreground shadow-sm hover:bg-accent flex items-center justify-center p-0"
+        >
+          {primaryCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </Button>
+
         {/* Logo */}
-        <Link href={homeHref} className="mb-6 flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105">
-          <GraduationCap className="h-6 w-6" />
-        </Link>
+        <div className={cn("flex w-full mb-6", primaryCollapsed ? "justify-center" : "justify-start px-4")}>
+          <Link href={homeHref} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105">
+            <GraduationCap className="h-6 w-6" />
+          </Link>
+          {!primaryCollapsed && (
+            <div className="ml-3 flex flex-col justify-center overflow-hidden">
+              <span className="font-bold text-lg leading-tight truncate">Gradeloop</span>
+            </div>
+          )}
+        </div>
 
         {/* Primary Navigation Icons */}
-        <nav className="flex flex-1 flex-col items-center gap-3 w-full px-2">
+        <nav className={cn("flex flex-1 flex-col gap-3 w-full", primaryCollapsed ? "px-2 items-center" : "px-4 items-stretch overflow-y-auto")}>
           {navItems.map((item) => {
             const isActive = activeRoot.title === item.title;
             const Icon = item.icon;
@@ -189,14 +213,16 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "h-12 w-full flex items-center justify-center rounded-xl transition-colors",
+                    "h-12 w-full flex items-center rounded-xl transition-colors",
+                    primaryCollapsed ? "justify-center p-0" : "justify-start px-4 gap-3",
                     isActive
-                      ? "bg-white/15 text-white"
-                      : "text-sidebar-primary-foreground/70 hover:bg-white/10 hover:text-white"
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   )}
-                  title={item.title}
+                  title={primaryCollapsed ? item.title : undefined}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {!primaryCollapsed && <span className="truncate">{item.title}</span>}
                 </Button>
               </Link>
             );
@@ -204,17 +230,24 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
         </nav>
 
         {/* Bottom Primary Actions */}
-        <div className="mt-auto flex flex-col items-center gap-3 w-full px-2">
-          <Button variant="ghost" className="h-12 w-full rounded-xl text-sidebar-primary-foreground/70 hover:bg-white/10 hover:text-white">
-            <Plus className="h-5 w-5" />
+        <div className={cn("mt-auto flex flex-col gap-3 w-full", primaryCollapsed ? "px-2 items-center" : "px-4 items-stretch")}>
+          <Button variant="ghost" className={cn("h-12 w-full rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground", primaryCollapsed ? "justify-center p-0" : "justify-start px-4 gap-3")}>
+            <Plus className="h-5 w-5 shrink-0" />
+            {!primaryCollapsed && <span className="truncate">Create New</span>}
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-12 w-full rounded-xl p-0 hover:bg-white/10">
-                <Avatar className="h-8 w-8 ring-2 ring-primary/20">
-                  <AvatarFallback className="bg-primary/20 text-xs text-white">{initials}</AvatarFallback>
+              <Button variant="ghost" className={cn("h-12 w-full rounded-xl hover:bg-sidebar-accent border-0", primaryCollapsed ? "p-0 justify-center" : "px-3 justify-start gap-3")}>
+                <Avatar className="h-8 w-8 ring-2 ring-primary/20 shrink-0">
+                  <AvatarFallback className="bg-primary/20 text-xs text-primary">{initials}</AvatarFallback>
                 </Avatar>
+                {!primaryCollapsed && (
+                  <div className="flex flex-col items-start overflow-hidden text-left flex-1">
+                    <span className="text-sm font-medium text-foreground truncate w-full">{displayName}</span>
+                    {isEmployee && <span className="text-xs text-muted-foreground truncate w-full">Instructor</span>}
+                  </div>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="right" className="w-56 mb-2 ml-2">
@@ -228,7 +261,7 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
               <DropdownMenuItem
                 onClick={() => logout()}
                 disabled={isLoggingOut}
-                className="text-red-600 gap-2"
+                className="text-red-600 gap-2 cursor-pointer"
               >
                 <LogOut className="h-4 w-4" />
                 {isLoggingOut ? "Logging out…" : "Log out"}
@@ -238,9 +271,12 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
         </div>
       </div>
 
-      {/* Secondary Sidebar */}
-      {!collapsed && (
-        <div className="relative z-10 flex w-64 flex-col border-r bg-sidebar-background transition-all duration-300">
+      {/* Secondary Sidebar Area */}
+      <div className={cn("relative transition-all duration-300", secondaryCollapsed ? "w-0" : "w-64")}>
+        <div className={cn(
+          "absolute inset-y-0 left-0 flex w-64 flex-col border-r bg-sidebar-background transition-transform duration-300",
+          secondaryCollapsed ? "-translate-x-full" : "translate-x-0"
+        )}>
           <div className="flex h-16 items-center px-6">
             <h2 className="text-lg font-semibold tracking-tight text-foreground font-heading">{activeRoot?.title || "Overview"}</h2>
           </div>
@@ -307,7 +343,20 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
             </div>
           </ScrollArea>
         </div>
-      )}
+
+        {/* Toggle Secondary Sidebar Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onSecondaryCollapsedChange(!secondaryCollapsed)}
+          className={cn(
+            "absolute top-16 z-50 h-6 w-6 rounded-full border bg-background text-foreground shadow-sm hover:bg-accent transition-all duration-300 flex items-center justify-center p-0",
+            secondaryCollapsed ? "left-[-0.75rem]" : "left-[calc(16rem-0.75rem)]"
+          )}
+        >
+          {secondaryCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </Button>
+      </div>
     </div>
   );
 }
