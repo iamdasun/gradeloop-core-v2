@@ -11,6 +11,7 @@ import {
   PowerOff,
   Power,
   AlertTriangle,
+  ChevronRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,18 +61,22 @@ interface DepartmentCardProps {
   canWrite: boolean;
   onEdit: (dept: Department) => void;
   onToggleActive: (dept: Department) => void;
+  onNavigate: (dept: Department) => void;
 }
 
-function DepartmentCard({ department, canWrite, onEdit, onToggleActive }: DepartmentCardProps) {
+function DepartmentCard({ department, canWrite, onEdit, onToggleActive, onNavigate }: DepartmentCardProps) {
   return (
     <div
+      onClick={() => onNavigate(department)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onNavigate(department)}
       className={`
-        group relative flex flex-col rounded-xl border bg-white transition-all duration-200
-        hover:shadow-md hover:-translate-y-0.5
-        dark:bg-zinc-950
+        group relative flex flex-col rounded-xl border bg-card transition-all duration-200 cursor-pointer
+        hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
         ${department.is_active
-          ? 'border-zinc-200 dark:border-zinc-800'
-          : 'border-zinc-200/60 opacity-70 dark:border-zinc-800/60'
+          ? 'border-border'
+          : 'border-border/60 opacity-70'
         }
       `}
     >
@@ -112,24 +117,24 @@ function DepartmentCard({ department, canWrite, onEdit, onToggleActive }: Depart
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800/60">
-          <span className="text-[11px] text-zinc-400 truncate max-w-[140px]" title={department.faculty_id}>
-            Faculty: <span className="font-mono">{department.faculty_id.slice(0, 8)}…</span>
+        <div className="flex items-center justify-between pt-1 border-t border-border/60">
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-medium group-hover:text-primary transition-colors">
+            View Degrees <ChevronRight className="h-3 w-3" />
           </span>
           {canWrite && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={(e) => e.stopPropagation()}>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={() => onEdit(department)} className="gap-2">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(department); }} className="gap-2">
                   <Pencil className="h-3.5 w-3.5" /> Edit
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => onToggleActive(department)}
+                  onClick={(e) => { e.stopPropagation(); onToggleActive(department); }}
                   className={`gap-2 ${department.is_active ? 'text-red-600 focus:text-red-600' : 'text-emerald-600 focus:text-emerald-600'}`}
                 >
                   {department.is_active
@@ -316,6 +321,7 @@ export default function DepartmentsPage() {
               canWrite={canWrite}
               onEdit={setEditTarget}
               onToggleActive={handleToggleActive}
+              onNavigate={(d) => router.push(`/admin/academics/departments/${d.id}`)}
             />
           ))}
         </div>

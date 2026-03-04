@@ -11,6 +11,7 @@ import {
   PowerOff,
   Power,
   AlertTriangle,
+  ChevronRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,18 +61,22 @@ interface FacultyCardProps {
   canWrite: boolean;
   onEdit: (f: Faculty) => void;
   onToggleActive: (f: Faculty) => void;
+  onNavigate: (f: Faculty) => void;
 }
 
-function FacultyCard({ faculty, canWrite, onEdit, onToggleActive }: FacultyCardProps) {
+function FacultyCard({ faculty, canWrite, onEdit, onToggleActive, onNavigate }: FacultyCardProps) {
   return (
     <div
+      onClick={() => onNavigate(faculty)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onNavigate(faculty)}
       className={`
-        group relative flex flex-col rounded-xl border bg-white transition-all duration-200
-        hover:shadow-md hover:-translate-y-0.5
-        dark:bg-zinc-950
+        group relative flex flex-col rounded-xl border bg-card transition-all duration-200 cursor-pointer
+        hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
         ${faculty.is_active
-          ? 'border-zinc-200 dark:border-zinc-800'
-          : 'border-zinc-200/60 opacity-70 dark:border-zinc-800/60'
+          ? 'border-border'
+          : 'border-border/60 opacity-70'
         }
       `}
     >
@@ -115,9 +120,9 @@ function FacultyCard({ faculty, canWrite, onEdit, onToggleActive }: FacultyCardP
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800/60">
-          <span className="text-[11px] text-zinc-400 font-mono truncate max-w-[160px]" title={faculty.id}>
-            {faculty.id.slice(0, 8)}…
+        <div className="flex items-center justify-between pt-1 border-t border-border/60">
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground font-medium group-hover:text-primary transition-colors">
+            View Departments <ChevronRight className="h-3 w-3" />
           </span>
           {canWrite && (
             <DropdownMenu>
@@ -125,18 +130,19 @@ function FacultyCard({ faculty, canWrite, onEdit, onToggleActive }: FacultyCardP
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-7 w-7 shrink-0"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={() => onEdit(faculty)} className="gap-2">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(faculty); }} className="gap-2">
                   <Pencil className="h-3.5 w-3.5" /> Edit
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => onToggleActive(faculty)}
+                  onClick={(e) => { e.stopPropagation(); onToggleActive(faculty); }}
                   className={`gap-2 ${faculty.is_active
                       ? 'text-red-600 focus:text-red-600'
                       : 'text-emerald-600 focus:text-emerald-600'
@@ -344,8 +350,24 @@ export default function FacultiesPage() {
               canWrite={isSuperAdmin}
               onEdit={setEditTarget}
               onToggleActive={handleToggleActive}
+              onNavigate={(f) => router.push(`/admin/academics/faculties/${f.id}`)}
             />
           ))}
+          {/* Create New Faculty CTA card */}
+          {isSuperAdmin && (
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-card/50 text-muted-foreground transition-all duration-200 hover:border-primary hover:text-primary hover:bg-primary/5 min-h-[160px] gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-dashed border-current">
+                <Plus className="h-5 w-5" />
+              </div>
+              <div className="text-center">
+                <p className="font-medium text-sm">Create New Faculty</p>
+                <p className="text-xs opacity-70 mt-0.5">Setup a new academic division</p>
+              </div>
+            </button>
+          )}
         </div>
       )}
 

@@ -85,9 +85,9 @@ const adminNavItems: NavItem[] = [
       { title: "Faculties", href: "/admin/academics/faculties" },
       { title: "Departments", href: "/admin/academics/departments" },
       { title: "Degrees", href: "/admin/academics/degrees" },
+      { title: "Specializations", href: "/admin/academics/specializations" },
       { title: "Courses", href: "/admin/academics/courses" },
       { title: "Semesters", href: "/admin/academics/semesters" },
-      { title: "Enrollment", href: "/admin/academics/enrollment" },
     ],
   },
   {
