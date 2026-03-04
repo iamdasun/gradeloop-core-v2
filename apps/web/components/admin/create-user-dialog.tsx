@@ -3,13 +3,13 @@
 import * as React from 'react';
 import { UserPlus } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  SideDialog,
+  SideDialogContent,
+  SideDialogDescription,
+  SideDialogFooter,
+  SideDialogHeader,
+  SideDialogTitle,
+} from '@/components/ui/side-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -109,21 +109,21 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+    <SideDialog open={open} onOpenChange={onOpenChange}>
+      <SideDialogContent className="max-w-md">
+        <SideDialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
               <UserPlus className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
             </div>
             <div>
-              <DialogTitle>Create User</DialogTitle>
-              <DialogDescription>
+              <SideDialogTitle>Create User</SideDialogTitle>
+              <SideDialogDescription>
                 Add a new user to the system.
-              </DialogDescription>
+              </SideDialogDescription>
             </div>
           </div>
-        </DialogHeader>
+        </SideDialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           {/* Full Name */}
@@ -259,7 +259,7 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
             )}
           </div>
 
-          <DialogFooter className="pt-2">
+          <SideDialogFooter className="pt-2">
             <Button
               type="button"
               variant="outline"
@@ -271,9 +271,9 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
             <Button type="submit" disabled={submitting}>
               {submitting ? 'Creating…' : 'Create User'}
             </Button>
-          </DialogFooter>
+          </SideDialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SideDialogContent>
+    </SideDialog>
   );
 }

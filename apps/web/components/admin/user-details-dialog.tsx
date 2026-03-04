@@ -11,17 +11,20 @@ import {
   Edit,
   ShieldOff,
   Trash2,
+  FileText,
+  Key,
 } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  SideDialog,
+  SideDialogContent,
+  SideDialogHeader,
+  SideDialogTitle,
+} from "@/components/ui/side-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { UserListItem } from "@/types/auth.types";
 
 interface Props {
@@ -69,11 +72,11 @@ export function UserDetailsDialog({
   if (!user) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>User Details</DialogTitle>
-        </DialogHeader>
+    <SideDialog open={open} onOpenChange={onOpenChange}>
+      <SideDialogContent className="max-w-lg">
+        <SideDialogHeader>
+          <SideDialogTitle>User Details</SideDialogTitle>
+        </SideDialogHeader>
 
         {/* Avatar + name + status */}
         <div className="flex items-center gap-4 py-2">
@@ -102,78 +105,110 @@ export function UserDetailsDialog({
 
         <Separator />
 
-        {/* Detail grid */}
-        <dl className="grid grid-cols-1 gap-3 text-sm">
-          <div className="flex items-start gap-3">
-            <Hash className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">
-                User ID
-              </dt>
-              <dd className="font-mono text-xs break-all">{user.id}</dd>
-            </div>
-          </div>
+        {/* Tabs */}
+        <Tabs defaultValue="details" className="mt-4">
+          <TabsList className="w-full grid-cols-2 grid bg-zinc-100 dark:bg-zinc-800">
+            <TabsTrigger value="details">Detail Information</TabsTrigger>
+            <TabsTrigger value="security">Security & Access</TabsTrigger>
+          </TabsList>
 
-          <div className="flex items-start gap-3">
-            <User className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">
-                Full Name
-              </dt>
-              <dd>{user.full_name || "—"}</dd>
+          <TabsContent value="details" className="pt-4 space-y-4">
+            <div className="flex items-center gap-2 font-semibold text-zinc-900 dark:text-zinc-50">
+              <FileText className="h-5 w-5" />
+              General Information
             </div>
-          </div>
 
-          <div className="flex items-start gap-3">
-            <Mail className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">
-                Email
-              </dt>
-              <dd className="break-all">{user.email}</dd>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3">
-            <Shield className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">Role</dt>
-              <dd>{user.role_name}</dd>
-            </div>
-          </div>
-
-          {user.designation && (
-            <div className="flex items-start gap-3">
-              <User className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
-              <div>
-                <dt className="text-zinc-500 dark:text-zinc-400 text-xs">
-                  Designation
+            <dl className="space-y-3 text-sm">
+              <div className="grid grid-cols-[140px_1fr] items-start gap-2">
+                <dt className="flex items-center gap-2 text-zinc-500">
+                  <Hash className="h-4 w-4 shrink-0" />
+                  User ID
                 </dt>
-                <dd>{user.designation}</dd>
+                <dd className="font-medium text-zinc-900 dark:text-zinc-100 flex gap-2">
+                  <span className="text-zinc-400">:</span>
+                  <span className="font-mono break-all">{user.id}</span>
+                </dd>
               </div>
-            </div>
-          )}
 
-          <div className="flex items-start gap-3">
-            <Calendar className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">
-                Created
-              </dt>
-              <dd>{formatDate(user.created_at)}</dd>
-            </div>
-          </div>
+              <div className="grid grid-cols-[140px_1fr] items-start gap-2">
+                <dt className="flex items-center gap-2 text-zinc-500">
+                  <User className="h-4 w-4 shrink-0" />
+                  Full Name
+                </dt>
+                <dd className="font-medium text-zinc-900 dark:text-zinc-100 flex gap-2">
+                  <span className="text-zinc-400">:</span>
+                  <span>{user.full_name || "—"}</span>
+                </dd>
+              </div>
 
-          <div className="flex items-start gap-3">
-            <Clock className="h-4 w-4 text-zinc-400 mt-0.5 shrink-0" />
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400 text-xs">
-                Last Login
-              </dt>
-              <dd>{formatDate(user.last_login_at)}</dd>
+              <div className="grid grid-cols-[140px_1fr] items-start gap-2">
+                <dt className="flex items-center gap-2 text-zinc-500">
+                  <Mail className="h-4 w-4 shrink-0" />
+                  Email
+                </dt>
+                <dd className="font-medium text-zinc-900 dark:text-zinc-100 flex gap-2">
+                  <span className="text-zinc-400">:</span>
+                  <span className="break-all">{user.email}</span>
+                </dd>
+              </div>
+
+              <div className="grid grid-cols-[140px_1fr] items-start gap-2">
+                <dt className="flex items-center gap-2 text-zinc-500">
+                  <Shield className="h-4 w-4 shrink-0" />
+                  Role / Type
+                </dt>
+                <dd className="font-medium text-zinc-900 dark:text-zinc-100 flex gap-2">
+                  <span className="text-zinc-400">:</span>
+                  <span className="capitalize">{user.role_name} ({user.user_type || "N/A"})</span>
+                </dd>
+              </div>
+
+              {user.designation && (
+                <div className="grid grid-cols-[140px_1fr] items-start gap-2">
+                  <dt className="flex items-center gap-2 text-zinc-500">
+                    <User className="h-4 w-4 shrink-0" />
+                    Designation
+                  </dt>
+                  <dd className="font-medium text-zinc-900 dark:text-zinc-100 flex gap-2">
+                    <span className="text-zinc-400">:</span>
+                    <span>{user.designation}</span>
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </TabsContent>
+
+          <TabsContent value="security" className="pt-4 space-y-4">
+            <div className="flex items-center gap-2 font-semibold text-zinc-900 dark:text-zinc-50">
+              <Key className="h-5 w-5" />
+              Access Information
             </div>
-          </div>
-        </dl>
+
+            <dl className="space-y-3 text-sm">
+              <div className="grid grid-cols-[140px_1fr] items-start gap-2">
+                <dt className="flex items-center gap-2 text-zinc-500">
+                  <Calendar className="h-4 w-4 shrink-0" />
+                  Created Date
+                </dt>
+                <dd className="font-medium text-zinc-900 dark:text-zinc-100 flex gap-2">
+                  <span className="text-zinc-400">:</span>
+                  <span>{formatDate(user.created_at)}</span>
+                </dd>
+              </div>
+
+              <div className="grid grid-cols-[140px_1fr] items-start gap-2">
+                <dt className="flex items-center gap-2 text-zinc-500">
+                  <Clock className="h-4 w-4 shrink-0" />
+                  Last Login
+                </dt>
+                <dd className="font-medium text-zinc-900 dark:text-zinc-100 flex gap-2">
+                  <span className="text-zinc-400">:</span>
+                  <span>{formatDate(user.last_login_at)}</span>
+                </dd>
+              </div>
+            </dl>
+          </TabsContent>
+        </Tabs>
 
         <Separator />
 
@@ -216,7 +251,7 @@ export function UserDetailsDialog({
             Delete
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SideDialogContent>
+    </SideDialog>
   );
 }

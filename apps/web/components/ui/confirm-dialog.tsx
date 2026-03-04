@@ -10,13 +10,13 @@
 import * as React from 'react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  SideDialog as Dialog,
+  SideDialogContent as DialogContent,
+  SideDialogDescription as DialogDescription,
+  SideDialogFooter as DialogFooter,
+  SideDialogHeader as DialogHeader,
+  SideDialogTitle as DialogTitle,
+} from '@/components/ui/side-dialog';
 import { Button } from '@/components/ui/button';
 
 export interface ConfirmDialogProps {

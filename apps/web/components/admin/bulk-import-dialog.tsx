@@ -13,12 +13,12 @@ import {
     Table as TableIcon,
 } from 'lucide-react';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+    SideDialog as Dialog,
+    SideDialogContent as DialogContent,
+    SideDialogDescription as DialogDescription,
+    SideDialogHeader as DialogHeader,
+    SideDialogTitle as DialogTitle,
+} from '@/components/ui/side-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -103,8 +103,8 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: Props) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
-                <DialogHeader className="p-6 pb-2">
+            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-6 overflow-hidden">
+                <DialogHeader className="pb-2">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
                             <Upload className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
@@ -120,7 +120,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: Props) {
 
                 <div className="flex-1 overflow-hidden">
                     {step === 'upload' && (
-                        <div className="p-6 pt-2 space-y-6">
+                        <div className="pt-2 space-y-6">
                             <div
                                 className="border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-12 flex flex-col items-center justify-center text-center space-y-4 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors cursor-pointer relative"
                                 onClick={() => document.getElementById('file-upload')?.click()}
@@ -177,7 +177,7 @@ export function BulkImportDialog({ open, onOpenChange, onSuccess }: Props) {
 
                     {step === 'preview' && preview && (
                         <div className="flex flex-col h-full overflow-hidden">
-                            <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex items-center justify-between">
+                            <div className="py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
                                 <div className="flex gap-4">
                                     <div className="flex flex-col">
                                         <span className="text-xs text-zinc-500 uppercase font-semibold">Total Rows</span>
