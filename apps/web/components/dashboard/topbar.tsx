@@ -63,41 +63,8 @@ export function Topbar({ onMenuClick, className }: TopbarProps) {
         </div>
       </div>
 
-      {/* Middle section: Navigation Tabs (optional) */}
-      <div className="hidden lg:flex items-center gap-6 px-8 text-sm font-medium text-muted-foreground">
-        <span className="cursor-pointer hover:text-foreground transition-colors pb-1">Folder</span>
-        <span className="cursor-pointer hover:text-foreground transition-colors pb-1">Page</span>
-        <span className="cursor-pointer hover:text-foreground transition-colors pb-1">Course</span>
-        <span className="cursor-pointer text-primary border-b-2 border-primary pb-1">Learning Path</span>
-        <span className="cursor-pointer hover:text-foreground transition-colors pb-1">Wiki</span>
-      </div>
-
       {/* Right section: Search & Actions */}
       <div className="flex items-center gap-3">
-        {/* Collaborative avatars (Mockup) */}
-        <div className="hidden lg:flex -space-x-2 mr-4">
-          <Avatar className="h-8 w-8 border-2 border-background">
-            <AvatarFallback className="bg-amber-100 text-amber-700 text-xs text-primary">DS</AvatarFallback>
-          </Avatar>
-          <Avatar className="h-8 w-8 border-2 border-background">
-            <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs">MK</AvatarFallback>
-          </Avatar>
-          <Avatar className="h-8 w-8 border-2 border-background">
-            <AvatarFallback className="bg-purple-100 text-purple-700 text-xs">AJ</AvatarFallback>
-          </Avatar>
-        </div>
-
-        <Button variant="outline" className="hidden sm:flex rounded-full h-9 px-4 shadow-sm border-border bg-background">
-          <Upload className="mr-2 h-4 w-4" />
-          Upload
-        </Button>
-
-        <Button className="hidden sm:flex rounded-full h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
-          <Plus className="mr-2 h-4 w-4" />
-          New Content
-        </Button>
-
-        <div className="h-6 w-px bg-border mx-1"></div>
 
         <ThemeToggle />
 

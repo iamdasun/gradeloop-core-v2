@@ -305,41 +305,7 @@ export function Sidebar({ primaryCollapsed, onPrimaryCollapsedChange, secondaryC
                     )
                   })}
                 </div>
-              ) : (
-                /* Generic Secondary Nav Elements when no sub-items */
-                <>
-                  <div className="flex flex-col gap-1">
-                    <Button variant="ghost" className="w-full justify-start text-sm h-9 text-muted-foreground hover:text-foreground">
-                      <History className="mr-2 h-4 w-4" /> Recents
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start text-sm h-9 text-muted-foreground hover:text-foreground">
-                      <Share2 className="mr-2 h-4 w-4" /> Shared Content
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start text-sm h-9 text-muted-foreground hover:text-foreground">
-                      <Archive className="mr-2 h-4 w-4" /> Archived
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start text-sm h-9 text-muted-foreground hover:text-foreground">
-                      <LayoutTemplate className="mr-2 h-4 w-4" /> Templates
-                    </Button>
-                  </div>
-
-                  <div className="flex flex-col gap-1 mt-4">
-                    <div className="flex items-center justify-between px-2 mb-1">
-                      <span className="text-xs font-semibold text-muted-foreground">Favorites</span>
-                      <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">3</span>
-                    </div>
-                    <Button variant="ghost" className="w-full justify-start text-sm h-9 text-muted-foreground hover:text-foreground">
-                      <Star className="mr-2 h-4 w-4 text-amber-500" /> Figma Basic
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start text-sm h-9 text-muted-foreground hover:text-foreground">
-                      <FolderOpen className="mr-2 h-4 w-4 text-emerald-500" /> Folder NEW 2024
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start text-sm h-9 text-muted-foreground hover:text-foreground">
-                      <FileText className="mr-2 h-4 w-4 text-purple-500" /> Assignment 101
-                    </Button>
-                  </div>
-                </>
-              )}
+              ) : null}
             </div>
           </ScrollArea>
         </div>
