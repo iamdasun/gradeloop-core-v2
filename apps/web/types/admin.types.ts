@@ -35,7 +35,7 @@ export interface CreateUserRequest {
   full_name: string;
   email: string;
   role_id: string;
-  /** "student" | "employee" | "all" */
+  /** "student" | "employee" | "admin" */
   user_type: string;
   student_id?: string;
   designation?: string;

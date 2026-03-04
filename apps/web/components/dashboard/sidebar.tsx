@@ -74,8 +74,8 @@ const adminNavItems: NavItem[] = [
     icon: Users,
     subItems: [
       { title: "Users", href: "/admin/users", icon: Users },
-      { title: "Roles", href: "/admin/users/roles", icon: UserCog },
-      { title: "Permissions", href: "/admin/users/permissions", icon: Key },
+      { title: "Roles", href: "/admin/roles", icon: UserCog },
+      { title: "Permissions", href: "/admin/permissions", icon: Key },
     ],
   },
   {

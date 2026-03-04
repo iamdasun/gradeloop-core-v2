@@ -210,10 +210,10 @@ export function UserDetailsDialog({
           </TabsContent>
         </Tabs>
 
-        <Separator />
+        <Separator className="mt-6 mb-4" />
 
         {/* Actions */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pb-2">
           <Button
             variant="outline"
             size="sm"
