@@ -16,8 +16,9 @@ import {
     CheckCircle2,
     XCircle,
     ChevronLeft,
+    Settings,
 } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +54,7 @@ import type { Batch, Degree, Specialization } from '@/types/academics.types';
 import { cn } from '@/lib/utils/cn';
 
 export default function GroupsPage() {
+    const router = useRouter();
     const { canAccess, canWrite } = useAcademicsAccess();
 
     const [batches, setBatches] = React.useState<Batch[]>([]);
@@ -177,13 +179,19 @@ export default function GroupsPage() {
 
         return (
             <>
-                <TableRow className={cn("group h-16 transition-colors", depth > 0 && "bg-zinc-50/40 dark:bg-zinc-900/10")}>
+                <TableRow
+                    className={cn("group h-16 transition-colors cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/40", depth > 0 && "bg-zinc-50/40 dark:bg-zinc-900/10")}
+                    onClick={() => router.push(`/admin/academics/groups/${batch.id}`)}
+                >
                     <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
                             <div className="flex items-center min-w-[24px]">
                                 {hasChildren && !isFiltered ? (
                                     <button
-                                        onClick={() => toggleExpand(batch.id)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleExpand(batch.id);
+                                        }}
                                         className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded transition-colors"
                                     >
                                         {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />}
@@ -198,15 +206,12 @@ export default function GroupsPage() {
                                         {getInitials(batch.code)}
                                     </AvatarFallback>
                                 </Avatar>
-                                <Link
-                                    href={`/admin/academics/groups/${batch.id}`}
-                                    className="flex flex-col min-w-0 hover:opacity-70 transition-opacity"
-                                >
+                                <div className="flex flex-col min-w-0">
                                     <span className="font-semibold text-sm truncate text-zinc-900 dark:text-zinc-100 group-hover:text-primary transition-colors">
                                         {batch.name}
                                     </span>
                                     <span className="text-[11px] text-zinc-500 font-medium">{batch.code}</span>
-                                </Link>
+                                </div>
                             </div>
                         </div>
                     </TableCell>
@@ -221,33 +226,10 @@ export default function GroupsPage() {
                             {Math.floor(Math.random() * 50) + 10}
                         </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="pr-6">
                         <Badge variant={batch.is_active ? "info" : "secondary"} className="rounded-full px-2 py-0 font-semibold text-[10px] h-5">
                             {batch.is_active ? 'Active' : 'Inactive'}
                         </Badge>
-                    </TableCell>
-                    <TableCell className="text-right pr-6">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-900">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 shadow-lg border-zinc-200 dark:border-zinc-800">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => setEditTarget(batch)}>
-                                    Edit Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setCreateParent(batch); setCreateOpen(true); }}>
-                                    Add Sub-batch
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => toggleActive(batch)} className={batch.is_active ? 'text-destructive' : 'text-primary'}>
-                                    {batch.is_active ? 'Deactivate' : 'Reactivate'}
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
                     </TableCell>
                 </TableRow>
                 {isExpanded && !isFiltered && children.map(child => (
@@ -383,7 +365,6 @@ export default function GroupsPage() {
                                 <TableHead className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Specialization</TableHead>
                                 <TableHead className="text-center text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Students</TableHead>
                                 <TableHead className="text-zinc-500 font-bold uppercase text-[10px] tracking-wider">Status</TableHead>
-                                <TableHead className="text-right pr-6 text-zinc-500 font-bold uppercase text-[10px] tracking-wider w-20" />
                             </TableRow>
                         </TableHeader>
                         <TableBody>
