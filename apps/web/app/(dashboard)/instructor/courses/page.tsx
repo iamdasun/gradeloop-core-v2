@@ -155,6 +155,10 @@ export default function InstructorCoursesPage() {
             <SectionHeader
                 title="My Courses"
                 description="Courses you are assigned to instruct this semester."
+<<<<<<< HEAD
+=======
+                icon={BookOpen}
+>>>>>>> e4e84167f (feat(web): instructor dashboard and API integration improvements [GRADELOOP-104])
                 action={
                     <div className="flex items-center p-1 bg-muted/50 rounded-xl border border-border/40 shrink-0">
                         <Button
