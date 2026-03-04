@@ -287,3 +287,5 @@ go.work
 ci_summary.txt
 final_status.txt
 .mcp.json
+
+datasets/
