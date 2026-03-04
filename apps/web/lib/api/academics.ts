@@ -494,6 +494,16 @@ export const batchMembersApi = {
 // ── Course Instances ──────────────────────────────────────────────────────────
 
 export const courseInstancesApi = {
+  listByCourse: async (courseId: string): Promise<CourseInstance[]> => {
+    const { data } = await axiosInstance.get("/course-instances", {
+      params: { course_id: courseId },
+    });
+    if (Array.isArray(data)) return data as CourseInstance[];
+    if (Array.isArray(data?.course_instances))
+      return data.course_instances as CourseInstance[];
+    return [];
+  },
+
   create: async (req: CreateCourseInstanceRequest): Promise<CourseInstance> => {
     const { data } = await axiosInstance.post<CourseInstance>(
       "/course-instances",
