@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Plus,
   RefreshCw,
@@ -12,9 +13,14 @@ import {
   Power,
   AlertTriangle,
   Star,
+  Search,
+  BookMarked,
+  BookX,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
@@ -32,9 +38,23 @@ import type { Course } from '@/types/academics.types';
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
+function StatCardSkeleton() {
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="flex items-center gap-3 p-4">
+        <Skeleton className="h-10 w-10 rounded-lg" />
+        <div className="space-y-1.5">
+          <Skeleton className="h-6 w-12" />
+          <Skeleton className="h-3.5 w-16" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CardSkeleton() {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950 space-y-3">
+    <div className="rounded-xl border border-border bg-card p-5 space-y-3">
       <div className="flex items-start justify-between">
         <Skeleton className="h-8 w-8 rounded-lg" />
         <div className="flex gap-2">
@@ -60,8 +80,8 @@ function CardSkeleton() {
 
 function CreditsDisplay({ credits }: { credits: number }) {
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+    <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+      <Star className="h-3 w-3 fill-warning text-warning" />
       {credits} {credits === 1 ? 'credit' : 'credits'}
     </span>
   );
@@ -80,25 +100,26 @@ function CourseCard({ course, canWrite, onEdit, onToggleActive }: CourseCardProp
   return (
     <div
       className={`
-        group relative flex flex-col rounded-xl border bg-white transition-all duration-200
-        hover:shadow-md hover:-translate-y-0.5 dark:bg-zinc-950
+        group relative flex flex-col rounded-xl border bg-card transition-all duration-200
+        hover:shadow-md hover:-translate-y-0.5
         ${course.is_active
-          ? 'border-zinc-200 dark:border-zinc-800'
-          : 'border-zinc-200/60 opacity-70 dark:border-zinc-800/60'
+          ? 'border-border'
+          : 'border-border/60 opacity-70'
         }
       `}
     >
       {/* Accent stripe */}
       <div
-        className={`absolute left-0 top-0 h-full w-1 rounded-l-xl ${course.is_active ? 'bg-sky-500' : 'bg-zinc-300 dark:bg-zinc-700'
-          }`}
+        className={`absolute left-0 top-0 h-full w-1 rounded-l-xl ${
+          course.is_active ? 'bg-primary' : 'bg-muted-foreground/40'
+        }`}
       />
 
       <div className="p-5 pl-6 flex flex-col gap-3 flex-1">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-950/30 shrink-0">
-            <BookOpen className="h-5 w-5 text-sky-600 dark:text-sky-400" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 shrink-0">
+            <BookOpen className="h-5 w-5 text-primary" />
           </div>
           <div className="flex items-center gap-1.5 flex-wrap justify-end">
             <Badge variant={course.is_active ? 'success' : 'secondary'} className="text-[11px]">
@@ -109,25 +130,27 @@ function CourseCard({ course, canWrite, onEdit, onToggleActive }: CourseCardProp
 
         {/* Title + code */}
         <div className="flex-1">
-          <h3 className="font-semibold text-zinc-900 dark:text-zinc-50 leading-tight line-clamp-2">
-            {course.title}
-          </h3>
-          <p className="mt-0.5 font-mono text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+          <Link href={`/admin/academics/courses/${course.id}`}>
+            <h3 className="font-semibold text-foreground hover:text-primary leading-tight line-clamp-2 transition-colors">
+              {course.title}
+            </h3>
+          </Link>
+          <p className="mt-0.5 font-mono text-xs text-muted-foreground uppercase tracking-wide">
             {course.code}
           </p>
         </div>
 
         {/* Description */}
         {course.description ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-2 leading-relaxed">
+          <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
             {course.description}
           </p>
         ) : (
-          <p className="text-sm text-zinc-400 italic">No description</p>
+          <p className="text-sm text-muted-foreground/60 italic">No description</p>
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800/60">
+        <div className="flex items-center justify-between pt-1 border-t border-border/60">
           <CreditsDisplay credits={course.credits} />
           {canWrite && (
             <DropdownMenu>
@@ -143,7 +166,7 @@ function CourseCard({ course, canWrite, onEdit, onToggleActive }: CourseCardProp
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => onToggleActive(course)}
-                  className={`gap-2 ${course.is_active ? 'text-red-600 focus:text-red-600' : 'text-emerald-600 focus:text-emerald-600'}`}
+                  className={`gap-2 ${course.is_active ? 'text-destructive focus:text-destructive' : 'text-success focus:text-success'}`}
                 >
                   {course.is_active
                     ? <><PowerOff className="h-3.5 w-3.5" /> Deactivate</>
@@ -238,56 +261,109 @@ export default function CoursesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Courses
-          </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          <h1 className="text-2xl font-bold tracking-tight">Courses</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Manage course catalogue — codes, titles, credits.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={() => setShowInactive((v) => !v)} className="text-xs">
-            {showInactive ? 'Hide Inactive' : 'Show Inactive'}
-          </Button>
-          <Button variant="outline" size="icon" onClick={load} disabled={loading} title="Refresh">
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
           {canWrite && (
-            <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
+            <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5 shadow-sm">
               <Plus className="h-4 w-4" /> Add Course
             </Button>
           )}
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <input
-          type="search"
-          placeholder="Search by title or code…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-xs placeholder:text-zinc-400 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 dark:border-zinc-800 dark:bg-zinc-950 dark:focus-visible:ring-zinc-300"
-        />
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {loading ? (
+          <>
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </>
+        ) : (
+          <>
+            <Card className="shadow-sm">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                  <BookOpen className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{courses.length}</p>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-muted">
+                  <BookMarked className="h-5 w-5 text-success" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{courses.filter((c) => c.is_active).length}</p>
+                  <p className="text-xs text-muted-foreground">Active</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm">
+              <CardContent className="flex items-center gap-3 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-error-muted">
+                  <BookX className="h-5 w-5 text-error" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{courses.filter((c) => !c.is_active).length}</p>
+                  <p className="text-xs text-muted-foreground">Inactive</p>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
+
+      {/* Filters */}
+      <Card className="shadow-sm">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search by title or code…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowInactive((v) => !v)}
+            className="text-xs shrink-0"
+          >
+            {showInactive ? 'Hide Inactive' : 'Show Inactive'}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={load}
+            disabled={loading}
+            title="Refresh"
+            className="shrink-0"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Error banner */}
       {error && (
-        <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-400">
+        <div className="flex items-center gap-3 rounded-lg border border-warning-border bg-warning-muted px-4 py-3 text-sm text-warning-muted-foreground">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           <span>Service unavailable: <strong>{error}</strong>.{courses.length > 0 ? ' Showing cached data.' : ''}</span>
-          <Button variant="ghost" size="sm" onClick={load} className="ml-auto shrink-0 text-amber-700 hover:text-amber-900">Retry</Button>
-        </div>
-      )}
-
-      {/* Stats */}
-      {!loading && !error && (
-        <div className="flex items-center gap-6 text-sm text-zinc-500">
-          <span><strong className="text-zinc-900 dark:text-zinc-100">{courses.filter((c) => c.is_active).length}</strong> active</span>
-          {showInactive && <span><strong className="text-zinc-900 dark:text-zinc-100">{courses.filter((c) => !c.is_active).length}</strong> inactive</span>}
-          {q && <span><strong className="text-zinc-900 dark:text-zinc-100">{visible.length}</strong> matching &ldquo;{search}&rdquo;</span>}
+          <Button variant="ghost" size="sm" onClick={load} className="ml-auto shrink-0">Retry</Button>
         </div>
       )}
 
@@ -297,12 +373,12 @@ export default function CoursesPage() {
           {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
         </div>
       ) : visible.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 py-16 text-center">
-          <BookOpen className="h-10 w-10 text-zinc-300 dark:text-zinc-700 mb-3" />
-          <p className="font-medium text-zinc-600 dark:text-zinc-400">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16 text-center">
+          <BookOpen className="h-10 w-10 text-muted-foreground/40 mb-3" />
+          <p className="font-medium text-muted-foreground">
             {q ? 'No courses match your search' : 'No courses found'}
           </p>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-muted-foreground/70">
             {!q && canWrite ? 'Add your first course to the catalogue.' : ''}
           </p>
           {!q && canWrite && (

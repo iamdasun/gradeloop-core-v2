@@ -9,7 +9,7 @@
 export interface IamTokenClaims {
   /** UUID of the authenticated user */
   user_id: string;
-  username: string;
+  email: string;
   /** Single role name assigned to the user */
   role_name: string;
   full_name: string;

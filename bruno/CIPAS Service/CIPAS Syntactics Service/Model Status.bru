@@ -1,0 +1,16 @@
+meta {
+  name: Model Status
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{CIPAS_SYNTACTICS_URL_V1}}/models
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

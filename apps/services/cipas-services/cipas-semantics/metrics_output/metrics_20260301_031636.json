@@ -1,0 +1,18 @@
+{
+  "accuracy": 0.8004000695773178,
+  "precision": 0.8039097744360902,
+  "recall": 0.8021177176662236,
+  "f1": 0.8030127462340672,
+  "roc_auc": 0.8920896736072572,
+  "feature_pruning_applied": true,
+  "isotonic_calibration_applied": true,
+  "original_features": 437,
+  "pruned_features": 350,
+  "optimal_threshold": 0.47999999999999976,
+  "accuracy_thresholded": 0.8008349278135328,
+  "precision_thresholded": 0.7944832460297664,
+  "recall_thresholded": 0.8192437947442878,
+  "f1_thresholded": 0.8066735611320993,
+  "macro_f1_thresholded": 0.8006531045801295,
+  "timestamp": "2026-03-01T03:16:36.829471"
+}

@@ -1,0 +1,26 @@
+{
+  "accuracy": 0.9395294771687767,
+  "precision": 0.9268324607329843,
+  "recall": 0.967393779315998,
+  "f1": 0.9466788475679048,
+  "roc_auc": 0.985435183708102,
+  "macro_f1": 0.93842244826815,
+  "threshold_used": 0.47999999999999976,
+  "confusion_matrix": [
+    [
+      15937,
+      1677
+    ],
+    [
+      716,
+      21243
+    ]
+  ],
+  "true_negatives": 15937,
+  "false_positives": 1677,
+  "false_negatives": 716,
+  "true_positives": 21243,
+  "optimal_threshold_f1": 0.5599999999999997,
+  "optimal_threshold_macro_f1": 0.6099999999999998,
+  "timestamp": "2026-03-01T07:27:47.982522"
+}

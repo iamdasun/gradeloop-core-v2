@@ -145,7 +145,10 @@ export default function StudentEnrollmentsPage() {
         }
         setEnrollSub(true);
         try {
-            await enrollmentsApi.enroll(enrollValues);
+            await enrollmentsApi.enroll({
+                ...enrollValues,
+                allow_individual: true, // Allow enrolling students outside of batch
+            });
             toast.success('Student enrolled');
             setEnrollOpen(false);
             if (enrollValues.course_instance_id === selectedInstance) await refreshEnrollments();

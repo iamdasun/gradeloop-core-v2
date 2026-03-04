@@ -19,7 +19,7 @@ var (
 
 type Claims struct {
 	UserID      uuid.UUID `json:"user_id"`
-	Username    string    `json:"username"`
+	Email       string    `json:"email"`
 	RoleName    string    `json:"role_name"`
 	FullName    string    `json:"full_name"`
 	Permissions []string  `json:"permissions"`
@@ -46,7 +46,7 @@ func NewJWT(secretKey string, accessTokenExpiryMinutes, refreshTokenExpiryDays i
 	}
 }
 
-func GenerateAccessToken(userID uuid.UUID, username, fullName, roleName string, permissions []string, secretKey []byte, expiry time.Duration) (string, time.Time, error) {
+func GenerateAccessToken(userID uuid.UUID, email, fullName, roleName string, permissions []string, secretKey []byte, expiry time.Duration) (string, time.Time, error) {
 	if len(secretKey) == 0 {
 		return "", time.Time{}, errors.New("secret key cannot be empty")
 	}
@@ -55,7 +55,7 @@ func GenerateAccessToken(userID uuid.UUID, username, fullName, roleName string, 
 
 	claims := Claims{
 		UserID:      userID,
-		Username:    username,
+		Email:       email,
 		FullName:    fullName,
 		RoleName:    roleName,
 		Permissions: permissions,
@@ -125,10 +125,10 @@ func HashToken(token string) string {
 	return base64.URLEncoding.EncodeToString(hash[:])
 }
 
-func (j *JWT) GenerateTokenPair(userID uuid.UUID, username, fullName, roleName string, permissions []string) (*TokenPair, error) {
+func (j *JWT) GenerateTokenPair(userID uuid.UUID, email, fullName, roleName string, permissions []string) (*TokenPair, error) {
 	accessToken, expiresAt, err := GenerateAccessToken(
 		userID,
-		username,
+		email,
 		fullName,
 		roleName,
 		permissions,

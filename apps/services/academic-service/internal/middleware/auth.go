@@ -11,9 +11,9 @@ import (
 
 // Claims matches the JWT structure from IAM Service
 type Claims struct {
-	UserID      string   `json:"user_id"`   // Changed: UUID string from IAM
-	Username    string   `json:"username"`  // Changed: Added username field
-	RoleName    string   `json:"role_name"` // Changed: Single role string from IAM
+	UserID      string   `json:"user_id"`   // UUID string from IAM
+	Email       string   `json:"email"`     // Email from IAM (used as identifier)
+	RoleName    string   `json:"role_name"` // Single role string from IAM
 	Permissions []string `json:"permissions"`
 	jwt.RegisteredClaims
 }
@@ -59,9 +59,12 @@ func AuthMiddleware(secretKey []byte) fiber.Handler {
 
 		// Store claims in context for handlers to access
 		c.Locals("user_id", claims.UserID)
-		c.Locals("username", claims.Username)
+		c.Locals("username", claims.Email)
 		c.Locals("role_name", claims.RoleName)
 		c.Locals("permissions", claims.Permissions)
+
+		fmt.Printf("[DEBUG AuthMiddleware] path=%s user_id='%s' username='%s' role_name='%s' permissions=%v\n",
+			c.Path(), claims.UserID, claims.Email, claims.RoleName, claims.Permissions)
 
 		return c.Next()
 	}

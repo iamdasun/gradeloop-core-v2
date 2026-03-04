@@ -4,7 +4,7 @@
  * Re-exports shared types from auth.types so consumers only need one import.
  */
 
-export type { UserListItem, Role, Permission } from '@/types/auth.types';
+export type { UserListItem, Role, Permission } from "@/types/auth.types";
 
 // ── Pagination ───────────────────────────────────────────────────────────────
 
@@ -26,6 +26,8 @@ export interface ListUsersParams {
   user_type?: string;
   /** Filter by role UUID — forwarded as role_id to backend GET /users */
   role_id?: string;
+  /** Search by name or email — forwarded as search query to backend */
+  search?: string;
 }
 
 /** POST /users — backend requires user_type; student/employee need extra fields. */
@@ -33,7 +35,7 @@ export interface CreateUserRequest {
   full_name: string;
   email: string;
   role_id: string;
-  /** "student" | "employee" | "all" */
+  /** "student" | "employee" | "admin" */
   user_type: string;
   student_id?: string;
   designation?: string;
@@ -62,7 +64,6 @@ export interface UpdateUserRequest {
 /** Matches the backend UpdateUserResponse DTO. */
 export interface UpdateUserResponse {
   id: string;
-  username: string;
   email: string;
   role_id: string;
   is_active: boolean;
@@ -73,4 +74,52 @@ export interface UpdateUserResponse {
 
 export interface FormErrors {
   [field: string]: string | undefined;
+}
+
+// ── Bulk Import ──────────────────────────────────────────────────────────────
+
+export interface BulkImportUserRow {
+  full_name: string;
+  email: string;
+  username: string;
+  role: string;
+  user_type: string;
+  department: string;
+  faculty: string;
+  student_id?: string;
+  designation?: string;
+}
+
+export interface BulkImportPreviewRow {
+  row_index: number;
+  data: BulkImportUserRow;
+  errors?: string[];
+  is_valid: boolean;
+}
+
+export interface BulkImportPreviewResponse {
+  rows: BulkImportPreviewRow[];
+  total_rows: number;
+  valid_rows: number;
+  invalid_rows: number;
+  column_mapping: Record<string, string>;
+}
+
+export interface BulkImportExecuteRequest {
+  rows: BulkImportUserRow[];
+  column_mapping: Record<string, string>;
+}
+
+export interface BulkImportResultRow {
+  row_index: number;
+  email: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface BulkImportExecuteResponse {
+  total_processed: number;
+  success_count: number;
+  failure_count: number;
+  results: BulkImportResultRow[];
 }

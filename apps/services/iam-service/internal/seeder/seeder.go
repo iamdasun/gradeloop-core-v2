@@ -20,6 +20,10 @@ var permissions = []domain.Permission{
 	{Name: "roles:delete", Description: "Delete roles"},
 	{Name: "permissions:read", Description: "Read permissions"},
 	{Name: "permissions:write", Description: "Create and update permissions"},
+	{Name: "courses:read", Description: "View assigned courses and course instances"},
+	{Name: "students:read", Description: "View enrolled students"},
+	{Name: "assignments:read", Description: "View assignments for assigned courses"},
+	{Name: "submissions:read", Description: "View submissions for assigned courses"},
 }
 
 var roles = []struct {
@@ -28,24 +32,24 @@ var roles = []struct {
 	Permissions  []string
 }{
 	{
-		Name:         "Super Admin",
+		Name:         "super_admin",
 		IsSystemRole: true,
 		Permissions:  []string{"users:read", "users:write", "users:delete", "roles:read", "roles:write", "roles:delete", "permissions:read", "permissions:write"},
 	},
 	{
-		Name:         "Admin",
+		Name:         "admin",
 		IsSystemRole: true,
 		Permissions:  []string{"users:read", "users:write", "roles:read", "roles:write", "permissions:read"},
 	},
 	{
-		Name:         "Student",
+		Name:         "student",
 		IsSystemRole: true,
 		Permissions:  []string{},
 	},
 	{
-		Name:         "Employee",
+		Name:         "employee",
 		IsSystemRole: true,
-		Permissions:  []string{},
+		Permissions:  []string{"courses:read", "students:read", "assignments:read", "submissions:read"},
 	},
 }
 
@@ -72,7 +76,8 @@ func Seed(db *gorm.DB) error {
 	log.Println("Seeding roles...")
 	for _, r := range roles {
 		var role domain.Role
-		if err := db.Where("name = ?", r.Name).First(&role).Error; err != nil {
+		// Case-insensitive lookup to handle "Employee" vs "employee" etc.
+		if err := db.Where("LOWER(name) = LOWER(?)", r.Name).First(&role).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				role = domain.Role{
 					ID:           uuid.New(),
@@ -86,11 +91,13 @@ func Seed(db *gorm.DB) error {
 			} else {
 				return fmt.Errorf("failed to check role %s: %w", r.Name, err)
 			}
+		} else {
+			log.Printf("Role already exists: %s (id=%s)", role.Name, role.ID)
 		}
 
-		// Assign permissions
-		var perms []domain.Permission
+		// Always sync permissions for the role (even if the role already existed)
 		if len(r.Permissions) > 0 {
+			var perms []domain.Permission
 			if err := db.Where("name IN ?", r.Permissions).Find(&perms).Error; err != nil {
 				return fmt.Errorf("failed to find permissions for role %s: %w", r.Name, err)
 			}
@@ -98,7 +105,7 @@ func Seed(db *gorm.DB) error {
 			if err := db.Model(&role).Association("Permissions").Replace(&perms); err != nil {
 				return fmt.Errorf("failed to assign permissions to role %s: %w", r.Name, err)
 			}
-			log.Printf("Assigned permissions to role: %s", r.Name)
+			log.Printf("Assigned %d permissions to role: %s", len(perms), r.Name)
 		}
 	}
 
@@ -122,15 +129,14 @@ func Seed(db *gorm.DB) error {
 				return fmt.Errorf("failed to hash password: %w", err)
 			}
 
-			// Find Super Admin role
+			// Find Super Admin role (case-insensitive to match DB)
 			var superAdminRole domain.Role
-			if err := db.Where("name = ?", "Super Admin").First(&superAdminRole).Error; err != nil {
-				return fmt.Errorf("failed to find Super Admin role: %w", err)
+			if err := db.Where("LOWER(name) = LOWER(?)", "super_admin").First(&superAdminRole).Error; err != nil {
+				return fmt.Errorf("failed to find super_admin role: %w", err)
 			}
 
 			user = domain.User{
 				ID:           uuid.New(),
-				Username:     "superadmin",
 				Email:        superAdminEmail,
 				PasswordHash: string(hashedPassword),
 				RoleID:       &superAdminRole.ID,

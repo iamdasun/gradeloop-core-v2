@@ -20,11 +20,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     networks:
       - gradeloop-network
-    healthcheck:
-      test: [ "CMD", "traefik", "healthcheck" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+  # =============================================================================
 
   # =============================================================================
   # IAM Service (Go Fiber)
@@ -33,6 +29,9 @@ services:
     build:
       context: ./apps/services/iam-service
       dockerfile: Dockerfile
+      target: dev
+    volumes:
+      - ./apps/services/iam-service:/app
     container_name: iam-service
     restart: unless-stopped
     labels:
@@ -53,9 +52,15 @@ services:
       - "traefik.http.middlewares.login-ratelimit.ratelimit.average=20"
       - "traefik.http.middlewares.login-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.login-ratelimit.ratelimit.burst=10"
+      # CORS Middlewares
+      - "traefik.http.middlewares.iam-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
+      - "traefik.http.middlewares.iam-cors.headers.accesscontrolalloworiginlist=http://localhost:3000"
+      - "traefik.http.middlewares.iam-cors.headers.accesscontrolallowheaders=Origin,Content-Type,Accept,Authorization,X-Request-ID,X-Requested-With,X-HTTP-Method-Override"
+      - "traefik.http.middlewares.iam-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.iam-cors.headers.addvaryheader=true"
       # Apply middlewares
-      - "traefik.http.routers.iam.middlewares=limit,global-ratelimit"
-      - "traefik.http.routers.iam-login.middlewares=limit,login-ratelimit"
+      - "traefik.http.routers.iam.middlewares=limit,global-ratelimit,iam-cors"
+      - "traefik.http.routers.iam-login.middlewares=limit,login-ratelimit,iam-cors"
 
     env_file:
       - .env
@@ -88,18 +93,10 @@ services:
       - "8081"
 
     depends_on:
-      minio:
-        condition: service_healthy
+      - minio
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
 
     logging:
       driver: "json-file"
@@ -115,6 +112,9 @@ services:
     build:
       context: ./apps/services/email-service
       dockerfile: Dockerfile
+      target: dev
+    volumes:
+      - ./apps/services/email-service:/app
     container_name: email-service
     restart: unless-stopped
     labels:
@@ -122,13 +122,17 @@ services:
       - "traefik.http.routers.email.rule=PathPrefix(`/api/v1/emails`)"
       - "traefik.http.routers.email.entrypoints=web"
       - "traefik.http.services.email-service.loadbalancer.server.port=8082"
-      # Apply middlewares (sharing the same limits as others if desired, or none)
+      # Define the limit middleware locally so it is registered regardless of
+      # iam-service startup order. Must match the type defined in iam-service.
+      - "traefik.http.middlewares.limit.buffering.maxRequestBodyBytes=5242880"
+      # Apply middlewares
       - "traefik.http.routers.email.middlewares=limit"
 
     env_file:
       - .env
 
     environment:
+      - APP_ENV=production
       - APP_PORT=${EMAIL_SVC_PORT}
       - DB_HOST=${GRA_DB_HOST}
       - DB_PORT=${GRA_DB_PORT}
@@ -143,10 +147,8 @@ services:
       - "8082"
 
     depends_on:
-      minio:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - minio
+      - rabbitmq
 
     networks:
       - gradeloop-network
@@ -165,22 +167,28 @@ services:
     build:
       context: ./apps/services/academic-service
       dockerfile: Dockerfile
+      target: dev
+    volumes:
+      - ./apps/services/academic-service:/app
     container_name: academic-service
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/departments`) || PathPrefix(`/api/v1/faculties`) || PathPrefix(`/api/v1/degrees`) || PathPrefix(`/api/v1/specializations`) || PathPrefix(`/api/v1/batches`) || PathPrefix(`/api/v1/batch-members`) || PathPrefix(`/api/v1/course-instances`) || PathPrefix(`/api/v1/course-instructors`) || PathPrefix(`/api/v1/enrollments`) || PathPrefix(`/api/v1/courses`) || PathPrefix(`/api/v1/semesters`) || PathPrefix(`/api/v1/debug`)"
-      - "traefik.http.routers.academic.priority=100"
+      - "traefik.http.routers.academic.rule=PathPrefix(`/api/v1/departments`) || PathPrefix(`/api/v1/faculties`) || PathPrefix(`/api/v1/degrees`) || PathPrefix(`/api/v1/specializations`) || PathPrefix(`/api/v1/batches`) || PathPrefix(`/api/v1/batch-members`) || PathPrefix(`/api/v1/course-instances`) || PathPrefix(`/api/v1/course-instructors`) || PathPrefix(`/api/v1/enrollments`) || PathPrefix(`/api/v1/courses`) || PathPrefix(`/api/v1/semesters`) || PathPrefix(`/api/v1/instructor-courses`) || PathPrefix(`/api/v1/debug`)"
       - "traefik.http.routers.academic.entrypoints=web"
       - "traefik.http.services.academic-service.loadbalancer.server.port=8083"
-      # Request Size Limiting (1MB)
+      # Middlewares
       - "traefik.http.middlewares.academic-limit.buffering.maxRequestBodyBytes=1048576"
-      # Rate Limiting
       - "traefik.http.middlewares.academic-ratelimit.ratelimit.average=500"
       - "traefik.http.middlewares.academic-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.academic-ratelimit.ratelimit.burst=50"
+      - "traefik.http.middlewares.academic-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
+      - "traefik.http.middlewares.academic-cors.headers.accesscontrolalloworiginlist=http://localhost:3000"
+      - "traefik.http.middlewares.academic-cors.headers.accesscontrolallowheaders=Origin,Content-Type,Accept,Authorization,X-Request-ID,X-Requested-With"
+      - "traefik.http.middlewares.academic-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.academic-cors.headers.addvaryheader=true"
       # Apply middlewares
-      - "traefik.http.routers.academic.middlewares=academic-limit,academic-ratelimit"
+      - "traefik.http.routers.academic.middlewares=academic-limit,academic-ratelimit,academic-cors"
 
     env_file:
       - .env
@@ -203,18 +211,10 @@ services:
       - "8083"
 
     depends_on:
-      iam-service:
-        condition: service_healthy
+      - iam-service
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8083/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
 
     logging:
       driver: "json-file"
@@ -224,20 +224,21 @@ services:
         compress: "true"
 
   # =============================================================================
-  # Assessment Service (Go Fiber) — under development, excluded from build
+  # Assessment Service (Go Fiber)
   # =============================================================================
   assessment-service:
     build:
       context: ./apps/services/assessment-service
       dockerfile: Dockerfile
+      target: dev
+    volumes:
+      - ./apps/services/assessment-service:/app
     container_name: assessment-service
     restart: unless-stopped
-    profiles:
-      - dev-assessment
     labels:
       - "traefik.enable=true"
-      # Route assignments, submissions, and groups through the assessment service
-      - "traefik.http.routers.assessment.rule=PathPrefix(`/api/v1/assignments`) || PathPrefix(`/api/v1/submissions`) || PathPrefix(`/api/v1/groups`)"
+      # Route assignments, submissions, groups, and instructor-scoped endpoints through the assessment service
+      - "traefik.http.routers.assessment.rule=PathPrefix(`/api/v1/assignments`) || PathPrefix(`/api/v1/submissions`) || PathPrefix(`/api/v1/groups`) || PathPrefix(`/api/v1/instructor-assignments`) || PathPrefix(`/api/v1/instructor-submissions`)"
       - "traefik.http.routers.assessment.priority=100"
       - "traefik.http.routers.assessment.entrypoints=web"
       - "traefik.http.services.assessment-service.loadbalancer.server.port=8084"
@@ -275,27 +276,22 @@ services:
       # RabbitMQ message queue
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - RABBITMQ_SUBMISSION_WORKERS=${ASSESSMENT_SVC_SUBMISSION_WORKERS:-8}
+      # Judge0 code execution service
+      - JUDGE0_URL=${JUDGE0_URL}
+      - JUDGE0_API_KEY=${JUDGE0_API_KEY}
+      - JUDGE0_TIMEOUT_SECONDS=${JUDGE0_TIMEOUT_SECONDS:-30}
+      - JUDGE0_MAX_PAYLOAD_SIZE=${JUDGE0_MAX_PAYLOAD_SIZE:-65536}
 
     expose:
       - "8084"
 
     depends_on:
-      iam-service:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - iam-service
+      - minio
+      - rabbitmq
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8084/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 120s
 
     logging:
       driver: "json-file"
@@ -305,49 +301,178 @@ services:
         compress: "true"
 
   # =============================================================================
-  # CIPAS Service (Python FastAPI)
+  # CIPAS Syntactics Service (Python FastAPI — Syntactic Clone Detection)
   # =============================================================================
-  cipas-service:
+  cipas-syntactics:
     build:
-      context: ./apps/services/cipas-service
+      context: ./apps/services/cipas-services/cipas-syntactics
       dockerfile: Dockerfile
-    container_name: cipas-service
+    container_name: cipas-syntactics
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.cipas.rule=PathPrefix(`/api/v1/cipas`) || PathPrefix(`/api/v1/analysis`) || PathPrefix(`/metrics`)"
-      - "traefik.http.routers.cipas.entrypoints=web"
-      - "traefik.http.services.cipas-service.loadbalancer.server.port=8000"
-      # Request Size Limiting (2MB)
-      - "traefik.http.middlewares.cipas-limit.buffering.maxRequestBodyBytes=2097152"
-      # Apply global middlewares
-      - "traefik.http.routers.cipas.middlewares=limit,global-ratelimit"
+      - "traefik.http.routers.cipas-syntactics.rule=PathPrefix(`/api/v1/syntactics`)"
+      - "traefik.http.routers.cipas-syntactics.entrypoints=web"
+      - "traefik.http.services.cipas-syntactics-service.loadbalancer.server.port=${CIPAS_SYN_SVC_PORT}"
+      - "traefik.http.middlewares.cipas-syntactics-limit.buffering.maxRequestBodyBytes=10485760"
+      - "traefik.http.middlewares.cipas-syntactics-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.cipas-syntactics-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.cipas-syntactics-ratelimit.ratelimit.burst=10"
+      - "traefik.http.routers.cipas-syntactics.middlewares=cipas-syntactics-limit,cipas-syntactics-ratelimit"
 
     env_file:
       - .env
 
+    volumes:
+      - ./apps/services/cipas-services/cipas-syntactics/models:/app/models:ro
+
     environment:
-      - CIPAS_ENV=${CIPAS_ENV:-development}
-      - CIPAS_LOG_LEVEL=${CIPAS_LOG_LEVEL:-INFO}
+      - CIPAS_SYNTACTICS_PORT=${CIPAS_SYN_SVC_PORT}
+      - CIPAS_SYNTACTICS_HOST=0.0.0.0
 
     expose:
-      - "8000"
-
-    # depends_on:
-    #   minio:
-    #     condition: service_healthy
-    #   redis:
-    #     condition: service_healthy
+      - "${CIPAS_SYN_SVC_PORT}"
 
     networks:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/v1/health" ]
-      interval: 10s
+      test: [ "CMD", "curl", "-f", "http://localhost:${CIPAS_SYN_SVC_PORT}/api/v1/syntactics/ready" ]
+      interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # =============================================================================
+  # CIPAS Semantics Service (Python FastAPI — Semantic Clone Detection)
+  # =============================================================================
+  cipas-semantics:
+    build:
+      context: ./apps/services/cipas-services/cipas-semantics
+      dockerfile: Dockerfile
+    container_name: cipas-semantics
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cipas-semantics.rule=PathPrefix(`/api/v1/semantics`)"
+      - "traefik.http.routers.cipas-semantics.entrypoints=web"
+      - "traefik.http.services.cipas-semantics-service.loadbalancer.server.port=${CIPAS_SEM_SVC_PORT}"
+      - "traefik.http.middlewares.cipas-semantics-limit.buffering.maxRequestBodyBytes=10485760"
+      - "traefik.http.middlewares.cipas-semantics-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.cipas-semantics-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.cipas-semantics-ratelimit.ratelimit.burst=10"
+      - "traefik.http.routers.cipas-semantics.middlewares=cipas-semantics-limit,cipas-semantics-ratelimit"
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./apps/services/cipas-services/cipas-semantics/models:/app/models:ro
+
+    environment:
+      - CIPAS_SEMANTICS_PORT=${CIPAS_SEM_SVC_PORT}
+      - CIPAS_SEMANTICS_HOST=0.0.0.0
+
+    expose:
+      - "${CIPAS_SEM_SVC_PORT}"
+
+    networks:
+      - gradeloop-network
+
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:${CIPAS_SEM_SVC_PORT}/api/v1/semantics/ready" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # =============================================================================
+  # ACAFS Service (Python FastAPI — AST Extraction & Code Analysis)
+  # =============================================================================
+  acafs-service:
+    build:
+      context: ./apps/services/acafs-service
+      dockerfile: Dockerfile
+      target: development
+    volumes:
+      - ./apps/services/acafs-service:/app
+    container_name: acafs-service
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.acafs.rule=PathPrefix(`/api/v1/acafs`)"
+      - "traefik.http.routers.acafs.entrypoints=web"
+      - "traefik.http.services.acafs.loadbalancer.server.port=8086"
+      # Request size limiting (10MB for batch operations)
+      - "traefik.http.middlewares.acafs-limit.buffering.maxRequestBodyBytes=10485760"
+      # Rate limiting
+      - "traefik.http.middlewares.acafs-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.acafs-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.acafs-ratelimit.ratelimit.burst=20"
+      - "traefik.http.routers.acafs.middlewares=acafs-limit,acafs-ratelimit"
+
+    env_file:
+      - .env
+
+    environment:
+      # Service
+      - SERVICE_NAME=${ACAFS_SERVICE_NAME:-acafs-service}
+      - SERVICE_PORT=${ACAFS_SERVICE_PORT:-8086}
+      - SERVICE_HOST=0.0.0.0
+      - LOG_LEVEL=${ACAFS_LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+
+      # RabbitMQ
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_EXCHANGE=${ACAFS_RABBITMQ_EXCHANGE:-submissions}
+      - RABBITMQ_QUEUE=${ACAFS_RABBITMQ_QUEUE:-acafs.evaluation}
+      - RABBITMQ_ROUTING_KEY=${ACAFS_RABBITMQ_ROUTING_KEY:-submission.created}
+      - RABBITMQ_CONCURRENCY=${ACAFS_RABBITMQ_CONCURRENCY:-4}
+
+      # PostgreSQL (shared with assessment service)
+      - DATABASE_URL=postgresql://${GRA_DB_USER}:${GRA_DB_PASSWORD}@${GRA_DB_HOST}:${GRA_DB_PORT}/${ASSESSMENT_SVC_DB_NAME}
+
+      # MinIO
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET=${MINIO_BUCKET:-submissions}
+      - MINIO_USE_SSL=false
+
+      # AST Parser
+      - AST_MAX_LINES=${ACAFS_AST_MAX_LINES:-5000}
+      - AST_TIMEOUT_SECONDS=${ACAFS_AST_TIMEOUT_SECONDS:-2}
+
+    expose:
+      - "8086"
+
+    depends_on:
+      - rabbitmq
+      - minio
+
+    networks:
+      - gradeloop-network
+
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/api/v1/acafs/health')" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
     logging:
       driver: "json-file"
@@ -380,13 +505,6 @@ services:
     networks:
       - gradeloop-network
 
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
     logging:
       driver: "json-file"
       options:
@@ -412,13 +530,6 @@ services:
 
     networks:
       - gradeloop-network
-
-    healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
 
     logging:
       driver: "json-file"

@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/gradeloop/academic-service/internal/domain"
 	"github.com/gradeloop/academic-service/internal/dto"
@@ -47,6 +49,27 @@ func (h *BatchMemberHandler) AddBatchMember(c fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(toBatchMemberResponse(member))
 }
 
+// AddMembersToBatch handles POST /batch-members/bulk
+func (h *BatchMemberHandler) AddMembersToBatch(c fiber.Ctx) error {
+	var req dto.BulkAddBatchMembersRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return utils.ErrBadRequest("invalid request body")
+	}
+
+	username := requireUsername(c)
+	if username == "" {
+		return utils.ErrUnauthorized("user not authenticated")
+	}
+
+	if err := h.batchMemberService.AddMembersToBatch(&req, username, c.IP(), c.Get("User-Agent")); err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message": "batch members added successfully",
+	})
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /batches/:id/members
 // ─────────────────────────────────────────────────────────────────────────────
@@ -71,6 +94,27 @@ func (h *BatchMemberHandler) GetBatchMembers(c fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"members": responses,
 		"count":   len(responses),
+	})
+}
+
+// GetBatchMembersDetailed handles GET /batches/:id/members/detailed
+func (h *BatchMemberHandler) GetBatchMembersDetailed(c fiber.Ctx) error {
+	batchID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	// Get token from header to pass to IAM client
+	token := c.Get("Authorization")
+
+	members, err := h.batchMemberService.GetBatchMembersDetailed(context.Background(), batchID, token)
+	if err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"members": members,
+		"count":   len(members),
 	})
 }
 
@@ -116,11 +160,4 @@ func toBatchMemberResponse(m *domain.BatchMember) *dto.BatchMemberResponse {
 		Status:     m.Status,
 		EnrolledAt: m.EnrolledAt,
 	}
-}
-
-// requireUsername is a package-level helper (shared across handlers in this
-// package) that extracts the username claim set by AuthMiddleware.
-func requireUsername(c fiber.Ctx) string {
-	username, _ := c.Locals("username").(string)
-	return username
 }

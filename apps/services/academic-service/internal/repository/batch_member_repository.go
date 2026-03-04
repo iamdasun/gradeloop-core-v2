@@ -11,6 +11,7 @@ import (
 // BatchMemberRepository defines all data operations for batch members.
 type BatchMemberRepository interface {
 	AddMember(member *domain.BatchMember) error
+	AddMembers(members []domain.BatchMember) error
 	GetMembers(batchID uuid.UUID) ([]domain.BatchMember, error)
 	GetMember(batchID, userID uuid.UUID) (*domain.BatchMember, error)
 	RemoveMember(batchID, userID uuid.UUID) error
@@ -29,6 +30,14 @@ func NewBatchMemberRepository(db *gorm.DB) BatchMemberRepository {
 // AddMember inserts a new batch membership record.
 func (r *batchMemberRepository) AddMember(member *domain.BatchMember) error {
 	return r.db.Create(member).Error
+}
+
+// AddMembers inserts multiple batch membership records in one batch operation.
+func (r *batchMemberRepository) AddMembers(members []domain.BatchMember) error {
+	if len(members) == 0 {
+		return nil
+	}
+	return r.db.Create(&members).Error
 }
 
 // GetMembers returns all members belonging to the given batch.

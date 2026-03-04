@@ -1,0 +1,34 @@
+meta {
+  name: Run Code Snippet
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{JUDGE0_URL}}/submissions?base64_encoded=false&wait=true
+  body: json
+  auth: none
+}
+
+query {
+  base64_encoded: false
+  wait: true
+}
+
+body:json {
+  {
+    "source_code": "def solve():\n    print('Hello, Judge0!')\n\nsolve()",
+    "language_id": 71,
+    "stdin": ""
+  }
+}
+
+docs {
+  # Run Code Snippet
+  
+  Creates a synchronous submission that evaluates the given source code and returns the result in the response.
+  
+  - `wait=true` causes the API call to block until execution completes.
+  - `base64_encoded=false` sends raw source code directly (instead of base64).
+  - `language_id` must match a supported language ID from the Languages endpoint (71 is Python).
+}

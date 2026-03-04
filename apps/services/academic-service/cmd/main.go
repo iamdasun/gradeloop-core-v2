@@ -69,6 +69,9 @@ func run() error {
 	// Initialize audit client
 	auditClient := client.NewAuditClient(cfg.IAMServiceURL, logger)
 
+	// Initialize IAM client for user profile lookups
+	iamClient := client.NewIAMClient(cfg.IAMServiceURL)
+
 	// Initialize repositories
 	facultyRepo := repository.NewFacultyRepository(db.DB)
 	leadershipRepo := repository.NewFacultyLeadershipRepository(db.DB)
@@ -107,10 +110,10 @@ func run() error {
 	enrollmentRepo := repository.NewEnrollmentRepository(db.DB)
 
 	// Initialize services for enrollment management
-	batchMemberService := service.NewBatchMemberService(batchRepo, batchMemberRepo, auditClient, logger)
+	batchMemberService := service.NewBatchMemberService(batchRepo, batchMemberRepo, auditClient, iamClient, logger)
 	courseInstanceService := service.NewCourseInstanceService(batchRepo, courseInstanceRepo, auditClient, logger)
 	courseInstructorService := service.NewCourseInstructorService(courseInstanceRepo, courseInstructorRepo, auditClient, logger)
-	enrollmentService := service.NewEnrollmentService(courseInstanceRepo, batchMemberRepo, enrollmentRepo, auditClient, logger)
+	enrollmentService := service.NewEnrollmentService(courseInstanceRepo, batchMemberRepo, enrollmentRepo, auditClient, iamClient, logger)
 
 	// Initialize handlers
 	healthHandler := handler.NewHealthHandler()
@@ -130,19 +133,23 @@ func run() error {
 	courseHandler := handler.NewCourseHandler(courseService, logger)
 	semesterHandler := handler.NewSemesterHandler(semesterService, logger)
 
+	// Initialize handler for instructor-scoped endpoints
+	instructorHandler := handler.NewInstructorHandler(courseInstructorService, enrollmentService, courseService, iamClient, logger)
+
 	app := fiber.New(fiber.Config{
 		AppName:      "academic-service",
 		ErrorHandler: utils.ErrorHandler,
 	})
 
-	app.Use(middleware.Recovery())
-	app.Use(middleware.Logger())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{cfg.FrontendURL, "http://localhost:3000"},
+		AllowOrigins:     []string{cfg.FrontendURL},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID", "X-Requested-With"},
 		AllowCredentials: true,
 	}))
+
+	app.Use(middleware.Recovery())
+	app.Use(middleware.Logger())
 
 	router.SetupRoutes(app, router.Config{
 		HealthHandler:           healthHandler,
@@ -157,6 +164,7 @@ func run() error {
 		EnrollmentHandler:       enrollmentHandler,
 		CourseHandler:           courseHandler,
 		SemesterHandler:         semesterHandler,
+		InstructorHandler:       instructorHandler,
 		JWTSecretKey:            []byte(cfg.JWT.SecretKey),
 	})
 

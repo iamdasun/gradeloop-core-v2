@@ -2,12 +2,12 @@
  * Represents the authenticated user as decoded from the IAM JWT.
  *
  * The login endpoint does NOT return a user object — all user data is
- * embedded in the access token's claims (user_id, username, role_name,
+ * embedded in the access token's claims (user_id, email, role_name,
  * permissions).  There is no /users/me profile endpoint.
  */
 export interface User {
   id: string; // user_id claim
-  username: string;
+  email: string;
   full_name: string;
   role_name: string; // single flat role string from JWT
   permissions: string[]; // flat permission names from JWT
@@ -36,7 +36,7 @@ export interface Permission {
 // ── Auth endpoint types ───────────────────────────────────────────────────────
 
 export interface LoginRequest {
-  username: string;
+  email: string;
   password: string;
 }
 
@@ -73,7 +73,6 @@ export interface ActivateAccountRequest {
 
 export interface ActivateAccountResponse {
   message: string;
-  username: string;
   email: string;
 }
 
@@ -96,12 +95,12 @@ export interface ChangePasswordResponse {
 /** Shape returned by GET /users (requires users:read permission). */
 export interface UserListItem {
   id: string;
-  username: string;
   email: string;
   full_name: string;
   role_id: string;
   role_name: string;
   user_type: string;
+  avatar_url?: string;
   student_id?: string;
   designation?: string;
   is_active: boolean;

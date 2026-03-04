@@ -21,3 +21,10 @@ func NewBaseHandler(service service.Service) *BaseHandler {
 
 func (h *BaseHandler) RegisterRoutes(app *fiber.App) {
 }
+
+// requireUsername is a package-level helper (shared across handlers in this
+// package) that extracts the username claim set by AuthMiddleware.
+func requireUsername(c fiber.Ctx) string {
+	username, _ := c.Locals("username").(string)
+	return username
+}

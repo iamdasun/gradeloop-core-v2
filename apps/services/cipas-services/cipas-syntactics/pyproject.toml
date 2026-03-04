@@ -1,0 +1,52 @@
+[project]
+name = "cipas-syntactics"
+version = "0.1.0"
+description = "Syntactic Code Clone Detection Service (Type-1/2/3) with Tree-sitter and XGBoost"
+authors = [
+    {name = "Dasun Wickramasooriya",email = "dasun.wickramasooriya@gmail.com"}
+]
+requires-python = "^3.11"
+dependencies = [
+    "fastapi (>=0.133.0,<0.134.0)",
+    "uvicorn (>=0.41.0,<0.42.0)",
+    "pydantic (>=2.0.0,<3.0.0)",
+    # Tree-sitter for CST parsing (compatible versions)
+    "tree-sitter (>=0.24.0,<0.26.0)",
+    "tree-sitter-java (>=0.23.5,<0.24.0)",
+    "tree-sitter-c (>=0.24.0,<0.25.0)",
+    "tree-sitter-python (>=0.23.0,<0.24.0)",
+    # ML libraries for syntactic analysis
+    "scikit-learn (>=1.6.0,<2.0.0)",
+    "xgboost (>=2.0.0,<3.0.0)",
+    # Data processing
+    "pandas (>=2.2.0,<3.0.0)",
+    "numpy (>=2.2.0,<3.0.0)",
+    # String similarity metrics (rapidfuzz is faster and maintained)
+    "rapidfuzz (>=3.14.0,<4.0.0)",
+    # LSH / MinHash for Phase 2 candidate retrieval
+    "datasketch (>=1.6.0,<2.0.0)",
+    # C# tree-sitter grammar (optional; falls back to regex if unavailable)
+    "tree-sitter-c-sharp (>=0.23.0,<0.25.0)",
+    # Graph algorithms for collusion ring detection (Phase 4 optional backend)
+    "networkx (>=3.0,<4.0)",
+    # Progress bars and TUI
+    "tqdm (>=4.67.0,<5.0.0)",
+    "textual (>=1.0.0,<2.0.0)",
+    "rich (>=13.0.0,<14.0.0)",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.2,<10.0.0)"
+]

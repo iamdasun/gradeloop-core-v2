@@ -38,6 +38,7 @@ type BatchResponse struct {
 	StartYear        int        `json:"start_year"`
 	EndYear          int        `json:"end_year"`
 	IsActive         bool       `json:"is_active"`
+	CreatedBy        uuid.UUID  `json:"created_by"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
 }
@@ -53,6 +54,7 @@ type BatchTreeResponse struct {
 	StartYear        int                 `json:"start_year"`
 	EndYear          int                 `json:"end_year"`
 	IsActive         bool                `json:"is_active"`
+	CreatedBy        uuid.UUID           `json:"created_by"`
 	Children         []BatchTreeResponse `json:"children"`
 }
 

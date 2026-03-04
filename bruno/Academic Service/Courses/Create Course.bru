@@ -16,7 +16,7 @@ auth:bearer {
 
 body:json {
   {
-    "code": "CS101",
+    "code": "CS10123",
     "title": "Introduction to Computer Science",
     "description": "Basic concepts of computer science and programming",
     "credits": 3
@@ -30,12 +30,12 @@ script:post-response {
       bru.setEnvVar("COURSE_ID", id);
       console.log("✅ COURSE_ID saved:", id);
     }
-
+  
     const code = res.body.code;
     if (code) {
       console.log("✅ Course code:", code);
     }
-
+  
     const title = res.body.title;
     if (title) {
       console.log("✅ Course title:", title);
@@ -50,28 +50,28 @@ settings {
 
 docs {
   # Create Course
-
+  
   Creates a new course in the course catalog.
-
+  
   ## Endpoint
   POST /api/v1/courses
-
+  
   ## Authentication
   - Requires a valid bearer access token.
   - Caller must have `super_admin` or `admin` role.
-
+  
   ## Request Body
   - `code`        (string, required) — unique course code (e.g. "CS101")
   - `title`       (string, required) — human-readable course title
   - `description` (string, optional) — detailed description of the course
   - `credits`     (int, required)    — number of credit hours (non-negative)
-
+  
   ## Business Rules
   - `code` must be unique across all non-deleted courses.
   - `credits` must be a non-negative integer.
   - The course is created with `is_active = true` by default.
   - An audit log entry with action COURSE_CREATED is written on success.
-
+  
   ## Response (201 Created)
   {
     "id":          "uuid",
@@ -83,13 +83,13 @@ docs {
     "created_at":  "2025-01-01T00:00:00Z",
     "updated_at":  "2025-01-01T00:00:00Z"
   }
-
+  
   ## Variable Automation
   On success this script saves:
   - COURSE_ID — used by Get Course, Update Course, Deactivate Course,
                 Add Prerequisite, List Prerequisites, Remove Prerequisite,
                 and Create Course Instance.
-
+  
   ## Error Responses
   - 400 Bad Request   — missing required fields or invalid credits value
   - 401 Unauthorized  — missing or invalid token

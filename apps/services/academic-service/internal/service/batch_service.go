@@ -13,7 +13,7 @@ import (
 
 // BatchService defines the business-logic contract for batch management.
 type BatchService interface {
-	CreateBatch(req *dto.CreateBatchRequest, username, ipAddress, userAgent string) (*domain.Batch, error)
+	CreateBatch(req *dto.CreateBatchRequest, creatorID uuid.UUID, username, ipAddress, userAgent string) (*domain.Batch, error)
 	UpdateBatch(id uuid.UUID, req *dto.UpdateBatchRequest, username, ipAddress, userAgent string) (*domain.Batch, error)
 	DeactivateBatch(id uuid.UUID, username, ipAddress, userAgent string) error
 	GetBatchByID(id uuid.UUID) (*domain.Batch, error)
@@ -57,6 +57,7 @@ func NewBatchService(
 
 func (s *batchService) CreateBatch(
 	req *dto.CreateBatchRequest,
+	creatorID uuid.UUID,
 	username, ipAddress, userAgent string,
 ) (*domain.Batch, error) {
 	// 1. Basic field validation
@@ -70,6 +71,7 @@ func (s *batchService) CreateBatch(
 		StartYear: req.StartYear,
 		EndYear:   req.EndYear,
 		IsActive:  true,
+		CreatedBy: creatorID,
 	}
 
 	// 2. Resolve degree_id and specialization_id via parent (if supplied)
@@ -503,6 +505,7 @@ func batchToTreeNode(b domain.Batch) dto.BatchTreeResponse {
 		StartYear:        b.StartYear,
 		EndYear:          b.EndYear,
 		IsActive:         b.IsActive,
+		CreatedBy:        b.CreatedBy,
 		Children:         []dto.BatchTreeResponse{},
 	}
 }

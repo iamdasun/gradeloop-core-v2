@@ -22,14 +22,20 @@ import (
 //
 //  1. Uploads the submitted code to MinIO at the pre-computed storage path.
 //  2. Transitions the submission row from "queued" → "pending".
-//  3. Emits an audit log entry.
+//  3. Executes code via Judge0 (if language_id is provided).
+//  4. Evaluates test cases (if assignment has them).
+//  5. Updates submission with execution results.
+//  6. Emits an audit log entry.
 //
 // The worker is stateless beyond its dependencies and therefore safe to call
 // concurrently from multiple goroutines (the consumer pool).
 type SubmissionWorker struct {
 	submissionRepo repository.SubmissionRepository
+	assignmentRepo repository.AssignmentRepository
 	storage        *storage.MinIOStorage
 	auditClient    *client.AuditClient
+	judge0Client   *client.Judge0Client
+	evalService    EvaluationService
 	db             *gorm.DB
 	logger         *zap.Logger
 }
@@ -38,15 +44,21 @@ type SubmissionWorker struct {
 // queue.JobProcessor so it can be passed directly to NewSubmissionConsumer.
 func NewSubmissionWorker(
 	submissionRepo repository.SubmissionRepository,
+	assignmentRepo repository.AssignmentRepository,
 	storage *storage.MinIOStorage,
 	auditClient *client.AuditClient,
+	judge0Client *client.Judge0Client,
+	evalService EvaluationService,
 	db *gorm.DB,
 	logger *zap.Logger,
 ) queue.JobProcessor {
 	w := &SubmissionWorker{
 		submissionRepo: submissionRepo,
+		assignmentRepo: assignmentRepo,
 		storage:        storage,
 		auditClient:    auditClient,
+		judge0Client:   judge0Client,
+		evalService:    evalService,
 		db:             db,
 		logger:         logger,
 	}
@@ -120,7 +132,70 @@ func (w *SubmissionWorker) Process(ctx context.Context, job queue.SubmissionJob)
 
 	logger.Info("worker: submission status updated to pending")
 
-	// ── Step 4: Emit audit log ───────────────────────────────────────────────
+	// ── Step 4: Execute via Judge0 (if language_id is provided) ───────────────
+	if job.LanguageID > 0 {
+		logger.Info("worker: executing submission via Judge0",
+			zap.Int("language_id", job.LanguageID),
+		)
+
+		execResult, err := w.judge0Client.CreateSubmission(ctx, client.Judge0SubmissionRequest{
+			SourceCode: job.Code,
+			LanguageID: job.LanguageID,
+			Stdin:      "", // No stdin for initial execution
+		})
+
+		if err != nil {
+			logger.Error("worker: Judge0 execution failed", zap.Error(err))
+			// Update status to error but don't fail the job
+			if updateErr := w.submissionRepo.UpdateStatus(
+				job.SubmissionID,
+				string(domain.SubmissionStatusError),
+			); updateErr != nil {
+				logger.Error("worker: failed to update submission status to error", zap.Error(updateErr))
+			}
+		} else {
+			// Update submission with execution results
+			executionUpdate := &domain.Submission{
+				ID:                job.SubmissionID,
+				ExecutionStdout:   execResult.Stdout,
+				ExecutionStderr:   execResult.Stderr,
+				CompileOutput:     execResult.CompileOutput,
+				ExecutionStatus:   execResult.Status.Description,
+				ExecutionStatusID: execResult.Status.ID,
+				ExecutionTime:     execResult.Time,
+				MemoryUsed:        execResult.Memory,
+			}
+
+			// Determine final status based on Judge0 result
+			finalStatus := string(domain.SubmissionStatusAccepted)
+			if !client.IsSuccessfulExecution(execResult.Status.ID) {
+				finalStatus = string(domain.SubmissionStatusRejected)
+			}
+			executionUpdate.Status = finalStatus
+
+			// ── Step 5: Evaluate test cases (if assignment has them) ────────────
+			assignment, err := w.assignmentRepo.GetAssignmentByID(job.AssignmentID)
+			if err == nil && assignment != nil {
+				// TODO: Load test cases from assignment when test case storage is implemented
+				// For now, skip test case evaluation
+				_ = assignment
+			}
+
+			// Update submission with execution results
+			if updateErr := w.submissionRepo.UpdateExecutionResults(executionUpdate); updateErr != nil {
+				logger.Error("worker: failed to update execution results",
+					zap.Error(updateErr),
+				)
+			} else {
+				logger.Info("worker: execution results saved",
+					zap.String("status", execResult.Status.Description),
+					zap.String("time", execResult.Time),
+				)
+			}
+		}
+	}
+
+	// ── Step 6: Emit audit log ───────────────────────────────────────────────
 	// Audit logging is best-effort — a failure here must not cause the message
 	// to be requeued, because the code is already uploaded and the status is
 	// already updated.
@@ -130,6 +205,7 @@ func (w *SubmissionWorker) Process(ctx context.Context, job queue.SubmissionJob)
 		"status_to":     string(domain.SubmissionStatusPending),
 		"storage_path":  uploadedPath,
 		"language":      job.Language,
+		"language_id":   job.LanguageID,
 	}
 
 	if auditErr := w.auditClient.LogAction(

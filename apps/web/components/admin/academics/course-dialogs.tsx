@@ -2,21 +2,23 @@
 
 /**
  * Course dialogs: Create + Edit (with Prerequisites management)
+ * Uses SideDialog for consistent layout with user management UIs.
  */
 import * as React from 'react';
 import { BookOpen, X, Plus, Loader2 } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  SideDialog,
+  SideDialogContent,
+  SideDialogDescription,
+  SideDialogFooter,
+  SideDialogHeader,
+  SideDialogTitle,
+} from '@/components/ui/side-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -139,19 +141,19 @@ export function CreateCourseDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-zinc-600" />
+    <SideDialog open={open} onOpenChange={onOpenChange}>
+      <SideDialogContent>
+        <SideDialogHeader>
+          <SideDialogTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-primary" />
             Create Course
-          </DialogTitle>
-          <DialogDescription>
+          </SideDialogTitle>
+          <SideDialogDescription>
             Add a new course to the catalogue.
-          </DialogDescription>
-        </DialogHeader>
+          </SideDialogDescription>
+        </SideDialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+        <form onSubmit={handleSubmit} className="space-y-4 flex-1">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="course_code">Code</Label>
@@ -161,7 +163,7 @@ export function CreateCourseDialog({
                 value={values.code}
                 onChange={(e) => set('code', e.target.value.toUpperCase())}
               />
-              {errors.code && <p className="text-xs text-red-600">{errors.code}</p>}
+              {errors.code && <p className="text-xs text-destructive">{errors.code}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="course_credits">Credits</Label>
@@ -173,7 +175,7 @@ export function CreateCourseDialog({
                 value={values.credits}
                 onChange={(e) => set('credits', parseInt(e.target.value, 10) || 0)}
               />
-              {errors.credits && <p className="text-xs text-red-600">{errors.credits}</p>}
+              {errors.credits && <p className="text-xs text-destructive">{errors.credits}</p>}
             </div>
           </div>
 
@@ -185,25 +187,31 @@ export function CreateCourseDialog({
               value={values.title}
               onChange={(e) => set('title', e.target.value)}
             />
-            {errors.title && <p className="text-xs text-red-600">{errors.title}</p>}
+            {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="course_desc">Description <span className="text-zinc-400">(optional)</span></Label>
-            <Input
+            <Label htmlFor="course_desc">
+              Description <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Textarea
               id="course_desc"
               placeholder="Brief course overview"
+              rows={3}
               value={values.description}
               onChange={(e) => set('description', e.target.value)}
+              className="resize-none"
             />
           </div>
 
           {/* ── Prerequisites Section ─────────────────────────────────── */}
-          <div className="space-y-2 border-t pt-4">
-            <Label className="text-sm font-medium">Prerequisites <span className="text-zinc-400 font-normal">(optional)</span></Label>
+          <div className="space-y-2 border-t border-border pt-4">
+            <Label className="text-sm font-medium">
+              Prerequisites <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
 
             {selectedPrereqIds.length === 0 ? (
-              <p className="text-xs text-zinc-400">No prerequisites selected.</p>
+              <p className="text-xs text-muted-foreground">No prerequisites selected.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {selectedPrereqIds.map((id) => {
@@ -217,7 +225,7 @@ export function CreateCourseDialog({
                       {prereqCourse ? `${prereqCourse.code} – ${prereqCourse.title}` : id.slice(0, 8)}
                       <button
                         type="button"
-                        className="ml-0.5 rounded-full p-0.5 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                        className="ml-0.5 rounded-full p-0.5 hover:bg-accent"
                         onClick={() => removePrereqFromList(id)}
                       >
                         <X className="h-3 w-3" />
@@ -257,17 +265,17 @@ export function CreateCourseDialog({
             )}
           </div>
 
-          <DialogFooter>
+          <SideDialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? 'Creating…' : 'Create Course'}
+              {submitting ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Creating…</> : 'Create Course'}
             </Button>
-          </DialogFooter>
+          </SideDialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SideDialogContent>
+    </SideDialog>
   );
 }
 
@@ -379,21 +387,21 @@ export function EditCourseDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5 text-zinc-600" />
+    <SideDialog open={open} onOpenChange={onOpenChange}>
+      <SideDialogContent>
+        <SideDialogHeader>
+          <SideDialogTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5 text-primary" />
             Edit Course
-          </DialogTitle>
-          <DialogDescription>
+          </SideDialogTitle>
+          <SideDialogDescription>
             Update details for <strong>{course.title}</strong>.
             <br />
-            <span className="text-xs font-mono text-zinc-400">{course.code}</span>
-          </DialogDescription>
-        </DialogHeader>
+            <span className="font-mono text-xs text-muted-foreground">{course.code}</span>
+          </SideDialogDescription>
+        </SideDialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+        <form onSubmit={handleSubmit} className="space-y-4 flex-1">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="edit_course_title">Title</Label>
@@ -413,32 +421,34 @@ export function EditCourseDialog({
                 value={values.credits ?? course.credits}
                 onChange={(e) => set('credits', parseInt(e.target.value, 10) || 0)}
               />
-              {errors.credits && <p className="text-xs text-red-600">{errors.credits}</p>}
+              {errors.credits && <p className="text-xs text-destructive">{errors.credits}</p>}
             </div>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="edit_course_desc">Description</Label>
-            <Input
+            <Textarea
               id="edit_course_desc"
+              rows={3}
               value={values.description ?? ''}
               onChange={(e) => set('description', e.target.value)}
+              className="resize-none"
             />
           </div>
 
           {/* ── Prerequisites Section ─────────────────────────────────── */}
-          <div className="space-y-2 border-t pt-4">
+          <div className="space-y-2 border-t border-border pt-4">
             <Label className="text-sm font-medium">Prerequisites</Label>
 
             {prereqLoading ? (
-              <div className="flex items-center gap-2 text-xs text-zinc-400">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" /> Loading prerequisites…
               </div>
             ) : (
               <>
                 {/* Current prereqs */}
                 {prereqs.length === 0 ? (
-                  <p className="text-xs text-zinc-400">No prerequisites set.</p>
+                  <p className="text-xs text-muted-foreground">No prerequisites set.</p>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {prereqs.map((p) => {
@@ -456,7 +466,7 @@ export function EditCourseDialog({
                             : p.prerequisite_course_id.slice(0, 8)}
                           <button
                             type="button"
-                            className="ml-0.5 rounded-full p-0.5 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                            className="ml-0.5 rounded-full p-0.5 hover:bg-accent"
                             onClick={() => removePrerequisite(p.prerequisite_course_id)}
                           >
                             <X className="h-3 w-3" />
@@ -506,16 +516,16 @@ export function EditCourseDialog({
             )}
           </div>
 
-          <DialogFooter>
+          <SideDialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? 'Saving…' : 'Save Changes'}
+              {submitting ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />Saving…</> : 'Save Changes'}
             </Button>
-          </DialogFooter>
+          </SideDialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SideDialogContent>
+    </SideDialog>
   );
 }

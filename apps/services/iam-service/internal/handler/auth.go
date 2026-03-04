@@ -56,11 +56,11 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 		return fiber.ErrBadRequest
 	}
 
-	if req.Username == "" || req.Password == "" {
+	if req.Email == "" || req.Password == "" {
 		return fiber.ErrBadRequest
 	}
 
-	response, err := h.authService.Login(c.RequestCtx(), req.Username, req.Password)
+	response, err := h.authService.Login(c.RequestCtx(), req.Email, req.Password)
 	if err != nil {
 		return handleAuthError(err)
 	}
@@ -218,7 +218,7 @@ func (h *AuthHandler) RevokeUserSessions(c fiber.Ctx) error {
 func handleAuthError(err error) error {
 	switch err {
 	case service.ErrInvalidCredentials:
-		return fiber.NewError(fiber.StatusUnauthorized, "Invalid username or password")
+		return fiber.NewError(fiber.StatusUnauthorized, "Invalid email or password")
 	case service.ErrUserInactive:
 		return fiber.NewError(fiber.StatusForbidden, "User account is inactive")
 	case service.ErrPasswordResetRequired:

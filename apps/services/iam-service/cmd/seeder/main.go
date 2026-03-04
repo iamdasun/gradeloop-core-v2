@@ -40,18 +40,8 @@ func main() {
 	}()
 	fmt.Println("Database connected")
 
-	// Pre-migration fix: Ensure username column exists and is populated
+	// Cleanup orphaned refresh tokens before adding FK constraint
 	fmt.Println("Running pre-migration fixes...")
-	// 1. Add username column if not exists (nullable)
-	if err := db.DB.Exec(`ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100)`).Error; err != nil {
-		fmt.Printf("Warning: Failed to add username column: %v\n", err)
-	}
-	// 2. Populate username with email for existing records where it's null
-	if err := db.DB.Exec(`UPDATE users SET username = email WHERE username IS NULL OR username = ''`).Error; err != nil {
-		fmt.Printf("Warning: Failed to update existing users with username: %v\n", err)
-	}
-
-	// 3. Cleanup orphaned refresh tokens before adding FK constraint
 	if err := db.DB.Exec(`DELETE FROM refresh_tokens WHERE user_id NOT IN (SELECT id FROM users)`).Error; err != nil {
 		fmt.Printf("Warning: Failed to cleanup orphaned refresh tokens: %v\n", err)
 	}

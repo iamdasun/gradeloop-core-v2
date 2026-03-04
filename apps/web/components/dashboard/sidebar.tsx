@@ -12,9 +12,6 @@ import {
   GraduationCap,
   BarChart3,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
   LogOut,
   School,
   Building2,
@@ -22,11 +19,26 @@ import {
   Landmark,
   Users2,
   ClipboardList,
+  MessageSquare,
+  Search,
+  FolderOpen,
+  History,
+  Share2,
+  Archive,
+  LayoutTemplate,
+  Star,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  UserCog,
+  Key,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuthStore } from "@/lib/stores/authStore";
+import { useLogoutMutation } from "@/lib/hooks/useAuthMutation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,84 +47,80 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuthStore } from "@/lib/stores/authStore";
-import { useLogoutMutation } from "@/lib/hooks/useAuthMutation";
 
-// ── Nav item type system ──────────────────────────────────────────────────────
+interface SubNavLink {
+  title: string;
+  href: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}
 
-interface NavLink {
-  type?: "link";
+interface NavItem {
   title: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
+  subItems?: SubNavLink[];
 }
 
-interface NavChild {
-  title: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-interface NavGroup {
-  type: "group";
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  /** Treated as the active root for pathname detection and collapsed-mode link */
-  baseHref: string;
-  children: NavChild[];
-}
-
-type NavItem = NavLink | NavGroup;
-
-// ── Nav configuration ─────────────────────────────────────────────────────────
-
-const navItems: NavItem[] = [
+const adminNavItems: NavItem[] = [
   {
     title: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
   },
   {
-    title: "Users",
+    title: "Users Management",
     href: "/admin/users",
     icon: Users,
-  },
-  {
-    type: "group",
-    title: "Academics",
-    icon: School,
-    baseHref: "/admin/academics",
-    children: [
-      { title: "Faculties", href: "/admin/academics/faculties", icon: Landmark },
-      { title: "Departments", href: "/admin/academics/departments", icon: Building2 },
-      { title: "Degrees", href: "/admin/academics/degrees", icon: Award },
-      { title: "Courses", href: "/admin/academics/courses", icon: BookOpen },
+    subItems: [
+      { title: "Users", href: "/admin/users", icon: Users },
+      { title: "Roles & Permissions", href: "/admin/roles", icon: UserCog },
+      { title: "Groups & Batches", href: "/admin/academics/groups", icon: Users2 },
     ],
   },
   {
-    title: "Assignments",
-    href: "/admin/assignments",
-    icon: FileText,
-  },
-  {
-    title: "Students",
-    href: "/admin/students",
-    icon: GraduationCap,
-  },
-  {
-    title: "Analytics",
-    href: "/admin/analytics",
-    icon: BarChart3,
-  },
-  {
-    title: "Calendar",
-    href: "/admin/calendar",
-    icon: Calendar,
+    title: "Academics",
+    href: "/admin/academics",
+    icon: School,
+    subItems: [
+      { title: "Faculties", href: "/admin/academics/faculties" },
+      { title: "Departments", href: "/admin/academics/departments" },
+      { title: "Degrees", href: "/admin/academics/degrees" },
+      { title: "Specializations", href: "/admin/academics/specializations" },
+      { title: "Courses", href: "/admin/academics/courses" },
+      { title: "Semesters", href: "/admin/academics/semesters" },
+    ],
   },
   {
     title: "Settings",
     href: "/admin/settings",
+    icon: Settings,
+  },
+];
+
+const instructorNavItems: NavItem[] = [
+  {
+    title: "Dashboard",
+    href: "/instructor",
+    icon: LayoutDashboard,
+  },
+  {
+    title: "My Courses",
+    href: "/instructor/courses",
+    icon: BookOpen,
+  },
+  {
+    title: "Assessments",
+    href: "/instructor/assessments",
+    icon: FileText,
+  },
+  {
+    title: "Students",
+    href: "/instructor/students",
+    icon: GraduationCap,
+  },
+  {
+    title: "Settings",
+    href: "/instructor/settings",
     icon: Settings,
   },
 ];
@@ -127,234 +135,183 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
 
-  const displayName = user?.full_name || user?.username || '—';
+  const isEmployee = user?.role_name?.toLowerCase().trim() === "employee";
+  const navItems = isEmployee ? instructorNavItems : adminNavItems;
+  const homeHref = isEmployee ? "/instructor" : "/admin";
+
+  const displayName = user?.full_name || user?.email || "—";
   const initials = user?.full_name
-    ? user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
-    : user?.username?.slice(0, 2).toUpperCase() || '??';
+    ? user.full_name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase()
+    : user?.email?.slice(0, 2).toUpperCase() || "??";
 
-  // Auto-open any group whose child is active on mount
-  const [openGroups, setOpenGroups] = React.useState<Set<string>>(() => {
-    const initial = new Set<string>();
-    navItems.forEach((item) => {
-      if (item.type === "group") {
-        if (item.children.some((c) => pathname.startsWith(c.href))) {
-          initial.add(item.title);
-        }
-      }
-    });
-    return initial;
-  });
+  // Determine active primary item
+  const activeRoot = navItems.find((item) => {
+    if (item.href === homeHref) return pathname === homeHref;
+    // Check if pathname starts with item.href
+    if (pathname.startsWith(item.href) && item.href !== homeHref) return true;
+    // Check if any subItems match
+    if (item.subItems?.some(sub => pathname.startsWith(sub.href))) return true;
+    return false;
+  }) || navItems[0];
 
-  const toggleGroup = React.useCallback((key: string) => {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }, []);
+  const hasSecondaryContent = activeRoot?.subItems && activeRoot.subItems.length > 0;
+  const [isHovered, setIsHovered] = React.useState(false);
+
+  const isPrimaryCollapsed = hasSecondaryContent ? !isHovered : collapsed;
 
   return (
-    <div
-      className={cn(
-        "relative flex h-screen flex-col border-r bg-white dark:bg-zinc-950 shadow-sm transition-all duration-300",
-        collapsed ? "w-16" : "w-64",
-      )}
-    >
-      {/* Logo Area */}
-      <div className="flex h-16 items-center border-b bg-zinc-50/50 dark:bg-zinc-900/50 px-4">
-        {!collapsed ? (
-          <Link href="/admin" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-900 dark:bg-zinc-50">
-              <GraduationCap className="h-5 w-5 text-zinc-50 dark:text-zinc-900" />
-            </div>
-            <span className="font-semibold text-lg">GradeLoop</span>
-          </Link>
-        ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-900 dark:bg-zinc-50 mx-auto">
-            <GraduationCap className="h-5 w-5 text-zinc-50 dark:text-zinc-900" />
-          </div>
+    <div className="relative flex h-screen text-sidebar-foreground transition-all duration-300 z-20">
+      {/* Primary Sidebar */}
+      <div
+        className={cn(
+          "relative z-20 flex flex-col items-center border-r bg-sidebar text-sidebar-foreground py-4 transition-all duration-300",
+          isPrimaryCollapsed ? "w-16" : "w-64 items-start"
         )}
-      </div>
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Logo */}
+        <div className={cn("flex w-full mb-6", isPrimaryCollapsed ? "justify-center" : "justify-start px-4")}>
+          <Link href={homeHref} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105">
+            <GraduationCap className="h-6 w-6" />
+          </Link>
+          {!isPrimaryCollapsed && (
+            <div className="ml-3 flex flex-col justify-center overflow-hidden">
+              <span className="font-bold text-lg leading-tight truncate">Gradeloop</span>
+            </div>
+          )}
+        </div>
 
-      {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-4">
-        <nav className="flex flex-col gap-1">
+        {/* Primary Navigation Icons */}
+        <nav className={cn("flex flex-1 flex-col gap-3 w-full", isPrimaryCollapsed ? "px-2 items-center" : "px-4 items-stretch overflow-y-auto")}>
           {navItems.map((item) => {
-            // ── Group item ──────────────────────────────────────────────────
-            if (item.type === "group") {
-              const isGroupActive = pathname.startsWith(item.baseHref);
-              const isOpen = openGroups.has(item.title);
-              const GroupIcon = item.icon;
-
-              if (collapsed) {
-                // Collapsed: icon only, link to baseHref (overview)
-                return (
-                  <Link key={item.title} href={item.baseHref}>
-                    <Button
-                      variant="ghost"
-                      className={cn(
-                        "w-full justify-start gap-3 px-2",
-                        isGroupActive
-                          ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 dark:bg-zinc-50 dark:text-zinc-900"
-                          : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                      )}
-                      title={item.title}
-                    >
-                      <GroupIcon className="h-5 w-5 shrink-0" />
-                    </Button>
-                  </Link>
-                );
-              }
-
-              return (
-                <div key={item.title} className="flex flex-col">
-                  <Button
-                    variant="ghost"
-                    className={cn(
-                      "w-full justify-start gap-3 px-3",
-                      isGroupActive && !isOpen
-                        ? "bg-zinc-100 dark:bg-zinc-800"
-                        : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                    )}
-                    onClick={() => toggleGroup(item.title)}
-                  >
-                    <GroupIcon className="h-5 w-5 shrink-0" />
-                    <span className="flex-1 text-left text-sm font-medium">
-                      {item.title}
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        "h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-200",
-                        isOpen && "rotate-180",
-                      )}
-                    />
-                  </Button>
-
-                  {/* Children */}
-                  <div
-                    className={cn(
-                      "overflow-hidden transition-all duration-200",
-                      isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0",
-                    )}
-                  >
-                    <div className="ml-4 mt-0.5 flex flex-col gap-0.5 border-l border-zinc-200 pl-2 dark:border-zinc-800">
-                      {item.children.map((child) => {
-                        const isChildActive = pathname === child.href || pathname.startsWith(child.href + "/");
-                        const ChildIcon = child.icon;
-                        return (
-                          <Link key={child.href} href={child.href}>
-                            <Button
-                              variant="ghost"
-                              className={cn(
-                                "h-8 w-full justify-start gap-2 px-3 text-sm",
-                                isChildActive
-                                  ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 dark:bg-zinc-50 dark:text-zinc-900"
-                                  : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
-                              )}
-                            >
-                              <ChildIcon className="h-4 w-4 shrink-0" />
-                              <span>{child.title}</span>
-                            </Button>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            // ── Regular link item ───────────────────────────────────────────
-            const navLink = item as NavLink;
-            const isActive = pathname === navLink.href;
-            const Icon = navLink.icon;
-
+            const isActive = activeRoot.title === item.title;
+            const Icon = item.icon;
             return (
-              <Link key={navLink.href} href={navLink.href}>
+              <Link key={item.title} href={item.href} className="w-full">
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start gap-3",
-                    collapsed ? "px-2" : "px-3",
+                    "h-12 w-full flex items-center rounded-xl transition-colors",
+                    isPrimaryCollapsed ? "justify-center p-0" : "justify-start px-4 gap-3",
                     isActive
-                      ? "bg-zinc-900 text-zinc-50 hover:bg-zinc-900/90 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-50/90"
-                      : "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+                      ? "bg-primary/10 text-primary font-semibold"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
                   )}
-                  title={collapsed ? navLink.title : undefined}
+                  title={isPrimaryCollapsed ? item.title : undefined}
                 >
                   <Icon className="h-5 w-5 shrink-0" />
-                  {!collapsed && (
-                    <span className="flex-1 text-left">{navLink.title}</span>
-                  )}
-                  {!collapsed && navLink.badge && (
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-xs text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900">
-                      {navLink.badge}
-                    </span>
-                  )}
+                  {!isPrimaryCollapsed && <span className="truncate">{item.title}</span>}
                 </Button>
               </Link>
             );
           })}
         </nav>
-      </ScrollArea>
 
-      {/* User Profile Section */}
-      <div className="border-t bg-zinc-50/50 dark:bg-zinc-900/50 p-3">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        {/* Bottom Primary Actions */}
+        <div className={cn("mt-auto w-full", isPrimaryCollapsed ? "px-2 flex flex-col items-center gap-2" : "px-4")}>
+          <div className={cn("flex items-center gap-1 w-full", isPrimaryCollapsed ? "flex-col" : "flex-row")}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className={cn("h-12 rounded-xl hover:bg-sidebar-accent border-0", isPrimaryCollapsed ? "w-12 p-0 justify-center" : "flex-1 min-w-0 px-3 justify-start gap-3")}>
+                  <Avatar className="h-8 w-8 ring-2 ring-primary/20 shrink-0">
+                    <AvatarFallback className="bg-primary/20 text-xs text-primary">{initials}</AvatarFallback>
+                  </Avatar>
+                  {!isPrimaryCollapsed && (
+                    <div className="flex flex-col items-start overflow-hidden text-left flex-1 min-w-0">
+                      <span className="text-sm font-medium text-foreground truncate w-full">{displayName}</span>
+                      {isEmployee && <span className="text-xs text-muted-foreground truncate w-full">Instructor</span>}
+                    </div>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" side="right" className="w-56 mb-2 ml-2">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/profile" className="flex w-full cursor-pointer items-center">Profile</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem>Settings</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => logout()}
+                  disabled={isLoggingOut}
+                  className="text-red-600 gap-2 cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {isLoggingOut ? "Logging out…" : "Log out"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               variant="ghost"
-              className={cn(
-                "w-full gap-3",
-                collapsed ? "px-2" : "justify-start px-3",
-              )}
-            >
-              <Avatar className="h-8 w-8 shrink-0">
-                <AvatarFallback>{initials}</AvatarFallback>
-              </Avatar>
-              {!collapsed && (
-                <div className="flex flex-1 items-center text-left text-sm">
-                  <span className="font-medium truncate max-w-[150px]">{displayName}</span>
-                </div>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/profile" className="flex w-full cursor-pointer items-center">
-                Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               onClick={() => logout()}
               disabled={isLoggingOut}
-              className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400 gap-2"
+              title="Log out"
             >
               <LogOut className="h-4 w-4" />
-              {isLoggingOut ? "Logging out…" : "Log out"}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </Button>
+          </div>
+        </div>
       </div>
+      {/* Secondary Sidebar Area */}
+      {hasSecondaryContent && (
+        <div
+          className={cn("relative transition-all duration-300 z-10 w-64")}
+        >
+          <div className={cn(
+            "absolute inset-y-0 left-0 flex flex-col border-r bg-sidebar-background transition-all duration-300 h-full w-64 items-start"
+          )}>
+            <div className={cn("flex h-16 items-center w-full px-6")}>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground font-heading">{activeRoot?.title || "Overview"}</h2>
+            </div>
+            <ScrollArea className={cn("flex-1 w-full px-4")}>
+              <div className="flex flex-col gap-3 py-2 w-full items-center">
+                {/* Contextual Sub-navigation */}
+                <div className="flex flex-col gap-1 w-full">
+                  {activeRoot.subItems!.map((subItem) => {
+                    const isChildActive = pathname === subItem.href || pathname.startsWith(subItem.href + "/");
+                    return (
+                      <Link key={subItem.title} href={subItem.href} className="w-full text-left">
+                        <Button
+                          variant="ghost"
+                          className={cn(
+                            "h-10 w-full flex items-center rounded-lg transition-colors justify-start px-3",
+                            isChildActive
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                          )}
+                        >
+                          <span className="truncate text-sm">{subItem.title}</span>
+                        </Button>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+      )}
 
-      {/* Collapse Toggle */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute -right-3 top-20 z-10 h-6 w-6 rounded-full border bg-white dark:bg-zinc-950 shadow-md hover:shadow-lg hover:scale-110 transition-all"
-        onClick={() => onCollapsedChange(!collapsed)}
-      >
-        {collapsed ? (
-          <ChevronRight className="h-4 w-4" />
-        ) : (
-          <ChevronLeft className="h-4 w-4" />
-        )}
-      </Button>
+      {/* Toggle Sidebar Button */}
+      {!hasSecondaryContent && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onCollapsedChange(!collapsed)}
+          className="absolute -right-3 top-6 z-50 h-6 w-6 rounded-full border bg-background text-foreground shadow-sm hover:bg-accent transition-all duration-300 flex items-center justify-center p-0"
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </Button>
+      )}
     </div>
   );
 }

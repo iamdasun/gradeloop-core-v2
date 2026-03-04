@@ -4,7 +4,6 @@ import "github.com/google/uuid"
 
 type UserResponse struct {
 	ID          uuid.UUID `json:"id"`
-	Username    string    `json:"username"`
 	Email       string    `json:"email"`
 	FullName    string    `json:"full_name"`
 	AvatarURL   string    `json:"avatar_url"`
@@ -39,9 +38,11 @@ type UpdateUserRequest struct {
 
 type UpdateUserResponse struct {
 	ID       uuid.UUID `json:"id"`
-	Username string    `json:"username"`
 	Email    string    `json:"email"`
 	RoleID   uuid.UUID `json:"role_id"`
 	IsActive bool      `json:"is_active"`
 	Message  string    `json:"message"`
+}
+type GetUsersByIDsRequest struct {
+	IDs []string `json:"ids"`
 }

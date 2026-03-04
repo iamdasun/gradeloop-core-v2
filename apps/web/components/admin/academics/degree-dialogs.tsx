@@ -35,6 +35,9 @@ interface CreateDegreeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: (degree: Degree) => void;
+  /** Pre-fill and lock Department when creating from a Department detail page */
+  initialDepartmentId?: string;
+  initialDepartmentName?: string;
 }
 
 const EMPTY: CreateDegreeRequest = {
@@ -59,6 +62,8 @@ export function CreateDegreeDialog({
   open,
   onOpenChange,
   onSuccess,
+  initialDepartmentId,
+  initialDepartmentName,
 }: CreateDegreeDialogProps) {
   const [values, setValues] = React.useState<CreateDegreeRequest>(EMPTY);
   const [errors, setErrors] = React.useState<AcademicFormErrors>({});
@@ -67,11 +72,13 @@ export function CreateDegreeDialog({
 
   React.useEffect(() => {
     if (open) {
-      setValues(EMPTY);
+      setValues({ ...EMPTY, department_id: initialDepartmentId ?? '' });
       setErrors({});
-      departmentsApi.list().then(setDepartments).catch(() => {});
+      if (!initialDepartmentId) {
+        departmentsApi.list().then(setDepartments).catch(() => {});
+      }
     }
-  }, [open]);
+  }, [open, initialDepartmentId]);
 
   function set(field: keyof CreateDegreeRequest, value: string) {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -112,19 +119,25 @@ export function CreateDegreeDialog({
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label htmlFor="deg_dept">Department</Label>
-            <select
-              id="deg_dept"
-              className="flex h-9 w-full rounded-md border border-zinc-200 bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 dark:border-zinc-800 dark:focus-visible:ring-zinc-300"
-              value={values.department_id}
-              onChange={(e) => set('department_id', e.target.value)}
-            >
-              <option value="">Select department…</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name} ({d.code})
-                </option>
-              ))}
-            </select>
+            {initialDepartmentId ? (
+              <div className="flex h-9 w-full items-center rounded-md border border-border bg-muted px-3 text-sm text-muted-foreground">
+                {initialDepartmentName ?? initialDepartmentId}
+              </div>
+            ) : (
+              <select
+                id="deg_dept"
+                className="flex h-9 w-full rounded-md border border-zinc-200 bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 dark:border-zinc-800 dark:focus-visible:ring-zinc-300"
+                value={values.department_id}
+                onChange={(e) => set('department_id', e.target.value)}
+              >
+                <option value="">Select department…</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} ({d.code})
+                  </option>
+                ))}
+              </select>
+            )}
             {errors.department_id && (
               <p className="text-xs text-red-600">{errors.department_id}</p>
             )}

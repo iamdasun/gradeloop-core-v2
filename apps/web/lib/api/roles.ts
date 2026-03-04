@@ -22,6 +22,18 @@ export const rolesApi = {
     const { data } = await axiosInstance.get<Role>(`/roles/${id}`);
     return data;
   },
+
+  /** POST /roles */
+  create: async (payload: { name: string; description?: string; base_role_id?: string; permissions?: string[] }): Promise<Role> => {
+    const { data } = await axiosInstance.post<Role>('/roles', payload);
+    return data;
+  },
+
+  /** PUT /roles/:id or PATCH */
+  update: async (id: string, payload: { name?: string; description?: string; permissions?: string[] }): Promise<Role> => {
+    const { data } = await axiosInstance.put<Role>(`/roles/${id}`, payload);
+    return data;
+  },
 };
 
 export const permissionsApi = {

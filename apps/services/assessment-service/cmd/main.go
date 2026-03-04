@@ -8,8 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/client"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/config"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/handler"
@@ -21,6 +19,8 @@ import (
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/service"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/storage"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/utils"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"go.uber.org/zap"
 )
 
@@ -94,6 +94,7 @@ func run() error {
 	// ── External clients ─────────────────────────────────────────────────────
 	auditClient := client.NewAuditClient(cfg.IAMServiceURL, logger)
 	academicClient := client.NewAcademicClient(cfg.AcademicSvcURL, logger)
+	judge0Client := client.NewJudge0Client(cfg.Judge0.URL, cfg.Judge0.APIKey, cfg.Judge0.Timeout, logger)
 
 	// ── Repositories ─────────────────────────────────────────────────────────
 	assignmentRepo := repository.NewAssignmentRepository(db.DB)
@@ -103,10 +104,16 @@ func run() error {
 	// ── Message queue: publisher + worker + consumer ──────────────────────────
 	submissionPublisher := queue.NewSubmissionPublisher(rmq, logger)
 
+	// Create evaluation service for test case evaluation
+	evaluationService := service.NewEvaluationService(judge0Client, logger)
+
 	submissionWorker := service.NewSubmissionWorker(
 		submissionRepo,
+		assignmentRepo,
 		minioStorage,
 		auditClient,
+		judge0Client,
+		evaluationService,
 		db.DB,
 		logger,
 	)
@@ -129,6 +136,8 @@ func run() error {
 		submissionPublisher,
 		auditClient,
 		academicClient,
+		judge0Client,
+		cfg.Judge0.MaxPayloadSize,
 		db.DB,
 		logger,
 	)
@@ -145,6 +154,7 @@ func run() error {
 	assignmentHandler := handler.NewAssignmentHandler(assignmentService, logger)
 	submissionHandler := handler.NewSubmissionHandler(submissionService, logger)
 	groupHandler := handler.NewGroupHandler(groupService, logger)
+	instructorHandler := handler.NewInstructorHandler(assignmentService, submissionService, academicClient, logger)
 
 	// ── Fiber app ────────────────────────────────────────────────────────────
 	app := fiber.New(fiber.Config{
@@ -167,6 +177,7 @@ func run() error {
 		AssignmentHandler: assignmentHandler,
 		SubmissionHandler: submissionHandler,
 		GroupHandler:      groupHandler,
+		InstructorHandler: instructorHandler,
 		JWTSecretKey:      []byte(cfg.JWT.SecretKey),
 	})
 

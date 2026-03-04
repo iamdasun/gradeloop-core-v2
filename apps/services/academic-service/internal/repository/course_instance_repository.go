@@ -14,6 +14,7 @@ type CourseInstanceRepository interface {
 	Update(instance *domain.CourseInstance) error
 	GetByID(id uuid.UUID) (*domain.CourseInstance, error)
 	ListByBatch(batchID uuid.UUID) ([]domain.CourseInstance, error)
+	ListByCourse(courseID uuid.UUID) ([]domain.CourseInstance, error)
 	GetByUnique(courseID, semesterID, batchID uuid.UUID) (*domain.CourseInstance, error)
 }
 
@@ -61,6 +62,17 @@ func (r *courseInstanceRepository) ListByBatch(batchID uuid.UUID) ([]domain.Cour
 	var instances []domain.CourseInstance
 	err := r.db.
 		Where("batch_id = ?", batchID).
+		Order("created_at ASC").
+		Find(&instances).Error
+	return instances, err
+}
+
+// ListByCourse returns all course instances associated with the given course,
+// ordered by creation time ascending.
+func (r *courseInstanceRepository) ListByCourse(courseID uuid.UUID) ([]domain.CourseInstance, error) {
+	var instances []domain.CourseInstance
+	err := r.db.
+		Where("course_id = ?", courseID).
 		Order("created_at ASC").
 		Find(&instances).Error
 	return instances, err

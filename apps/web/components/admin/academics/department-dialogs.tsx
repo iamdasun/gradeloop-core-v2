@@ -35,6 +35,9 @@ interface CreateDepartmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: (dept: Department) => void;
+  /** Pre-fill and lock Faculty when creating from a Faculty detail page */
+  initialFacultyId?: string;
+  initialFacultyName?: string;
 }
 
 const EMPTY_CREATE: CreateDepartmentRequest = {
@@ -64,6 +67,8 @@ export function CreateDepartmentDialog({
   open,
   onOpenChange,
   onSuccess,
+  initialFacultyId,
+  initialFacultyName,
 }: CreateDepartmentDialogProps) {
   const { isSuperAdmin } = useAcademicsAccess();
   const [values, setValues] = React.useState<CreateDepartmentRequest>(EMPTY_CREATE);
@@ -76,16 +81,16 @@ export function CreateDepartmentDialog({
 
   React.useEffect(() => {
     if (open) {
-      setValues(EMPTY_CREATE);
+      setValues({ ...EMPTY_CREATE, faculty_id: initialFacultyId ?? '' });
       setErrors({});
-      if (isSuperAdmin && !facultiesLoaded) {
+      if (isSuperAdmin && !facultiesLoaded && !initialFacultyId) {
         facultiesApi
           .list()
           .then((f) => { setFaculties(f); setFacultiesLoaded(true); })
           .catch(() => { /* graceful — admin will type UUID manually */ });
       }
     }
-  }, [open, isSuperAdmin, facultiesLoaded]);
+  }, [open, isSuperAdmin, facultiesLoaded, initialFacultyId]);
 
   function set(field: keyof CreateDepartmentRequest, value: string) {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -124,12 +129,14 @@ export function CreateDepartmentDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
-          {/* Faculty ID — dropdown for super_admin, text for admin */}
+          {/* Faculty ID — locked when pre-filled, dropdown for super_admin, text otherwise */}
           <div className="space-y-1.5">
-            <Label htmlFor="faculty_id">
-              Faculty{isSuperAdmin ? '' : ' ID (UUID)'}
-            </Label>
-            {isSuperAdmin && faculties.length > 0 ? (
+            <Label htmlFor="faculty_id">Faculty</Label>
+            {initialFacultyId ? (
+              <div className="flex h-9 w-full items-center rounded-md border border-border bg-muted px-3 text-sm text-muted-foreground">
+                {initialFacultyName ?? initialFacultyId}
+              </div>
+            ) : isSuperAdmin && faculties.length > 0 ? (
               <select
                 id="faculty_id"
                 className="flex h-9 w-full rounded-md border border-zinc-200 bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 dark:border-zinc-800 dark:focus-visible:ring-zinc-300"

@@ -1,0 +1,24 @@
+meta {
+  name: Compare Two Codes
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{CIPAS_SEMANTICS_URL_V1}}/compare
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "code1": "int sum(int a, int b) { return a + b; }",
+    "code2": "int add(int x, int y) { int result = x + y; return result; }",
+    "language": "java"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

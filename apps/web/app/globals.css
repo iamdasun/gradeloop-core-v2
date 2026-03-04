@@ -1,380 +1,383 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
+@variant dark (&:where(.dark, .dark *));
+
 /* ==========================================================================
    GradeLoop Core V2 — Design Token System
    Built for: Tailwind v4 + shadcn/ui + Radix UI
-   
+
    Brand Palette:
-     #191726  →  246 22% 12%   Deep primary / dark base
-     #5D7173  →  184 10% 40%   Muted neutral / secondary surfaces
-     #B4BEBF  →  186  8% 73%   Soft neutral / borders / disabled
-     #027368  →  176 96% 23%   Accent / brand / interactive emphasis
-     #F2F2F2  →    0  0% 95%   Light base / backgrounds
+     Primary:    248 89% 63%   Vibrant Indigo/Purple (#6366F1)
+     Secondary:  252 100% 96%  Soft Lavender (#F5F3FF)
+     Muted:      220 14% 96%   Light gray for subtle elements
+     Accent:     220 14% 96%   Hover states and icons
+     Background: 0 0% 100%     Pure white
+     Foreground: 224 71.4% 4.1% Deep navy text
    ========================================================================== */
 
 @layer base {
 
     /* -----------------------------------------------------------------------
        LIGHT THEME  (:root)
-       Base: #F2F2F2 (off-white) canvas, #191726 foreground
+       Clean, modern aesthetic with vibrant indigo/purple brand colors
     ----------------------------------------------------------------------- */
     :root {
         /* --- Core Surface Layers --- */
-        --background: 0 0% 95%;
-        /* #F2F2F2  — page canvas */
-        --foreground: 246 22% 12%;
-        /* #191726  — primary text */
+        --background: 0 0% 100%;
+        /* Pure white canvas */
+        --foreground: 224 71.4% 4.1%;
+        /* Deep navy text */
 
         --card: 0 0% 100%;
-        /* #FFFFFF  — card surface (+1 layer) */
-        --card-foreground: 246 22% 12%;
-        /* #191726  — card text */
+        /* Pure white card surface */
+        --card-foreground: 224 71.4% 4.1%;
+        /* Deep navy text */
 
         --popover: 0 0% 100%;
-        /* #FFFFFF  — popover/dropdown */
-        --popover-foreground: 246 22% 12%;
-        /* #191726  — popover text */
+        /* Pure white popover/dropdown */
+        --popover-foreground: 224 71.4% 4.1%;
+        /* Deep navy text */
 
         /* --- Brand / Interactive --- */
-        --primary: 176 96% 22%;
-        /* #027368  — brand teal */
-        --primary-foreground: 0 0% 95%;
-        /* #F2F2F2  — text on primary */
+        --primary: 248 89% 63%;
+        /* Vibrant indigo/purple */
+        --primary-foreground: 210 20% 98%;
+        /* Light text on primary */
 
         /* --- Secondary & Muted --- */
-        --secondary: 186 14% 88%;
-        /* #DDE5E6  — subtle fill layer */
-        --secondary-foreground: 184 12% 32%;
-        /* #476365  — secondary text */
+        --secondary: 252 100% 96%;
+        /* Soft lavender background */
+        --secondary-foreground: 248 89% 63%;
+        /* Indigo text */
 
-        --muted: 186 10% 91%;
-        /* #E5EAEB  — muted fills */
-        --muted-foreground: 184 10% 40%;
-        /* #5D7173  — subdued text */
+        --muted: 220 14% 96%;
+        /* Light gray for subtle elements */
+        --muted-foreground: 220 9% 46%;
+        /* Medium gray text */
 
         /* --- Accent --- */
-        --accent: 176 60% 88%;
-        /* #CBE8E5  — teal-tinted highlight */
-        --accent-foreground: 176 96% 18%;
-        /* #015D55  — accent text */
+        --accent: 220 14% 96%;
+        /* Light gray for hover states */
+        --accent-foreground: 224 71.4% 4.1%;
+        /* Deep navy text */
 
         /* --- Destructive --- */
-        --destructive: 8 55% 48%;
-        /* #BE5040  — muted brick red */
-        --destructive-foreground: 0 0% 95%;
-        /* #F2F2F2  */
+        --destructive: 0 84.2% 60.2%;
+        /* Red for errors/destructive actions */
+        --destructive-foreground: 210 20% 98%;
+        /* Light text on destructive */
 
         /* --- Structural --- */
-        --border: 186 8% 73%;
-        /* #B4BEBF  — lines & dividers */
-        --input: 186 8% 80%;
-        /* #C5CCCF  — input borders */
-        --ring: 176 96% 22%;
-        /* #027368  — focus rings */
+        --border: 220 13% 91%;
+        /* Light gray borders */
+        --input: 220 13% 91%;
+        /* Light gray input borders */
+        --ring: 248 89% 63%;
+        /* Indigo focus rings */
 
         /* --- Border Radius --- */
-        --radius: 0.5rem;
+        --radius: 0.3rem;
 
         /* -------------------------------------------------------------------
            FEEDBACK STATES — Light
-           Derived from palette; no arbitrary colors introduced.
-           Success: teal pushed green; Error: warm brick; Warning: amber;
-           Info: teal-blue bridge
+           Harmonized with indigo/purple brand palette
         ------------------------------------------------------------------- */
 
-        /* Success (teal → shifted green) */
-        --success: 163 80% 26%;
-        /* #0C7A54  */
-        --success-foreground: 0 0% 95%;
-        /* #F2F2F2  */
-        --success-muted: 163 50% 90%;
-        /* #D4EDE6  */
-        --success-muted-foreground: 163 70% 22%;
-        /* #0A6645  */
-        --success-border: 163 50% 70%;
-        /* #7DCAB3  */
+        /* Success (green with brand harmony) */
+        --success: 142 71% 45%;
+        /* Emerald green */
+        --success-foreground: 210 20% 98%;
+        /* Light text */
+        --success-muted: 142 70% 90%;
+        /* Light green background */
+        --success-muted-foreground: 142 70% 35%;
+        /* Dark green text */
+        --success-border: 142 50% 70%;
+        /* Light green border */
 
-        /* Warning (warm amber — neutral complement of teal) */
-        --warning: 38 75% 35%;
-        /* #9C6A0E  */
-        --warning-foreground: 0 0% 95%;
-        /* #F2F2F2  */
+        /* Warning (warm amber) */
+        --warning: 38 85% 55%;
+        /* Amber */
+        --warning-foreground: 210 20% 98%;
+        /* Light text */
         --warning-muted: 38 80% 93%;
-        /* #FBF0D6  */
-        --warning-muted-foreground: 38 70% 28%;
-        /* #7A5410  */
-        --warning-border: 38 65% 65%;
-        /* #D4A856  */
+        /* Light amber background */
+        --warning-muted-foreground: 38 75% 35%;
+        /* Dark amber text */
+        --warning-border: 38 70% 70%;
+        /* Light amber border */
 
-        /* Error (brick red — muted, no pure red) */
-        --error: 8 55% 42%;
-        /* #A64236  */
-        --error-foreground: 0 0% 95%;
-        /* #F2F2F2  */
-        --error-muted: 8 60% 93%;
-        /* #FADFD8  */
-        --error-muted-foreground: 8 55% 35%;
-        /* #8A3830  */
-        --error-border: 8 50% 70%;
-        /* #D4907F  */
+        /* Error (red) */
+        --error: 0 84% 60%;
+        /* Red */
+        --error-foreground: 210 20% 98%;
+        /* Light text */
+        --error-muted: 0 70% 93%;
+        /* Light red background */
+        --error-muted-foreground: 0 70% 40%;
+        /* Dark red text */
+        --error-border: 0 60% 70%;
+        /* Light red border */
 
-        /* Info (teal-blue, bridging brand toward cyan) */
-        --info: 191 76% 28%;
-        /* #136986  */
-        --info-foreground: 0 0% 95%;
-        /* #F2F2F2  */
-        --info-muted: 191 60% 91%;
-        /* #D2EAF0  */
-        --info-muted-foreground: 191 70% 22%;
-        /* #0E5168  */
-        --info-border: 191 55% 65%;
-        /* #72B8CC  */
+        /* Info (brand indigo) */
+        --info: 248 89% 63%;
+        /* Brand indigo */
+        --info-foreground: 210 20% 98%;
+        /* Light text */
+        --info-muted: 248 70% 93%;
+        /* Light indigo background */
+        --info-muted-foreground: 248 80% 45%;
+        /* Dark indigo text */
+        --info-border: 248 70% 75%;
+        /* Light indigo border */
 
         /* -------------------------------------------------------------------
            CODE & DEVELOPER TOOLING — Light
-           GitHub/VS Code aesthetic, brand-harmonized
+           Clean, brand-harmonized
         ------------------------------------------------------------------- */
 
-        --code-bg: 186 12% 92%;
-        /* #E6ECEC  */
-        --code-foreground: 246 22% 18%;
-        /* #252233  */
-        --code-border: 186 8% 73%;
-        /* #B4BEBF  */
+        --code-bg: 220 14% 96%;
+        /* Light gray code background */
+        --code-foreground: 224 71.4% 4.1%;
+        /* Deep navy text */
+        --code-border: 220 13% 91%;
+        /* Light gray border */
 
-        --diff-added: 163 45% 88%;
-        /* #D2EDE4  */
-        --diff-added-foreground: 163 80% 22%;
-        /* #0C6647  */
-        --diff-removed: 8 50% 90%;
-        /* #F6DDD8  */
-        --diff-removed-foreground: 8 55% 38%;
-        /* #8F3C30  */
-        --diff-modified: 38 65% 90%;
-        /* #FAECD4  */
-        --diff-modified-foreground: 38 70% 30%;
-        /* #7A5214  */
+        --diff-added: 142 50% 88%;
+        /* Light green for additions */
+        --diff-added-foreground: 142 70% 35%;
+        /* Dark green text */
+        --diff-removed: 0 60% 90%;
+        /* Light red for removals */
+        --diff-removed-foreground: 0 70% 40%;
+        /* Dark red text */
+        --diff-modified: 248 70% 90%;
+        /* Light indigo for modifications */
+        --diff-modified-foreground: 248 80% 45%;
+        /* Dark indigo text */
 
-        --log-info: 176 96% 22%;
-        /* #027368  brand teal */
-        --log-warning: 38 75% 35%;
-        /* #9C6A0E  amber */
-        --log-error: 8 55% 42%;
-        /* #A64236  muted red */
-        --log-success: 163 80% 26%;
-        /* #0C7A54  */
+        --log-info: 248 89% 63%;
+        /* Brand indigo */
+        --log-warning: 38 85% 55%;
+        /* Amber */
+        --log-error: 0 84% 60%;
+        /* Red */
+        --log-success: 142 71% 45%;
+        /* Emerald green */
 
         /* -------------------------------------------------------------------
            CHART COLORS — Light  (5 brand-derived points)
         ------------------------------------------------------------------- */
-        --chart-1: 176 96% 22%;
-        /* brand teal    #027368 */
-        --chart-2: 184 10% 40%;
-        /* muted teal    #5D7173 */
-        --chart-3: 38 75% 45%;
-        /* warm amber    #C8861A */
-        --chart-4: 163 60% 38%;
-        /* muted green   #297A5E */
-        --chart-5: 201 40% 50%;
-        /* steel blue    #4D8FAD */
+        --chart-1: 248 89% 63%;
+        /* brand indigo    #6366F1 */
+        --chart-2: 252 100% 96%;
+        /* soft lavender   #F5F3FF */
+        --chart-3: 38 85% 55%;
+        /* warm amber      #F59E0B */
+        --chart-4: 142 71% 45%;
+        /* emerald green   #10B981 */
+        --chart-5: 220 70% 55%;
+        /* steel blue      #3B82F6 */
 
         /* -------------------------------------------------------------------
            SIDEBAR TOKENS — Light
         ------------------------------------------------------------------- */
-        --sidebar-background: 186 12% 92%;
-        /* #E6ECEC  slightly off canvas */
-        --sidebar-foreground: 246 22% 20%;
-        /* #2A273D  */
-        --sidebar-primary: 176 96% 22%;
-        /* #027368  */
-        --sidebar-primary-foreground: 0 0% 95%;
-        /* #F2F2F2  */
-        --sidebar-accent: 176 55% 88%;
-        /* #CBE5E2  */
-        --sidebar-accent-foreground: 176 96% 18%;
-        /* #015D55  */
-        --sidebar-border: 186 8% 78%;
-        /* #BEC6C8  */
-        --sidebar-ring: 176 96% 22%;
-        /* #027368  */
+        --sidebar-background: 220 14% 96%;
+        /* Light gray sidebar */
+        --sidebar-foreground: 224 71.4% 4.1%;
+        /* Deep navy text */
+        --sidebar-primary: 248 89% 63%;
+        /* Brand indigo */
+        --sidebar-primary-foreground: 210 20% 98%;
+        /* Light text */
+        --sidebar-accent: 252 100% 96%;
+        /* Soft lavender */
+        --sidebar-accent-foreground: 248 89% 63%;
+        /* Indigo text */
+        --sidebar-border: 220 13% 91%;
+        /* Light gray border */
+        --sidebar-ring: 248 89% 63%;
+        /* Indigo focus ring */
     }
 
     /* -----------------------------------------------------------------------
        DARK THEME  (.dark)
-       Base: #191726 canvas, #F2F2F2 foreground
+       Deep navy base with luminous indigo/purple accents
     ----------------------------------------------------------------------- */
     .dark {
         /* --- Core Surface Layers --- */
-        --background: 246 22% 12%;
-        /* #191726  — dark canvas */
-        --foreground: 0 0% 95%;
-        /* #F2F2F2  — primary text */
+        --background: 224 71% 4%;
+        /* Deep navy dark canvas */
+        --foreground: 210 20% 98%;
+        /* Light text */
 
-        --card: 246 22% 16%;
-        /* #22203A  — card (+1 layer) */
-        --card-foreground: 186 8% 88%;
-        /* #DEE2E3  — card text */
+        --card: 224 71% 7%;
+        /* Slightly lighter navy card */
+        --card-foreground: 210 20% 98%;
+        /* Light text */
 
-        --popover: 246 22% 18%;
-        /* #272440  — popover (deepest) */
-        --popover-foreground: 0 0% 95%;
-        /* #F2F2F2  */
+        --popover: 224 71% 4%;
+        /* Deep navy popover */
+        --popover-foreground: 210 20% 98%;
+        /* Light text */
 
         /* --- Brand / Interactive --- */
-        --primary: 176 80% 35%;
-        /* #0F9E90  — brightened teal for dark */
-        --primary-foreground: 246 22% 8%;
-        /* #100F1A  — dark text on bright teal */
+        --primary: 248 89% 70%;
+        /* Brighter indigo for dark mode */
+        --primary-foreground: 224 71% 4%;
+        /* Dark text on primary */
 
         /* --- Secondary & Muted --- */
-        --secondary: 246 16% 22%;
-        /* #312F48  — secondary surface */
-        --secondary-foreground: 186 8% 73%;
-        /* #B4BEBF  — secondary text */
+        --secondary: 248 50% 15%;
+        /* Dark indigo surface */
+        --secondary-foreground: 210 20% 98%;
+        /* Light text */
 
-        --muted: 246 16% 19%;
-        /* #2A283E  — muted fills */
-        --muted-foreground: 184 10% 55%;
-        /* #7A9092  — subdued text */
+        --muted: 224 30% 15%;
+        /* Dark muted surface */
+        --muted-foreground: 215 20% 65%;
+        /* Medium gray text */
 
         /* --- Accent --- */
-        --accent: 176 40% 18%;
-        /* #1A3836  — dark teal fill */
-        --accent-foreground: 176 55% 68%;
-        /* #6FBFB9  — accent text */
+        --accent: 224 30% 20%;
+        /* Dark accent surface */
+        --accent-foreground: 210 20% 98%;
+        /* Light text */
 
         /* --- Destructive --- */
-        --destructive: 8 60% 52%;
-        /* #D45A44  — brighter red for dark */
-        --destructive-foreground: 0 0% 95%;
-        /* #F2F2F2  */
+        --destructive: 0 62.8% 30.6%;
+        /* Dark red for destructive */
+        --destructive-foreground: 210 20% 98%;
+        /* Light text */
 
         /* --- Structural --- */
-        --border: 246 16% 25%;
-        /* #383556  — subtle borders */
-        --input: 246 16% 25%;
-        /* #383556  — input borders */
-        --ring: 176 80% 38%;
-        /* #129D8F  — focus ring (visible on dark) */
+        --border: 224 30% 18%;
+        /* Subtle dark borders */
+        --input: 224 30% 18%;
+        /* Dark input borders */
+        --ring: 248 89% 70%;
+        /* Bright indigo focus ring */
 
         /* -------------------------------------------------------------------
            FEEDBACK STATES — Dark
         ------------------------------------------------------------------- */
 
         /* Success */
-        --success: 163 65% 42%;
-        /* #259E72  */
-        --success-foreground: 246 22% 8%;
-        /* #100F1A  */
-        --success-muted: 163 40% 14%;
-        /* #112E23  */
-        --success-muted-foreground: 163 55% 60%;
-        /* #59BFA0  */
-        --success-border: 163 50% 28%;
-        /* #166647  */
+        --success: 142 65% 50%;
+        /* Bright emerald */
+        --success-foreground: 224 71% 4%;
+        /* Dark text */
+        --success-muted: 142 40% 14%;
+        /* Dark green background */
+        --success-muted-foreground: 142 55% 60%;
+        /* Bright green text */
+        --success-border: 142 50% 28%;
+        /* Dark green border */
 
         /* Warning */
         --warning: 38 80% 55%;
-        /* #E09A22  */
-        --warning-foreground: 246 22% 8%;
-        /* #100F1A  */
+        /* Bright amber */
+        --warning-foreground: 224 71% 4%;
+        /* Dark text */
         --warning-muted: 38 50% 14%;
-        /* #2B2108  */
+        /* Dark amber background */
         --warning-muted-foreground: 38 70% 65%;
-        /* #D4A84C  */
+        /* Bright amber text */
         --warning-border: 38 60% 32%;
-        /* #7A5814  */
+        /* Dark amber border */
 
         /* Error */
-        --error: 8 65% 56%;
-        /* #DA5844  */
-        --error-foreground: 246 22% 8%;
-        /* #100F1A  */
-        --error-muted: 8 45% 14%;
-        /* #28150F  */
-        --error-muted-foreground: 8 60% 68%;
-        /* #D49080  */
-        --error-border: 8 55% 30%;
-        /* #7A3226  */
+        --error: 0 65% 50%;
+        /* Bright red */
+        --error-foreground: 224 71% 4%;
+        /* Dark text */
+        --error-muted: 0 45% 14%;
+        /* Dark red background */
+        --error-muted-foreground: 0 60% 68%;
+        /* Bright red text */
+        --error-border: 0 55% 30%;
+        /* Dark red border */
 
         /* Info */
-        --info: 191 70% 48%;
-        /* #25A4C2  */
-        --info-foreground: 246 22% 8%;
-        /* #100F1A  */
-        --info-muted: 191 45% 12%;
-        /* #0E2230  */
-        --info-muted-foreground: 191 60% 62%;
-        /* #5CBAD4  */
-        --info-border: 191 55% 26%;
-        /* #1A5668  */
+        --info: 248 89% 70%;
+        /* Brand indigo */
+        --info-foreground: 224 71% 4%;
+        /* Dark text */
+        --info-muted: 248 45% 12%;
+        /* Dark indigo background */
+        --info-muted-foreground: 248 60% 62%;
+        /* Bright indigo text */
+        --info-border: 248 55% 26%;
+        /* Dark indigo border */
 
         /* -------------------------------------------------------------------
            CODE & DEVELOPER TOOLING — Dark
         ------------------------------------------------------------------- */
 
-        --code-bg: 246 22% 9%;
-        /* #131121  deepest tint */
-        --code-foreground: 186 8% 78%;
-        /* #C0CACC  */
-        --code-border: 246 16% 25%;
-        /* #383556  */
+        --code-bg: 224 71% 6%;
+        /* Deep navy code background */
+        --code-foreground: 215 20% 75%;
+        /* Light gray text */
+        --code-border: 224 30% 18%;
+        /* Dark border */
 
-        --diff-added: 163 40% 14%;
-        /* #112E23  */
-        --diff-added-foreground: 163 55% 60%;
-        /* #59BFA0  */
-        --diff-removed: 8 45% 14%;
-        /* #28150F  */
-        --diff-removed-foreground: 8 60% 68%;
-        /* #D49080  */
-        --diff-modified: 38 50% 14%;
-        /* #2B2108  */
-        --diff-modified-foreground: 38 65% 60%;
-        /* #CCA040  */
+        --diff-added: 142 40% 14%;
+        /* Dark green for additions */
+        --diff-added-foreground: 142 55% 60%;
+        /* Bright green text */
+        --diff-removed: 0 45% 14%;
+        /* Dark red for removals */
+        --diff-removed-foreground: 0 60% 68%;
+        /* Bright red text */
+        --diff-modified: 248 45% 14%;
+        /* Dark indigo for modifications */
+        --diff-modified-foreground: 248 65% 60%;
+        /* Bright indigo text */
 
-        --log-info: 176 80% 38%;
-        /* #129D8F  brand teal brightened */
+        --log-info: 248 89% 70%;
+        /* Brand indigo */
         --log-warning: 38 80% 55%;
-        /* #E09A22  amber */
-        --log-error: 8 65% 56%;
-        /* #DA5844  muted red */
-        --log-success: 163 65% 42%;
-        /* #259E72  */
+        /* Amber */
+        --log-error: 0 65% 50%;
+        /* Red */
+        --log-success: 142 65% 50%;
+        /* Emerald green */
 
         /* -------------------------------------------------------------------
            CHART COLORS — Dark  (brightened for contrast on dark surfaces)
         ------------------------------------------------------------------- */
-        --chart-1: 176 80% 38%;
-        /* bright teal    #129D8F */
-        --chart-2: 184 20% 58%;
-        /* muted teal     #7FA0A2 */
+        --chart-1: 248 89% 70%;
+        /* bright indigo    #818CF8 */
+        --chart-2: 252 50% 25%;
+        /* dark lavender    #4C1D95 */
         --chart-3: 38 80% 58%;
-        /* amber          #E29E2D */
-        --chart-4: 163 55% 52%;
-        /* muted green    #37B880 */
-        --chart-5: 201 50% 58%;
-        /* steel blue     #5BA8C4 */
+        /* amber            #F59E0B */
+        --chart-4: 142 55% 52%;
+        /* muted green      #34D399 */
+        --chart-5: 220 50% 58%;
+        /* steel blue       #60A5FA */
 
         /* -------------------------------------------------------------------
            SIDEBAR TOKENS — Dark
         ------------------------------------------------------------------- */
-        --sidebar-background: 246 22% 10%;
-        /* #161428  slightly deeper than bg */
-        --sidebar-foreground: 186 8% 82%;
-        /* #CACED0  */
-        --sidebar-primary: 176 80% 38%;
-        /* #129D8F  */
-        --sidebar-primary-foreground: 246 22% 8%;
-        /* #100F1A  */
-        --sidebar-accent: 176 40% 18%;
-        /* #1A3836  */
-        --sidebar-accent-foreground: 176 55% 68%;
-        /* #6FBFB9  */
-        --sidebar-border: 246 16% 22%;
-        /* #312F48  */
-        --sidebar-ring: 176 80% 38%;
-        /* #129D8F  */
+        --sidebar-background: 224 71% 5%;
+        /* Slightly deeper than bg */
+        --sidebar-foreground: 215 20% 75%;
+        /* Light gray text */
+        --sidebar-primary: 248 89% 70%;
+        /* Bright indigo */
+        --sidebar-primary-foreground: 224 71% 4%;
+        /* Dark text */
+        --sidebar-accent: 224 30% 20%;
+        /* Dark accent */
+        --sidebar-accent-foreground: 210 20% 98%;
+        /* Light text */
+        --sidebar-border: 224 30% 18%;
+        /* Dark border */
+        --sidebar-ring: 248 89% 70%;
+        /* Bright indigo ring */
     }
 
     /* -----------------------------------------------------------------------
@@ -388,10 +391,29 @@
     body {
         background-color: hsl(var(--background));
         color: hsl(var(--foreground));
-        font-family: var(--font-geist-sans), "Geist", ui-sans-serif, system-ui, sans-serif;
-        font-feature-settings: "rlig" 1, "calt" 1;
+        font-family:
+            var(--font-inter), ui-sans-serif, system-ui,
+            sans-serif;
+        font-feature-settings:
+            "rlig" 1,
+            "calt" 1;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+    }
+
+    .font-body {
+        font-family: var(--font-inter), sans-serif;
+    }
+
+    /* Headings — Montserrat */
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    .font-heading {
+        font-family: var(--font-montserrat), sans-serif;
     }
 
     /* Monospace — code blocks, logs, diffs */
@@ -399,7 +421,9 @@
     pre,
     kbd,
     samp {
-        font-family: var(--font-geist-mono), "Geist Mono", ui-monospace, "Cascadia Code", monospace;
+        font-family:
+            ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Monaco, Consolas,
+            monospace;
     }
 
     /* Scrollbar styling */
@@ -449,6 +473,10 @@
    ========================================================================== */
 
 @theme inline {
+    /* Fonts */
+    --font-heading: var(--font-montserrat);
+    --font-body: var(--font-inter);
+
     /* Core surfaces */
     --color-background: hsl(var(--background));
     --color-foreground: hsl(var(--foreground));
@@ -551,6 +579,7 @@
     --radius-lg: calc(var(--radius) + 4px);
     --radius-xl: calc(var(--radius) + 8px);
     --radius-full: 9999px;
+    --color-sidebar: var(--sidebar);
 }
 
 /* ==========================================================================
@@ -592,6 +621,29 @@
         background-color: hsl(var(--code-bg));
         color: hsl(var(--code-foreground));
         border-color: hsl(var(--code-border));
-        font-family: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+        font-family:
+            ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Monaco, Consolas, monospace;
     }
+}
+
+:root {
+    --sidebar: hsl(0 0% 98%);
+    --sidebar-foreground: hsl(240 5.3% 26.1%);
+    --sidebar-primary: hsl(240 5.9% 10%);
+    --sidebar-primary-foreground: hsl(0 0% 98%);
+    --sidebar-accent: hsl(240 4.8% 95.9%);
+    --sidebar-accent-foreground: hsl(240 5.9% 10%);
+    --sidebar-border: hsl(220 13% 91%);
+    --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+.dark {
+    --sidebar: hsl(240 5.9% 10%);
+    --sidebar-foreground: hsl(240 4.8% 95.9%);
+    --sidebar-primary: hsl(224.3 76.3% 48%);
+    --sidebar-primary-foreground: hsl(0 0% 100%);
+    --sidebar-accent: hsl(240 3.7% 15.9%);
+    --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+    --sidebar-border: hsl(240 3.7% 15.9%);
+    --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }

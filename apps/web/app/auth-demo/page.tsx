@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -43,11 +42,6 @@ export default function AuthDemoPage() {
         <CardDescription>
           Enter your email below to login to your account
         </CardDescription>
-        <CardAction>
-          <Button variant="link" className="px-0">
-            Sign Up
-          </Button>
-        </CardAction>
       </CardHeader>
       <CardContent>
         <form>
@@ -80,9 +74,6 @@ export default function AuthDemoPage() {
       <CardFooter className="flex-col gap-2">
         <Button type="submit" className="w-full">
           Login
-        </Button>
-        <Button variant="outline" className="w-full">
-          Login with Google
         </Button>
       </CardFooter>
     </Card>
@@ -299,11 +290,10 @@ export default function AuthDemoPage() {
                 setForgotPasswordSubmitted(false);
                 setResetPasswordSuccess(false);
               }}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "login"
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "login"
                   ? "border-zinc-900 text-zinc-900 dark:border-zinc-50 dark:text-zinc-50"
                   : "border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-              }`}
+                }`}
             >
               Login
             </button>
@@ -313,11 +303,10 @@ export default function AuthDemoPage() {
                 setForgotPasswordSubmitted(false);
                 setResetPasswordSuccess(false);
               }}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "forgot"
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "forgot"
                   ? "border-zinc-900 text-zinc-900 dark:border-zinc-50 dark:text-zinc-50"
                   : "border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-              }`}
+                }`}
             >
               Forgot Password
             </button>
@@ -327,11 +316,10 @@ export default function AuthDemoPage() {
                 setForgotPasswordSubmitted(false);
                 setResetPasswordSuccess(false);
               }}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "reset"
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "reset"
                   ? "border-zinc-900 text-zinc-900 dark:border-zinc-50 dark:text-zinc-50"
                   : "border-transparent text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
-              }`}
+                }`}
             >
               Reset Password
             </button>

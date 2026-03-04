@@ -29,6 +29,23 @@ const (
 	SubmissionStatusError    SubmissionStatus = "error"
 )
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Judge0 Execution Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestCaseResult represents individual test case evaluation
+type TestCaseResult struct {
+	TestCaseID     string `json:"test_case_id"`
+	Input          string `json:"input"`
+	ExpectedOutput string `json:"expected_output"`
+	ActualOutput   string `json:"actual_output"`
+	Passed         bool   `json:"passed"`
+	ExecutionTime  string `json:"execution_time,omitempty"`
+	MemoryUsed     int    `json:"memory_used,omitempty"`
+	StatusID       int    `json:"status_id"`
+	StatusDesc     string `json:"status_description"`
+}
+
 // Submission represents a single (potentially versioned) code submission made
 // by an individual student or a student group for a given assignment.
 //
@@ -50,6 +67,7 @@ type Submission struct {
 
 	StoragePath string `gorm:"type:text;not null"       json:"storage_path"`
 	Language    string `gorm:"type:varchar(50)"         json:"language"`
+	LanguageID  int    `gorm:""                         json:"language_id,omitempty"`
 	Status      string `gorm:"type:varchar(50);not null;default:'pending'" json:"status"`
 
 	Version  int  `gorm:"not null;default:1" json:"version"`
@@ -57,6 +75,18 @@ type Submission struct {
 
 	Judge0JobID string    `gorm:"type:varchar(100)" json:"judge0_job_id,omitempty"`
 	SubmittedAt time.Time `gorm:"not null"          json:"submitted_at"`
+
+	// Judge0 execution results
+	ExecutionStdout     string         `gorm:"type:text" json:"execution_stdout,omitempty"`
+	ExecutionStderr     string         `gorm:"type:text" json:"execution_stderr,omitempty"`
+	CompileOutput       string         `gorm:"type:text" json:"compile_output,omitempty"`
+	ExecutionStatus     string         `gorm:"type:varchar(50)" json:"execution_status,omitempty"`
+	ExecutionStatusID   int            `gorm:"" json:"execution_status_id,omitempty"`
+	ExecutionTime       string         `gorm:"type:varchar(20)" json:"execution_time,omitempty"`
+	MemoryUsed          int            `gorm:"" json:"memory_used,omitempty"`
+	TestCasesPassed     int            `gorm:"" json:"test_cases_passed,omitempty"`
+	TotalTestCases      int            `gorm:"" json:"total_test_cases,omitempty"`
+	TestCaseResults     datatypes.JSON `gorm:"type:jsonb" json:"test_case_results,omitempty"`
 }
 
 // TableName overrides the GORM default table name.

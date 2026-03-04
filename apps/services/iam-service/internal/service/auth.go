@@ -27,7 +27,7 @@ var (
 )
 
 type AuthService interface {
-	Login(ctx context.Context, username, password string) (*dto.LoginResponse, error)
+	Login(ctx context.Context, email, password string) (*dto.LoginResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*dto.RefreshTokenResponse, error)
 	Logout(ctx context.Context, refreshToken string) error
 	RevokeUserSessions(ctx context.Context, userID uuid.UUID, actorPermissions []string) (*dto.RevokeUserSessionsResponse, error)
@@ -57,9 +57,9 @@ func NewAuthService(
 	}
 }
 
-func (s *authService) Login(ctx context.Context, username, password string) (*dto.LoginResponse, error) {
+func (s *authService) Login(ctx context.Context, email, password string) (*dto.LoginResponse, error) {
 	// Get user with role and permissions
-	user, err := s.authRepo.GetUserByUsername(ctx, username)
+	user, err := s.authRepo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return nil, fmt.Errorf("fetching user: %w", err)
 	}
@@ -87,7 +87,7 @@ func (s *authService) Login(ctx context.Context, username, password string) (*dt
 	// Generate token pair
 	accessToken, _, err := jwt.GenerateAccessToken(
 		user.ID,
-		user.Username,
+		user.Email,
 		user.FullName,
 		user.RoleName,
 		user.Permissions,
@@ -146,14 +146,8 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*d
 		return nil, ErrRefreshTokenNotFound
 	}
 
-	// Get user to check status and get updated permissions
-	user, err := s.authRepo.GetUserByUsername(ctx, "")
-	if err != nil {
-		return nil, fmt.Errorf("fetching user: %w", err)
-	}
-
 	// For refresh, we need to fetch by user ID
-	user, err = s.getUserByID(ctx, token.UserID)
+	user, err := s.getUserByID(ctx, token.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("fetching user: %w", err)
 	}
@@ -173,7 +167,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*d
 	// Generate new access token
 	accessToken, expiresAt, err := jwt.GenerateAccessToken(
 		user.ID,
-		user.Username,
+		user.Email,
 		user.FullName,
 		user.RoleName,
 		user.Permissions,
@@ -233,7 +227,6 @@ func (s *authService) getUserByID(ctx context.Context, userID uuid.UUID) (*dto.U
 		Table("users").
 		Select(`
 			users.id,
-			users.username,
 			users.email,
 			users.full_name,
 			users.password_hash,

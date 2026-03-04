@@ -1,12 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  ArrowRight,
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -15,6 +22,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+
 import { authApi } from "@/lib/api/auth";
 import { handleApiError } from "@/lib/api/axios";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -22,14 +31,10 @@ import { useAuthStore } from "@/lib/stores/authStore";
 export default function LoginPage() {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const isHydrated = useAuthStore((s) => s.isHydrated);
-  const getRedirectPath = useAuthStore((s) => s.getRedirectPath);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -37,20 +42,16 @@ export default function LoginPage() {
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const username = formData.get("username") as string;
+    const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
     try {
       const response = await authApi.login({
-        username,
+        email,
         password,
       });
 
-      // Decode JWT claims and populate the store.
-      // The refresh token is set as an HttpOnly cookie by the server automatically.
       setSession(response.access_token);
-
-      // Read the redirect path after setSession so role is already resolved
       const path = useAuthStore.getState().getRedirectPath();
       router.push(path);
     } catch (err) {
@@ -61,56 +62,57 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-zinc-900">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl">Login to your account</CardTitle>
-          <CardDescription>
-            Enter your username or email below to login to your account
+    <div className="w-full max-w-md animate-in fade-in zoom-in duration-500 px-4">
+      <Card className="border-none shadow-2xl shadow-indigo-200/50 dark:shadow-none bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
+        <CardHeader className="space-y-1 pb-6 text-center pt-8">
+          <CardTitle className="text-3xl font-bold tracking-tight text-foreground">
+            Welcome back
+          </CardTitle>
+          <CardDescription className="text-base text-muted-foreground">
+            Please enter your details to sign in.
           </CardDescription>
-          {/*<CardAction>
-            <Link href="/signup">
-              <Button variant="link" className="px-0">
-                Sign Up
-              </Button>
-            </Link>
-          </CardAction>*/}
         </CardHeader>
-        <CardContent>
+
+        <CardContent className="space-y-4 pb-2">
           <form onSubmit={handleSubmit} id="login-form">
-            <div className="flex flex-col gap-6">
+            <div className="space-y-4">
               {error && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950">
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    {error}
-                  </p>
+                <div className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 p-4 text-destructive animate-in slide-in-from-top-2">
+                  <p className="text-sm font-medium">{error}</p>
                 </div>
               )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="username">Username or Email</Label>
-                <Input
-                  id="username"
-                  name="username"
-                  type="text"
-                  placeholder="superadmin@gradeloop.com"
-                  required
-                  disabled={isLoading}
-                  autoComplete="username"
-                />
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-sm font-semibold ml-1">
+                  Email or Username
+                </Label>
+                <div className="relative group">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                    <Mail className="h-4 w-4" />
+                  </div>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="student@gradeloop.edu"
+                    required
+                    disabled={isLoading}
+                    className="pl-10 h-11 bg-muted/40 border-muted-foreground/10 focus:bg-background transition-all rounded-xl"
+                    autoComplete="email"
+                  />
+                </div>
               </div>
 
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </Link>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between ml-1">
+                  <Label htmlFor="password" className="text-sm font-semibold">
+                    Password
+                  </Label>
                 </div>
-                <div className="relative">
+                <div className="relative group">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
+                    <Lock className="h-4 w-4" />
+                  </div>
                   <Input
                     id="password"
                     name="password"
@@ -118,32 +120,65 @@ export default function LoginPage() {
                     placeholder="Enter your password"
                     required
                     disabled={isLoading}
+                    className="pl-10 pr-10 h-11 bg-muted/40 border-muted-foreground/10 focus:bg-background transition-all rounded-xl"
                     autoComplete="current-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-700 text-sm"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors outline-none"
                     disabled={isLoading}
                   >
-                    {showPassword ? "Hide" : "Show"}
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-0.5">
+                <div className="flex items-center space-x-2 ml-1">
+                  <Checkbox
+                    id="remember"
+                    className="rounded-md border-muted-foreground/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                  />
+                  <label
+                    htmlFor="remember"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-muted-foreground cursor-pointer"
+                  >
+                    Remember me
+                  </label>
+                </div>
+                <Link
+                  href="/forgot-password"
+                  className="text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+                >
+                  Forgot password?
+                </Link>
               </div>
             </div>
           </form>
         </CardContent>
-        <CardFooter className="flex-col gap-2">
+
+        <CardFooter className="pt-4 pb-10 px-6">
           <Button
             type="submit"
             form="login-form"
-            className="w-full"
+            className="w-full h-12 rounded-xl font-bold text-base shadow-lg shadow-primary/25 hover:shadow-primary/35 transition-all active:scale-[0.98]"
             disabled={isLoading}
           >
-            {isLoading ? "Logging in…" : "Login"}
-          </Button>
-          <Button variant="outline" className="w-full" disabled={isLoading}>
-            Login with Google
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                Signing in...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                Sign in <ArrowRight className="h-4 w-4" />
+              </span>
+            )}
           </Button>
         </CardFooter>
       </Card>

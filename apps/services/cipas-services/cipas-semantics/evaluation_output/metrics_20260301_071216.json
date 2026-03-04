@@ -1,0 +1,26 @@
+{
+  "accuracy": 0.971,
+  "precision": 1.0,
+  "recall": 0.971,
+  "f1": 0.9852866565195332,
+  "roc_auc": 0.5,
+  "macro_f1": 0.4926433282597666,
+  "threshold_used": 0.47999999999999976,
+  "confusion_matrix": [
+    [
+      0,
+      0
+    ],
+    [
+      29,
+      971
+    ]
+  ],
+  "true_negatives": 0,
+  "false_positives": 0,
+  "false_negatives": 29,
+  "true_positives": 971,
+  "optimal_threshold_f1": 0.1,
+  "optimal_threshold_macro_f1": 0.1,
+  "timestamp": "2026-03-01T07:12:16.326673"
+}

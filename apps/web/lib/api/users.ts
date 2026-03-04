@@ -48,6 +48,7 @@ export const usersApi = {
     if (params.limit !== undefined) cleanParams.limit = params.limit;
     if (params.user_type) cleanParams.user_type = params.user_type;
     if (params.role_id) cleanParams.role_id = params.role_id;
+    if (params.search) cleanParams.search = params.search;
 
     const { data } = await axiosInstance.get('/users', { params: cleanParams });
     return normalizePaginated(data, params);
@@ -79,6 +80,42 @@ export const usersApi = {
   /** POST /admin/users/:id/revoke-sessions */
   revokeSessions: async (id: string): Promise<void> => {
     await axiosInstance.post(`/admin/users/${id}/revoke-sessions`);
+  },
+
+  /** GET /users/import/template */
+  importTemplate: async (format: 'csv' | 'xlsx'): Promise<void> => {
+    const { data } = await axiosInstance.get('/users/import/template', {
+      params: { format },
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `user_import_template.${format}`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  },
+
+  /** POST /users/import/preview */
+  importPreview: async (file: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await axiosInstance.post('/users/import/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
+  },
+
+  /** POST /users/import/execute */
+  importExecute: async (file: File, mapping: Record<string, string>): Promise<any> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('column_mapping', JSON.stringify(mapping));
+    const { data } = await axiosInstance.post('/users/import/execute', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data;
   },
 };
 

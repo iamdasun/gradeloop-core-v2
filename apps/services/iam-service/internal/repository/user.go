@@ -11,13 +11,13 @@ import (
 type UserRepository interface {
 	CreateUser(ctx context.Context, user *domain.User) error
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error)
-	GetUserByUsername(ctx context.Context, username string) (*domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*domain.User, error)
 	UpdateUser(ctx context.Context, user *domain.User) error
 	SoftDeleteUser(ctx context.Context, userID uuid.UUID) error
 	RestoreUser(ctx context.Context, userID uuid.UUID) error
-	GetUsers(ctx context.Context, offset, limit int, userType string, roleID string) ([]*domain.User, error)
-	CountUsers(ctx context.Context, userType string, roleID string) (int64, error)
+	GetUsers(ctx context.Context, offset, limit int, userType string, roleID string, search string) ([]*domain.User, error)
+	CountUsers(ctx context.Context, userType string, roleID string, search string) (int64, error)
+	GetUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]*domain.User, error)
 	RoleExists(ctx context.Context, roleID uuid.UUID) (bool, error)
 	CreateStudentProfile(ctx context.Context, profile *domain.UserProfileStudent) error
 	CreateEmployeeProfile(ctx context.Context, profile *domain.UserProfileEmployee) error
@@ -57,24 +57,6 @@ func (r *userRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*do
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	return &user, nil
-}
-
-func (r *userRepository) GetUserByUsername(ctx context.Context, username string) (*domain.User, error) {
-	var user domain.User
-
-	query := r.db.WithContext(ctx).
-		Preload("Role").
-		Where("username = ? AND deleted_at IS NULL", username).
-		First(&user)
-
-	if query.Error != nil {
-		if query.Error == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, query.Error
 	}
 
 	return &user, nil
@@ -137,7 +119,7 @@ func (r *userRepository) RestoreUser(ctx context.Context, userID uuid.UUID) erro
 		Update("deleted_at", nil).Error
 }
 
-func (r *userRepository) GetUsers(ctx context.Context, offset, limit int, userType string, roleID string) ([]*domain.User, error) {
+func (r *userRepository) GetUsers(ctx context.Context, offset, limit int, userType string, roleID string, search string) ([]*domain.User, error) {
 	var users []*domain.User
 
 	db := r.db.WithContext(ctx).Preload("Role")
@@ -152,6 +134,16 @@ func (r *userRepository) GetUsers(ctx context.Context, offset, limit int, userTy
 		db = db.Where("users.role_id = ?", roleID)
 	}
 
+	if search != "" {
+		s := "%" + search + "%"
+		db = db.Where("users.email ILIKE ? OR users.full_name ILIKE ?", s, s)
+
+		// Prioritize exact matches
+		db = db.Order(gorm.Expr("CASE WHEN users.email = ? OR users.full_name = ? THEN 0 ELSE 1 END", search, search))
+	}
+
+	db = db.Order("users.created_at DESC")
+
 	query := db.Limit(limit).Offset(offset).Find(&users)
 
 	if query.Error != nil {
@@ -161,7 +153,7 @@ func (r *userRepository) GetUsers(ctx context.Context, offset, limit int, userTy
 	return users, nil
 }
 
-func (r *userRepository) CountUsers(ctx context.Context, userType string, roleID string) (int64, error) {
+func (r *userRepository) CountUsers(ctx context.Context, userType string, roleID string, search string) (int64, error) {
 	var count int64
 	db := r.db.WithContext(ctx).Model(&domain.User{})
 
@@ -175,10 +167,26 @@ func (r *userRepository) CountUsers(ctx context.Context, userType string, roleID
 		db = db.Where("users.role_id = ?", roleID)
 	}
 
+	if search != "" {
+		s := "%" + search + "%"
+		db = db.Where("users.email ILIKE ? OR users.full_name ILIKE ?", s, s)
+	}
+
 	if err := db.Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
+}
+
+func (r *userRepository) GetUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]*domain.User, error) {
+	var users []*domain.User
+	if err := r.db.WithContext(ctx).
+		Preload("Role").
+		Where("id IN ? AND deleted_at IS NULL", ids).
+		Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func (r *userRepository) RoleExists(ctx context.Context, roleID uuid.UUID) (bool, error) {

@@ -32,6 +32,9 @@ type SubmissionJob struct {
 	// Language is the programming language identifier (e.g. "python", "go").
 	Language string `json:"language"`
 
+	// LanguageID is the Judge0 language ID for code execution.
+	LanguageID int `json:"language_id"`
+
 	// StoragePath is the deterministically computed MinIO object key that the
 	// worker will upload the code to.  It matches the path already stored in
 	// the DB row so no second update is needed after the upload.

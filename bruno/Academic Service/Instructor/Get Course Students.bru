@@ -1,0 +1,50 @@
+meta {
+  name: Get Course Students
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{INSTRUCTOR_COURSES_URL_V1}}/{{COURSE_INSTANCE_ID}}/students
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Enrolled students fetched successfully");
+    console.log("   Count:", res.body.count);
+  }
+}
+
+docs {
+  # Get Course Students
+
+  Returns all enrolled students for a course instance the instructor is assigned to.
+
+  ## Endpoint
+  GET /api/v1/instructor-courses/:id/students
+
+  ## Authentication
+  Requires Employee, Admin, or Super Admin role.
+  The instructor must be assigned to the specified course instance.
+
+  ## Response (200 OK)
+  ```json
+  {
+    "enrollments": [
+      {
+        "course_instance_id": "uuid",
+        "user_id": "uuid",
+        "status": "active",
+        "enrolled_at": "2025-01-01T00:00:00Z"
+      }
+    ],
+    "count": 1
+  }
+  ```
+}

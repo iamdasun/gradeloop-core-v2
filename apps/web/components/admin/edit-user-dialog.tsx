@@ -1,24 +1,28 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { UserCog } from 'lucide-react';
+import * as React from "react";
+import { UserCog } from "lucide-react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { SelectNative } from '@/components/ui/select-native';
-import { useAdminUsersStore } from '@/lib/stores/adminUsersStore';
-import { usersApi, handleApiError } from '@/lib/api/users';
-import { toast } from '@/lib/hooks/use-toast';
-import type { UpdateUserRequest, UpdateUserResponse, FormErrors } from '@/types/admin.types';
-import type { UserListItem } from '@/types/auth.types';
+  SideDialog,
+  SideDialogContent,
+  SideDialogDescription,
+  SideDialogFooter,
+  SideDialogHeader,
+  SideDialogTitle,
+} from "@/components/ui/side-dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { SelectNative } from "@/components/ui/select-native";
+import { useAdminUsersStore } from "@/lib/stores/adminUsersStore";
+import { usersApi, handleApiError } from "@/lib/api/users";
+import { toast } from "@/lib/hooks/use-toast";
+import type {
+  UpdateUserRequest,
+  UpdateUserResponse,
+  FormErrors,
+} from "@/types/admin.types";
+import type { UserListItem } from "@/types/auth.types";
 
 interface Props {
   user: UserListItem | null;
@@ -33,10 +37,11 @@ interface FormValues {
 }
 
 export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
-  const { roles, rolesLoading, rolesError, fetchRoles, refetchRoles } = useAdminUsersStore();
+  const { roles, rolesLoading, rolesError, fetchRoles, refetchRoles } =
+    useAdminUsersStore();
   const [values, setValues] = React.useState<FormValues>({
     is_active: true,
-    role_id: '',
+    role_id: "",
   });
   const [errors, setErrors] = React.useState<FormErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
@@ -46,21 +51,16 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
     if (user && open) {
       setValues({
         is_active: user.is_active,
-        role_id: user.role_id ?? '',
+        role_id: user.role_id ?? "",
       });
       setErrors({});
       fetchRoles();
     }
   }, [user, open, fetchRoles]);
 
-  // Only show roles compatible with the user's type so admins can't accidentally
-  // assign a student-only role to an employee, etc.
-  const compatibleRoles = React.useMemo(() => {
-    if (!user?.user_type) return roles;
-    return roles.filter(
-      (r) => r.user_type === user.user_type || r.user_type === 'all',
-    );
-  }, [roles, user?.user_type]);
+  // User type is tied to the role, so any role can be selected.
+  const selectedRole = roles.find((r) => r.id === values.role_id);
+  const displayUserType = selectedRole?.user_type || user?.user_type || "—";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,14 +76,16 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
         payload.role_id = values.role_id;
       }
 
-      const updated: UpdateUserResponse = await usersApi.update(user.id, payload);
+      const updated: UpdateUserResponse = await usersApi.update(
+        user.id,
+        payload,
+      );
 
       // Merge response with original user to produce a full UserListItem
       const resolvedRoleId = updated.role_id ?? values.role_id ?? user.role_id;
       const finalUser: UserListItem = {
         ...user,
         id: updated.id,
-        username: updated.username,
         email: updated.email,
         role_id: resolvedRoleId,
         is_active: updated.is_active,
@@ -91,11 +93,14 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
           roles.find((r) => r.id === resolvedRoleId)?.name ?? user.role_name,
       };
 
-      toast.success('User updated', `${user.full_name || "No Name"} has been updated.`);
+      toast.success(
+        "User updated",
+        `${user.full_name || "No Name"} has been updated.`,
+      );
       onSuccess(finalUser);
       onOpenChange(false);
     } catch (err) {
-      toast.error('Failed to update user', handleApiError(err));
+      toast.error("Failed to update user", handleApiError(err));
     } finally {
       setSubmitting(false);
     }
@@ -104,21 +109,21 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
   if (!user) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+    <SideDialog open={open} onOpenChange={onOpenChange}>
+      <SideDialogContent className="max-w-md">
+        <SideDialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800">
               <UserCog className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
             </div>
             <div>
-              <DialogTitle>Edit User</DialogTitle>
-              <DialogDescription>
+              <SideDialogTitle>Edit User</SideDialogTitle>
+              <SideDialogDescription>
                 Editing <strong>{user.full_name || "No Name"}</strong>
-              </DialogDescription>
+              </SideDialogDescription>
             </div>
           </div>
-        </DialogHeader>
+        </SideDialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           {/* Read-only info */}
@@ -135,7 +140,9 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500">User Type</span>
-              <span className="font-medium capitalize">{user.user_type || '—'}</span>
+              <span className="font-medium capitalize">
+                {displayUserType}
+              </span>
             </div>
           </div>
 
@@ -149,12 +156,18 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
                 setValues((v) => ({ ...v, role_id: e.target.value }))
               }
               disabled={submitting || rolesLoading}
-              title={rolesError ? `Roles unavailable: ${rolesError}` : undefined}
+              title={
+                rolesError ? `Roles unavailable: ${rolesError}` : undefined
+              }
             >
               <option value="">
-                {rolesLoading ? 'Loading…' : rolesError ? 'Roles unavailable' : 'Select role'}
+                {rolesLoading
+                  ? "Loading…"
+                  : rolesError
+                    ? "Roles unavailable"
+                    : "Select role"}
               </option>
-              {compatibleRoles.map((r) => (
+              {roles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
                 </option>
@@ -191,7 +204,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
             />
           </div>
 
-          <DialogFooter className="pt-2">
+          <SideDialogFooter className="pt-2">
             <Button
               type="button"
               variant="outline"
@@ -201,11 +214,11 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? 'Saving…' : 'Save Changes'}
+              {submitting ? "Saving…" : "Save Changes"}
             </Button>
-          </DialogFooter>
+          </SideDialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SideDialogContent>
+    </SideDialog>
   );
 }

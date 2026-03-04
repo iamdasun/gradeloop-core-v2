@@ -1,24 +1,67 @@
-FROM golang:1.25.6-alpine AS builder
+# =============================================================================
+# Assessment Service - Optimized Dockerfile
+# Target Image Size: <25MB
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 1: Builder
+# -----------------------------------------------------------------------------
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-RUN apk add --no-cache git
+# Install git for module fetching
+RUN apk add --no-cache git ca-certificates
 
+# Cache Go modules
 COPY go.mod go.sum ./
-COPY vendor ./vendor
+RUN go mod download
 
-COPY . .
+# Copy only necessary source files
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
 
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -a -installsuffix cgo -o main ./cmd/main.go
+# Build static binary with stripped symbols
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-s -w -buildid=" \
+    -trimpath \
+    -o assessment-service \
+    ./cmd/main.go
 
-FROM alpine:latest
+# -----------------------------------------------------------------------------
+# Stage 2: Development
+# -----------------------------------------------------------------------------
+FROM builder AS dev
+RUN go install github.com/air-verse/air@latest
+# Use -mod=mod to ignore vendor directory during development
+ENV GOFLAGS="-mod=mod"
+CMD ["air"]
 
-RUN apk --no-cache add ca-certificates tzdata curl
+# -----------------------------------------------------------------------------
+# Stage 3: Production Runtime - Distroless
+# -----------------------------------------------------------------------------
+FROM gcr.io/distroless/static-debian12:nonroot AS production
 
-WORKDIR /root/
+WORKDIR /app
 
-COPY --from=builder /app/main .
+# Copy CA certificates and timezone data
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 
+# Copy compiled binary
+COPY --from=builder /app/assessment-service .
+
+# Use non-root user
+USER 65532:65532
+
+# Expose API port
 EXPOSE 8084
 
-CMD ["./main"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["/app/assessment-service", "health"]
+
+# Set environment for binding to all interfaces
+ENV HOST=0.0.0.0
+
+CMD ["./assessment-service"]

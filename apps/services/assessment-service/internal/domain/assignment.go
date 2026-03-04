@@ -42,6 +42,20 @@ type Assignment struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TestCase
+// ─────────────────────────────────────────────────────────────────────────────
+
+// TestCase represents a single test case for an assignment
+type TestCase struct {
+	ID             string `json:"id"`
+	AssignmentID   string `json:"assignment_id"`
+	Input          string `json:"input"`
+	ExpectedOutput string `json:"expected_output"`
+	IsHidden       bool   `json:"is_hidden"`
+	OrderIndex     int    `json:"order_index"`
+}
+
 // TableName overrides the GORM default table name.
 func (Assignment) TableName() string {
 	return "assignments"

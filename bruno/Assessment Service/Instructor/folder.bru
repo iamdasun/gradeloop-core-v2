@@ -1,0 +1,20 @@
+meta {
+  name: Instructor
+}
+
+docs {
+  # Instructor-Scoped Assessment Endpoints
+
+  These endpoints allow instructors to manage assignments and view submissions
+  for their assigned course instances.
+
+  ## Authentication
+  Requires a valid Bearer token. Caller must have Employee, Admin, or Super Admin role.
+
+  ## Available Endpoints
+  | Method | Path                                                | Description                       |
+  |--------|-----------------------------------------------------|-----------------------------------|
+  | GET    | /api/v1/instructor-assignments/me                   | My assignments across courses     |
+  | POST   | /api/v1/instructor-assignments                      | Create assignment (instructor)    |
+  | GET    | /api/v1/instructor-submissions/assignment/:id       | Submissions for an assignment     |
+}
