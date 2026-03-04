@@ -69,58 +69,66 @@ export default function CourseInstanceLayout({
             }
         }
         fetchCourseData();
-        return () => {
-            mounted = false;
-            setPageTitle(null);
-            setSecondarySidebar(null);
-        };
-    }, [instanceId, basePath, setPageTitle, setSecondarySidebar]);
+        return () => { mounted = false; };
+    }, [instanceId]);
 
-    // Assignment detail pages have their own full-page layout
+    const basePath = `/instructor/courses/${instanceId}`;
+    const tabs = [
+        { name: "Overview", href: basePath, icon: LayoutDashboard },
+        { name: "Assignments", href: `${basePath}/assignments`, icon: FileText },
+        { name: "Students", href: `${basePath}/students`, icon: Users },
+    ];
+
+    // Hide the course-level tab bar when inside an assignment detail page —
+    // the assignment layout renders its own secondary bar there.
     const isInsideAssignment = /\/assignments\/[^/]+/.test(pathname);
-    if (isInsideAssignment) {
-        return <>{children}</>;
-    }
 
     return (
-        <>
-            {/* Mobile only: back link + horizontal tab bar */}
-            <div className="lg:hidden mb-6">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    asChild
-                    className="mb-3 h-8 px-2 text-muted-foreground hover:text-foreground justify-start -ml-2"
-                >
-                    <Link href="/instructor/courses">
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Back to Courses
-                    </Link>
-                </Button>
-                <div className="flex items-center gap-5 overflow-x-auto border-b border-border/40">
-                    {NAV_ITEMS.map(({ name, href, icon: Icon }) => {
-                        const fullHref = `${basePath}${href}`;
-                        const isActive = href === ""
-                            ? pathname === basePath
-                            : pathname.startsWith(fullHref);
-                        return (
-                            <Link
-                                key={name}
-                                href={fullHref}
-                                className={cn(
-                                    "flex items-center gap-2 pb-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                                    isActive
-                                        ? "border-primary text-primary"
-                                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                                )}
-                            >
-                                <Icon className="h-4 w-4" />
-                                {name}
-                            </Link>
-                        );
-                    })}
+        <div className="flex-1 flex flex-col overflow-hidden w-full animate-in fade-in duration-300">
+            {/* Horizontal Header / Tabs — hidden when inside an assignment detail page */}
+            {!isInsideAssignment && (
+            <div className="border-b border-border/40 bg-background/95 backdrop-blur z-10 sticky top-0 px-4 md:px-8 pt-6 shrink-0">
+                <div className="max-w-6xl mx-auto w-full">
+                    <Button variant="ghost" size="sm" asChild className="mb-4 h-8 px-2 text-muted-foreground hover:text-foreground -ml-2">
+                        <Link href="/instructor/courses">
+                            <ArrowLeft className="h-4 w-4 mr-2" />
+                            Back to Courses
+                        </Link>
+                    </Button>
+                    <div className="mb-6">
+                        <div className="text-xs font-mono font-bold text-primary mb-1 uppercase tracking-wider">{courseCode}</div>
+                        <h2 className="text-3xl font-bold font-heading text-foreground tracking-tight" title={courseTitle}>
+                            {courseTitle}
+                        </h2>
+                    </div>
+
+                    <div className="flex items-center gap-6 overflow-x-auto">
+                        {tabs.map((tab) => {
+                            const isActive = tab.href === basePath
+                                ? pathname === basePath
+                                : pathname.startsWith(tab.href);
+                            const Icon = tab.icon;
+
+                            return (
+                                <Link
+                                    key={tab.name}
+                                    href={tab.href}
+                                    className={cn(
+                                        "flex items-center gap-2 pb-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap",
+                                        isActive
+                                            ? "border-primary text-primary"
+                                            : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                                    )}
+                                >
+                                    <Icon className="h-4 w-4" />
+                                    {tab.name}
+                                </Link>
+                            )
+                        })}
+                    </div>
                 </div>
             </div>
+            )}
 
             {children}
         </>
