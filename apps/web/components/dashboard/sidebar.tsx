@@ -74,8 +74,8 @@ const adminNavItems: NavItem[] = [
     icon: Users,
     subItems: [
       { title: "Users", href: "/admin/users", icon: Users },
-      { title: "Roles", href: "/admin/roles", icon: UserCog },
-      { title: "Permissions", href: "/admin/permissions", icon: Key },
+      { title: "Groups & Batches", href: "/admin/academics/groups", icon: Users },
+      { title: "Roles & Permissions", href: "/admin/roles", icon: UserCog },
     ],
   },
   {
@@ -88,7 +88,6 @@ const adminNavItems: NavItem[] = [
       { title: "Degrees", href: "/admin/academics/degrees" },
       { title: "Courses", href: "/admin/academics/courses" },
       { title: "Semesters", href: "/admin/academics/semesters" },
-      { title: "Groups", href: "/admin/academics/groups" },
       { title: "Enrollment", href: "/admin/academics/enrollment" },
     ],
   },
@@ -152,11 +151,14 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
     : user?.email?.slice(0, 2).toUpperCase() || "??";
 
   // Determine active primary item
-  const activeRoot = navItems.find((item) =>
-    pathname.startsWith(item.href) && item.href !== homeHref
-      ? true
-      : pathname === item.href
-  ) || navItems[0];
+  const activeRoot = navItems.find((item) => {
+    if (item.href === homeHref) return pathname === homeHref;
+    // Check if pathname starts with item.href
+    if (pathname.startsWith(item.href) && item.href !== homeHref) return true;
+    // Check if any subItems match
+    if (item.subItems?.some(sub => pathname.startsWith(sub.href))) return true;
+    return false;
+  }) || navItems[0];
 
   const hasSecondaryContent = activeRoot?.subItems && activeRoot.subItems.length > 0;
   const [isHovered, setIsHovered] = React.useState(false);
