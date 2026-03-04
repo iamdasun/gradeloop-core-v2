@@ -1,5 +1,5 @@
-import { axiosInstance, handleApiError } from './axios';
-import type { UserListItem } from '@/types/auth.types';
+import { axiosInstance, handleApiError } from "./axios";
+import type { UserListItem } from "@/types/auth.types";
 import type {
   PaginatedResponse,
   ListUsersParams,
@@ -7,9 +7,29 @@ import type {
   UpdateUserRequest,
   CreateUserResponse,
   UpdateUserResponse,
-} from '@/types/admin.types';
+} from "@/types/admin.types";
 
 export type PaginatedUsers = PaginatedResponse<UserListItem>;
+
+export interface UserActivityLog {
+  id: string;
+  user_id: string;
+  action: string;
+  description: string;
+  entity_type?: string;
+  entity_id?: string;
+  metadata?: Record<string, unknown>;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: string;
+}
+
+export interface UserActivityResponse {
+  data: UserActivityLog[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
 /**
  * Normalises the backend response which may return:
@@ -50,7 +70,7 @@ export const usersApi = {
     if (params.role_id) cleanParams.role_id = params.role_id;
     if (params.search) cleanParams.search = params.search;
 
-    const { data } = await axiosInstance.get('/users', { params: cleanParams });
+    const { data } = await axiosInstance.get("/users", { params: cleanParams });
     return normalizePaginated(data, params);
   },
 
@@ -62,13 +82,22 @@ export const usersApi = {
 
   /** POST /users */
   create: async (payload: CreateUserRequest): Promise<CreateUserResponse> => {
-    const { data } = await axiosInstance.post<CreateUserResponse>('/users', payload);
+    const { data } = await axiosInstance.post<CreateUserResponse>(
+      "/users",
+      payload,
+    );
     return data;
   },
 
   /** PUT /users/:id — accepts role_id and is_active only */
-  update: async (id: string, payload: UpdateUserRequest): Promise<UpdateUserResponse> => {
-    const { data } = await axiosInstance.put<UpdateUserResponse>(`/users/${id}`, payload);
+  update: async (
+    id: string,
+    payload: UpdateUserRequest,
+  ): Promise<UpdateUserResponse> => {
+    const { data } = await axiosInstance.put<UpdateUserResponse>(
+      `/users/${id}`,
+      payload,
+    );
     return data;
   },
 
@@ -83,15 +112,15 @@ export const usersApi = {
   },
 
   /** GET /users/import/template */
-  importTemplate: async (format: 'csv' | 'xlsx'): Promise<void> => {
-    const { data } = await axiosInstance.get('/users/import/template', {
+  importTemplate: async (format: "csv" | "xlsx"): Promise<void> => {
+    const { data } = await axiosInstance.get("/users/import/template", {
       params: { format },
-      responseType: 'blob',
+      responseType: "blob",
     });
     const url = window.URL.createObjectURL(new Blob([data]));
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    link.setAttribute('download', `user_import_template.${format}`);
+    link.setAttribute("download", `user_import_template.${format}`);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -100,22 +129,53 @@ export const usersApi = {
   /** POST /users/import/preview */
   importPreview: async (file: File): Promise<any> => {
     const formData = new FormData();
-    formData.append('file', file);
-    const { data } = await axiosInstance.post('/users/import/preview', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    formData.append("file", file);
+    const { data } = await axiosInstance.post(
+      "/users/import/preview",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
     return data;
   },
 
   /** POST /users/import/execute */
-  importExecute: async (file: File, mapping: Record<string, string>): Promise<any> => {
+  importExecute: async (
+    file: File,
+    mapping: Record<string, string>,
+  ): Promise<any> => {
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('column_mapping', JSON.stringify(mapping));
-    const { data } = await axiosInstance.post('/users/import/execute', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    formData.append("file", file);
+    formData.append("column_mapping", JSON.stringify(mapping));
+    const { data } = await axiosInstance.post(
+      "/users/import/execute",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      },
+    );
     return data;
+  },
+
+  /** GET /admin/users/:id/activity — Fetch user activity/audit logs */
+  getActivity: async (
+    userId: string,
+    page = 1,
+    limit = 20,
+  ): Promise<UserActivityResponse> => {
+    const { data } = await axiosInstance.get(
+      `/admin/users/${userId}/activity`,
+      {
+        params: { page, limit },
+      },
+    );
+    return {
+      data: data.data || data.activities || [],
+      total: data.total || data.total_count || 0,
+      page: data.page || 1,
+      limit: data.limit || limit,
+    };
   },
 };
 

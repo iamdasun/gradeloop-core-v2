@@ -39,17 +39,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CreateUserDialog } from "@/components/admin/create-user-dialog";
 import { BulkImportDialog } from "@/components/admin/bulk-import-dialog";
 import { EditUserDialog } from "@/components/admin/edit-user-dialog";
 import { UserDetailsDialog } from "@/components/admin/user-details-dialog";
+import { UserProfileSideDialog } from "@/components/admin/user-profile-dialog";
 import { RevokeSessionsDialog } from "@/components/admin/revoke-sessions-dialog";
 import { DeleteUserDialog } from "@/components/admin/delete-user-dialog";
 import { useAdminUsersStore } from "@/lib/stores/adminUsersStore";
@@ -139,6 +135,9 @@ export default function UsersPage() {
   const [importOpen, setImportOpen] = React.useState(false);
   const [editUser, setEditUser] = React.useState<UserListItem | null>(null);
   const [detailsUser, setDetailsUser] = React.useState<UserListItem | null>(
+    null,
+  );
+  const [profileUser, setProfileUser] = React.useState<UserListItem | null>(
     null,
   );
   const [revokeUser, setRevokeUser] = React.useState<UserListItem | null>(null);
@@ -242,7 +241,11 @@ export default function UsersPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="all" value={userTypeFilter} onValueChange={setUserTypeFilter}>
+      <Tabs
+        defaultValue="all"
+        value={userTypeFilter}
+        onValueChange={setUserTypeFilter}
+      >
         <TabsList className="mb-4">
           <TabsTrigger value="all">All Users</TabsTrigger>
           <TabsTrigger value="student">Students</TabsTrigger>
@@ -393,7 +396,11 @@ export default function UsersPage() {
                   </TableRow>
                 ) : (
                   displayUsers.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow
+                      key={user.id}
+                      className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+                      onClick={() => setProfileUser(user)}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9 shrink-0">
@@ -427,15 +434,19 @@ export default function UsersPage() {
                       <TableCell className="hidden lg:table-cell text-sm text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
                         {user.last_login_at
                           ? new Date(user.last_login_at).toLocaleDateString(
-                            "en-US",
-                            { dateStyle: "medium" },
-                          )
+                              "en-US",
+                              { dateStyle: "medium" },
+                            )
                           : "—"}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                               <span className="sr-only">Open menu</span>
                             </Button>
@@ -560,6 +571,23 @@ export default function UsersPage() {
         }}
         onDelete={(u) => {
           setDetailsUser(null);
+          setDeleteUser(u);
+        }}
+      />
+      <UserProfileSideDialog
+        user={profileUser}
+        open={!!profileUser}
+        onOpenChange={(open) => !open && setProfileUser(null)}
+        onEdit={(u) => {
+          setProfileUser(null);
+          setEditUser(u);
+        }}
+        onRevokeSessions={(u) => {
+          setProfileUser(null);
+          setRevokeUser(u);
+        }}
+        onDelete={(u) => {
+          setProfileUser(null);
           setDeleteUser(u);
         }}
       />
