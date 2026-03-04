@@ -20,8 +20,14 @@ import {
   GraduationCap,
   Building2,
   Layers,
+  Settings,
+  Save,
+  ShieldAlert,
+  Loader2,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,7 +56,7 @@ import {
   EditSpecializationDialog,
 } from '@/components/admin/academics/specialization-dialogs';
 import { EditDegreeDialog } from '@/components/admin/academics/degree-dialogs';
-import type { Degree, Specialization, DegreeLevel, Department } from '@/types/academics.types';
+import type { Degree, Specialization, DegreeLevel, Department, UpdateDegreeRequest } from '@/types/academics.types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -132,6 +138,11 @@ export default function DegreeDetailPage() {
   const [editSpecTarget, setEditSpecTarget] = React.useState<Specialization | null>(null);
   const [editDegreeOpen, setEditDegreeOpen] = React.useState(false);
 
+  // Settings
+  const [activeTab, setActiveTab] = React.useState<'specializations' | 'settings'>('specializations');
+  const [editValues, setEditValues] = React.useState<UpdateDegreeRequest>({});
+  const [saving, setSaving] = React.useState(false);
+
   React.useEffect(() => {
     if (!canAccess) router.replace('/admin');
   }, [canAccess, router]);
@@ -148,6 +159,7 @@ export default function DegreeDetailPage() {
       setDegree(deg);
       setSpecializations(specs);
       setPageTitle(deg.name);
+      setEditValues({ name: deg.name, code: deg.code, level: deg.level });
       // Lazily fetch department info
       if (deg.department_id) {
         departmentsApi.get(deg.department_id).then(setDepartment).catch(() => {});
@@ -162,6 +174,39 @@ export default function DegreeDetailPage() {
   React.useEffect(() => { load(); }, [load]);
 
   React.useEffect(() => () => setPageTitle(null), [setPageTitle]);
+
+  async function handleSaveDegree(e: React.FormEvent) {
+    e.preventDefault();
+    if (!degree) return;
+    setSaving(true);
+    try {
+      const updated = await degreesApi.update(degree.id, editValues);
+      setDegree(updated);
+      setPageTitle(updated.name);
+      toast.success('Degree updated', updated.name);
+    } catch (err) {
+      toast.error('Update failed', handleApiError(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleDegreeStatus() {
+    if (!degree) return;
+    try {
+      if (degree.is_active) {
+        await degreesApi.deactivate(degree.id);
+        setDegree((prev) => prev ? { ...prev, is_active: false } : prev);
+        toast.success('Degree deactivated', degree.name);
+      } else {
+        await degreesApi.reactivate(degree.id);
+        setDegree((prev) => prev ? { ...prev, is_active: true } : prev);
+        toast.success('Degree reactivated', degree.name);
+      }
+    } catch (err) {
+      toast.error('Action failed', handleApiError(err));
+    }
+  }
 
   async function handleToggleSpec(spec: Specialization) {
     try {
@@ -323,8 +368,38 @@ export default function DegreeDetailPage() {
         </div>
       )}
 
-      {/* Specializations section */}
+      {/* Tab layout */}
       {degree && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* LHS Sidebar */}
+          <div className="lg:col-span-1 space-y-3">
+            <Button
+              variant={activeTab === 'specializations' ? 'default' : 'ghost'}
+              className={cn(
+                'justify-start font-semibold w-full',
+                activeTab === 'specializations' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setActiveTab('specializations')}
+            >
+              <Layers className="h-4 w-4 mr-2" />
+              Specializations
+            </Button>
+            <Button
+              variant={activeTab === 'settings' ? 'default' : 'ghost'}
+              className={cn(
+                'justify-start font-semibold w-full',
+                activeTab === 'settings' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setActiveTab('settings')}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+          </div>
+
+          {/* RHS Content */}
+          <div className="lg:col-span-3 space-y-6">
+          {activeTab === 'specializations' ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -439,6 +514,96 @@ export default function DegreeDetailPage() {
               </div>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <Card className="border-border">
+            <CardHeader className="border-b border-border bg-muted/30">
+              <CardTitle className="text-base font-bold">General Settings</CardTitle>
+              <CardDescription className="text-xs">Update the degree name, code and programme level.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <form onSubmit={handleSaveDegree} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="deg_name" className="text-xs font-bold uppercase text-muted-foreground">Degree Name</Label>
+                    <input
+                      id="deg_name"
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-medium"
+                      value={editValues.name ?? ''}
+                      onChange={(e) => setEditValues({ ...editValues, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="deg_code" className="text-xs font-bold uppercase text-muted-foreground">Degree Code</Label>
+                    <input
+                      id="deg_code"
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                      value={editValues.code ?? ''}
+                      onChange={(e) => setEditValues({ ...editValues, code: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="deg_level" className="text-xs font-bold uppercase text-muted-foreground">Programme Level</Label>
+                  <select
+                    id="deg_level"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    value={editValues.level ?? ''}
+                    onChange={(e) => setEditValues({ ...editValues, level: e.target.value as DegreeLevel })}
+                  >
+                    <option value="Undergraduate">Undergraduate</option>
+                    <option value="Postgraduate">Postgraduate</option>
+                    <option value="Doctoral">Doctoral</option>
+                    <option value="Diploma">Diploma</option>
+                    <option value="Certificate">Certificate</option>
+                  </select>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <Button disabled={saving} className="font-bold gap-2">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save Changes
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-100 dark:border-red-900/30 overflow-hidden">
+            <CardHeader className="bg-red-50/50 dark:bg-red-900/10 border-b border-red-100 dark:border-red-900/20">
+              <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
+                <ShieldAlert className="h-5 w-5" />
+                <div>
+                  <CardTitle className="text-base font-bold">Danger Zone</CardTitle>
+                  <CardDescription className="text-xs text-red-500/70">Proceed with caution. These actions may affect all specializations under this degree.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-foreground">
+                    {degree.is_active ? 'Deactivate Degree' : 'Reactivate Degree'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {degree.is_active
+                      ? 'All specializations under this degree will be affected.'
+                      : 'Restore visibility and access for this degree and its specializations.'}
+                  </p>
+                </div>
+                <Button
+                  variant={degree.is_active ? 'destructive' : 'secondary'}
+                  className="font-bold whitespace-nowrap"
+                  onClick={handleToggleDegreeStatus}
+                >
+                  {degree.is_active ? 'Deactivate' : 'Reactivate'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+          </div>
         </div>
       )}
 

@@ -19,8 +19,14 @@ import {
   CalendarDays,
   CheckCircle2,
   XCircle,
+  Settings,
+  Save,
+  ShieldAlert,
+  Loader2,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -49,7 +55,7 @@ import {
   EditDepartmentDialog,
 } from '@/components/admin/academics/department-dialogs';
 import { EditFacultyDialog } from '@/components/admin/academics/faculty-dialogs';
-import type { Faculty, Department } from '@/types/academics.types';
+import type { Faculty, Department, UpdateFacultyRequest } from '@/types/academics.types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -118,6 +124,11 @@ export default function FacultyDetailPage() {
   const [editDeptTarget, setEditDeptTarget] = React.useState<Department | null>(null);
   const [editFacultyOpen, setEditFacultyOpen] = React.useState(false);
 
+  // Settings
+  const [activeTab, setActiveTab] = React.useState<'departments' | 'settings'>('departments');
+  const [editValues, setEditValues] = React.useState<UpdateFacultyRequest>({});
+  const [saving, setSaving] = React.useState(false);
+
   React.useEffect(() => {
     if (!canAccess) router.replace('/admin');
   }, [canAccess, router]);
@@ -134,6 +145,7 @@ export default function FacultyDetailPage() {
       setFaculty(fac);
       setDepartments(depts);
       setPageTitle(fac.name);
+      setEditValues({ name: fac.name, code: fac.code, description: fac.description ?? '' });
     } catch (err) {
       setError(handleApiError(err));
     } finally {
@@ -144,6 +156,39 @@ export default function FacultyDetailPage() {
   React.useEffect(() => { load(); }, [load]);
 
   React.useEffect(() => () => setPageTitle(null), [setPageTitle]);
+
+  async function handleSaveFaculty(e: React.FormEvent) {
+    e.preventDefault();
+    if (!faculty) return;
+    setSaving(true);
+    try {
+      const updated = await facultiesApi.update(faculty.id, editValues);
+      setFaculty(updated);
+      setPageTitle(updated.name);
+      toast.success('Faculty updated', updated.name);
+    } catch (err) {
+      toast.error('Update failed', handleApiError(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleFacultyStatus() {
+    if (!faculty) return;
+    try {
+      if (faculty.is_active) {
+        await facultiesApi.deactivate(faculty.id);
+        setFaculty((prev) => prev ? { ...prev, is_active: false } : prev);
+        toast.success('Faculty deactivated', faculty.name);
+      } else {
+        await facultiesApi.reactivate(faculty.id);
+        setFaculty((prev) => prev ? { ...prev, is_active: true } : prev);
+        toast.success('Faculty reactivated', faculty.name);
+      }
+    } catch (err) {
+      toast.error('Action failed', handleApiError(err));
+    }
+  }
 
   async function handleToggleDept(dept: Department) {
     try {
@@ -287,8 +332,38 @@ export default function FacultyDetailPage() {
         </div>
       )}
 
-      {/* Departments section */}
+      {/* Tab layout */}
       {faculty && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* LHS Sidebar */}
+          <div className="lg:col-span-1 space-y-3">
+            <Button
+              variant={activeTab === 'departments' ? 'default' : 'ghost'}
+              className={cn(
+                'justify-start font-semibold w-full',
+                activeTab === 'departments' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setActiveTab('departments')}
+            >
+              <Building2 className="h-4 w-4 mr-2" />
+              Departments
+            </Button>
+            <Button
+              variant={activeTab === 'settings' ? 'default' : 'ghost'}
+              className={cn(
+                'justify-start font-semibold w-full',
+                activeTab === 'settings' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setActiveTab('settings')}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+          </div>
+
+          {/* RHS Content */}
+          <div className="lg:col-span-3 space-y-6">
+          {activeTab === 'departments' ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -433,6 +508,91 @@ export default function FacultyDetailPage() {
               </div>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <Card className="border-border">
+            <CardHeader className="border-b border-border bg-muted/30">
+              <CardTitle className="text-base font-bold">General Settings</CardTitle>
+              <CardDescription className="text-xs">Update the faculty name, code and description.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <form onSubmit={handleSaveFaculty} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="faculty_name" className="text-xs font-bold uppercase text-muted-foreground">Faculty Name</Label>
+                    <input
+                      id="faculty_name"
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-medium"
+                      value={editValues.name ?? ''}
+                      onChange={(e) => setEditValues({ ...editValues, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="faculty_code" className="text-xs font-bold uppercase text-muted-foreground">Faculty Code</Label>
+                    <input
+                      id="faculty_code"
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                      value={editValues.code ?? ''}
+                      onChange={(e) => setEditValues({ ...editValues, code: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="faculty_desc" className="text-xs font-bold uppercase text-muted-foreground">Description</Label>
+                  <textarea
+                    id="faculty_desc"
+                    rows={3}
+                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                    value={editValues.description ?? ''}
+                    onChange={(e) => setEditValues({ ...editValues, description: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end pt-2">
+                  <Button disabled={saving} className="font-bold gap-2">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save Changes
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-100 dark:border-red-900/30 overflow-hidden">
+            <CardHeader className="bg-red-50/50 dark:bg-red-900/10 border-b border-red-100 dark:border-red-900/20">
+              <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
+                <ShieldAlert className="h-5 w-5" />
+                <div>
+                  <CardTitle className="text-base font-bold">Danger Zone</CardTitle>
+                  <CardDescription className="text-xs text-red-500/70">Proceed with caution. These actions may affect all departments under this faculty.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-foreground">
+                    {faculty.is_active ? 'Deactivate Faculty' : 'Reactivate Faculty'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {faculty.is_active
+                      ? 'All departments under this faculty will be affected.'
+                      : 'Restore visibility and access for this faculty and its departments.'}
+                  </p>
+                </div>
+                <Button
+                  variant={faculty.is_active ? 'destructive' : 'secondary'}
+                  className="font-bold whitespace-nowrap"
+                  onClick={handleToggleFacultyStatus}
+                >
+                  {faculty.is_active ? 'Deactivate' : 'Reactivate'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+          </div>
         </div>
       )}
 

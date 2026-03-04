@@ -19,8 +19,14 @@ import {
   CheckCircle2,
   XCircle,
   Layers,
+  Settings,
+  Save,
+  ShieldAlert,
+  Loader2,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -49,7 +55,7 @@ import {
   EditDegreeDialog,
 } from '@/components/admin/academics/degree-dialogs';
 import { EditDepartmentDialog } from '@/components/admin/academics/department-dialogs';
-import type { Department, Degree, DegreeLevel, Faculty } from '@/types/academics.types';
+import type { Department, Degree, DegreeLevel, Faculty, UpdateDepartmentRequest } from '@/types/academics.types';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -128,6 +134,11 @@ export default function DepartmentDetailPage() {
   const [editDegreeTarget, setEditDegreeTarget] = React.useState<Degree | null>(null);
   const [editDeptOpen, setEditDeptOpen] = React.useState(false);
 
+  // Settings
+  const [activeTab, setActiveTab] = React.useState<'degrees' | 'settings'>('degrees');
+  const [editValues, setEditValues] = React.useState<UpdateDepartmentRequest>({});
+  const [saving, setSaving] = React.useState(false);
+
   React.useEffect(() => {
     if (!canAccess) router.replace('/admin');
   }, [canAccess, router]);
@@ -144,6 +155,7 @@ export default function DepartmentDetailPage() {
       setDepartment(dept);
       setDegrees(degList);
       setPageTitle(dept.name);
+      setEditValues({ name: dept.name, code: dept.code, description: dept.description ?? '' });
       // Lazily fetch faculty name
       if (dept.faculty_id) {
         facultiesApi.get(dept.faculty_id).then(setFaculty).catch(() => {});
@@ -158,6 +170,39 @@ export default function DepartmentDetailPage() {
   React.useEffect(() => { load(); }, [load]);
 
   React.useEffect(() => () => setPageTitle(null), [setPageTitle]);
+
+  async function handleSaveDepartment(e: React.FormEvent) {
+    e.preventDefault();
+    if (!department) return;
+    setSaving(true);
+    try {
+      const updated = await departmentsApi.update(department.id, editValues);
+      setDepartment(updated);
+      setPageTitle(updated.name);
+      toast.success('Department updated', updated.name);
+    } catch (err) {
+      toast.error('Update failed', handleApiError(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleDepartmentStatus() {
+    if (!department) return;
+    try {
+      if (department.is_active) {
+        await departmentsApi.deactivate(department.id);
+        setDepartment((prev) => prev ? { ...prev, is_active: false } : prev);
+        toast.success('Department deactivated', department.name);
+      } else {
+        await departmentsApi.reactivate(department.id);
+        setDepartment((prev) => prev ? { ...prev, is_active: true } : prev);
+        toast.success('Department reactivated', department.name);
+      }
+    } catch (err) {
+      toast.error('Action failed', handleApiError(err));
+    }
+  }
 
   async function handleToggleDegree(deg: Degree) {
     try {
@@ -319,8 +364,38 @@ export default function DepartmentDetailPage() {
         </div>
       )}
 
-      {/* Degrees section */}
+      {/* Tab layout */}
       {department && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* LHS Sidebar */}
+          <div className="lg:col-span-1 space-y-3">
+            <Button
+              variant={activeTab === 'degrees' ? 'default' : 'ghost'}
+              className={cn(
+                'justify-start font-semibold w-full',
+                activeTab === 'degrees' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setActiveTab('degrees')}
+            >
+              <Award className="h-4 w-4 mr-2" />
+              Degrees &amp; Programs
+            </Button>
+            <Button
+              variant={activeTab === 'settings' ? 'default' : 'ghost'}
+              className={cn(
+                'justify-start font-semibold w-full',
+                activeTab === 'settings' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-muted-foreground hover:text-foreground',
+              )}
+              onClick={() => setActiveTab('settings')}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+          </div>
+
+          {/* RHS Content */}
+          <div className="lg:col-span-3 space-y-6">
+          {activeTab === 'degrees' ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -448,6 +523,91 @@ export default function DepartmentDetailPage() {
               </div>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <Card className="border-border">
+            <CardHeader className="border-b border-border bg-muted/30">
+              <CardTitle className="text-base font-bold">General Settings</CardTitle>
+              <CardDescription className="text-xs">Update the department name, code and description.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <form onSubmit={handleSaveDepartment} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="dept_name" className="text-xs font-bold uppercase text-muted-foreground">Department Name</Label>
+                    <input
+                      id="dept_name"
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-medium"
+                      value={editValues.name ?? ''}
+                      onChange={(e) => setEditValues({ ...editValues, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dept_code" className="text-xs font-bold uppercase text-muted-foreground">Department Code</Label>
+                    <input
+                      id="dept_code"
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+                      value={editValues.code ?? ''}
+                      onChange={(e) => setEditValues({ ...editValues, code: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dept_desc" className="text-xs font-bold uppercase text-muted-foreground">Description</Label>
+                  <textarea
+                    id="dept_desc"
+                    rows={3}
+                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                    value={editValues.description ?? ''}
+                    onChange={(e) => setEditValues({ ...editValues, description: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end pt-2">
+                  <Button disabled={saving} className="font-bold gap-2">
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Save Changes
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-100 dark:border-red-900/30 overflow-hidden">
+            <CardHeader className="bg-red-50/50 dark:bg-red-900/10 border-b border-red-100 dark:border-red-900/20">
+              <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
+                <ShieldAlert className="h-5 w-5" />
+                <div>
+                  <CardTitle className="text-base font-bold">Danger Zone</CardTitle>
+                  <CardDescription className="text-xs text-red-500/70">Proceed with caution. These actions may affect all degrees under this department.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-foreground">
+                    {department.is_active ? 'Deactivate Department' : 'Reactivate Department'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {department.is_active
+                      ? 'All degrees under this department will be affected.'
+                      : 'Restore visibility and access for this department and its degrees.'}
+                  </p>
+                </div>
+                <Button
+                  variant={department.is_active ? 'destructive' : 'secondary'}
+                  className="font-bold whitespace-nowrap"
+                  onClick={handleToggleDepartmentStatus}
+                >
+                  {department.is_active ? 'Deactivate' : 'Reactivate'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+          </div>
         </div>
       )}
 
