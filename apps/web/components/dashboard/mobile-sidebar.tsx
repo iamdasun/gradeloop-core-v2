@@ -111,16 +111,11 @@ const instructorNavItems: NavItem[] = [
     title: "My Courses",
     href: "/instructor/courses",
     icon: BookOpen,
-  },
-  {
-    title: "Assessments",
-    href: "/instructor/assessments",
-    icon: FileText,
-  },
-  {
-    title: "Students",
-    href: "/instructor/students",
-    icon: GraduationCap,
+    subItems: [
+      { title: "All Courses", href: "/instructor/courses", icon: BookOpen },
+      { title: "Assessments", href: "/instructor/assessments", icon: FileText },
+      { title: "Students", href: "/instructor/students", icon: GraduationCap },
+    ],
   },
   {
     title: "Settings",
