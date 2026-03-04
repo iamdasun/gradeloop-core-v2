@@ -58,14 +58,9 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
     }
   }, [user, open, fetchRoles]);
 
-  // Only show roles compatible with the user's type so admins can't accidentally
-  // assign a student-only role to an employee, etc.
-  const compatibleRoles = React.useMemo(() => {
-    if (!user?.user_type) return roles;
-    return roles.filter(
-      (r) => r.user_type === user.user_type || r.user_type === "all",
-    );
-  }, [roles, user?.user_type]);
+  // User type is tied to the role, so any role can be selected.
+  const selectedRole = roles.find((r) => r.id === values.role_id);
+  const displayUserType = selectedRole?.user_type || user?.user_type || "—";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -146,7 +141,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500">User Type</span>
               <span className="font-medium capitalize">
-                {user.user_type || "—"}
+                {displayUserType}
               </span>
             </div>
           </div>
@@ -172,7 +167,7 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
                     ? "Roles unavailable"
                     : "Select role"}
               </option>
-              {compatibleRoles.map((r) => (
+              {roles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
                 </option>

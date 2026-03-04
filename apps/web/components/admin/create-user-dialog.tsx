@@ -41,7 +41,6 @@ function validate(values: CreateUserRequest): FormErrors {
     errors.email = 'Enter a valid email address';
   }
   if (!values.role_id) errors.role_id = 'Role is required';
-  if (!values.user_type) errors.user_type = 'User type is required';
   if (values.user_type === 'student' && !values.student_id?.trim())
     errors.student_id = 'Student ID is required for student type';
   if (values.user_type === 'employee' && !values.designation?.trim())
@@ -68,20 +67,16 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
     }
   }, [open]);
 
-  // Filter roles to only those compatible with the selected user_type.
-  // A role is compatible when role.user_type matches or role.user_type === 'all'.
-  const compatibleRoles = React.useMemo(() => {
-    if (!values.user_type) return roles;
-    return roles.filter(
-      (r) => r.user_type === values.user_type || r.user_type === 'all',
-    );
-  }, [roles, values.user_type]);
+  // User Type is now inferred from the selected role
+
 
   function set(field: keyof CreateUserRequest, value: string) {
     setValues((prev) => {
       const next = { ...prev, [field]: value };
-      // When user_type changes the previously selected role may be incompatible—reset it.
-      if (field === 'user_type') next.role_id = '';
+      if (field === 'role_id') {
+        const role = roles.find((r) => r.id === value);
+        next.user_type = role?.user_type || 'all';
+      }
       return next;
     });
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -163,24 +158,38 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
             )}
           </div>
 
-          {/* User Type */}
+          {/* Role */}
           <div className="space-y-1.5">
-            <Label htmlFor="cu-usertype">
-              User Type <span className="text-red-500">*</span>
+            <Label htmlFor="cu-role">
+              Role <span className="text-red-500">*</span>
             </Label>
             <SelectNative
-              id="cu-usertype"
-              value={values.user_type}
-              onChange={(e) => set('user_type', e.target.value)}
-              disabled={submitting}
+              id="cu-role"
+              value={values.role_id}
+              onChange={(e) => set('role_id', e.target.value)}
+              disabled={submitting || rolesLoading}
+              title={rolesError ? `Roles unavailable: ${rolesError}` : undefined}
             >
-              <option value="">Select user type</option>
-              <option value="student">Student</option>
-              <option value="employee">Employee</option>
-              <option value="all">Other / Admin</option>
+              <option value="">
+                {rolesLoading ? 'Loading roles…' : rolesError ? 'Roles unavailable' : 'Select a role'}
+              </option>
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
             </SelectNative>
-            {errors.user_type && (
-              <p className="text-xs text-red-500">{errors.user_type}</p>
+            {rolesError && (
+              <button
+                type="button"
+                className="text-xs text-red-500 hover:underline"
+                onClick={() => refetchRoles()}
+              >
+                Retry loading roles
+              </button>
+            )}
+            {errors.role_id && (
+              <p className="text-xs text-red-500">{errors.role_id}</p>
             )}
           </div>
 
@@ -224,40 +233,6 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
             </div>
           )}
 
-          {/* Role */}
-          <div className="space-y-1.5">
-            <Label htmlFor="cu-role">
-              Role <span className="text-red-500">*</span>
-            </Label>
-            <SelectNative
-              id="cu-role"
-              value={values.role_id}
-              onChange={(e) => set('role_id', e.target.value)}
-              disabled={submitting || rolesLoading}
-              title={rolesError ? `Roles unavailable: ${rolesError}` : undefined}
-            >
-              <option value="">
-                {rolesLoading ? 'Loading roles…' : rolesError ? 'Roles unavailable' : 'Select a role'}
-              </option>
-              {compatibleRoles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </SelectNative>
-            {rolesError && (
-              <button
-                type="button"
-                className="text-xs text-red-500 hover:underline"
-                onClick={() => refetchRoles()}
-              >
-                Retry loading roles
-              </button>
-            )}
-            {errors.role_id && (
-              <p className="text-xs text-red-500">{errors.role_id}</p>
-            )}
-          </div>
 
           <SideDialogFooter className="pt-2">
             <Button
