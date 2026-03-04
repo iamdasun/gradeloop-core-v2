@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { useUIStore } from "@/lib/stores/uiStore";
 
 interface TopbarProps {
   onMenuClick?: () => void;
@@ -24,12 +25,15 @@ interface TopbarProps {
 export function Topbar({ onMenuClick, className }: TopbarProps) {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
+  const pageTitle = useUIStore((s) => s.pageTitle);
 
   // Format pathname as Title
   const paths = pathname.split("/").filter(Boolean);
-  const currentPath = paths[paths.length - 1]
+  const pathDerivedTitle = paths[paths.length - 1]
     ? paths[paths.length - 1].charAt(0).toUpperCase() + paths[paths.length - 1].slice(1)
     : "Dashboard";
+
+  const currentPath = pageTitle || pathDerivedTitle;
 
   return (
     <header

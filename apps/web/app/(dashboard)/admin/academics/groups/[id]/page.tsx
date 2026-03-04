@@ -16,6 +16,7 @@ import {
     ChevronRight,
     MoreHorizontal,
     UserCircle,
+    Copy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,12 +48,14 @@ import {
 import type { Batch, BatchMemberDetail } from '@/types/academics.types';
 import type { UserListItem } from '@/types/auth.types';
 import { cn } from '@/lib/utils/cn';
+import { useUIStore } from '@/lib/stores/uiStore';
 
 export default function GroupDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
     const { canAccess, canWrite } = useAcademicsAccess();
+    const setPageTitle = useUIStore(s => s.setPageTitle);
 
     const [batch, setBatch] = React.useState<Batch | null>(null);
     const [members, setMembers] = React.useState<BatchMemberDetail[]>([]);
@@ -78,6 +81,7 @@ export default function GroupDetailPage() {
             ]);
             setBatch(batchData);
             setMembers(membersData);
+            setPageTitle(batchData.name);
         } catch (err) {
             setError(handleApiError(err));
             toast.error('Failed to load group details');
@@ -87,6 +91,10 @@ export default function GroupDetailPage() {
     }, [id]);
 
     React.useEffect(() => { fetchData(); }, [fetchData]);
+
+    React.useEffect(() => {
+        return () => setPageTitle(null);
+    }, [setPageTitle]);
 
     // Search students for bulk add
     React.useEffect(() => {
@@ -344,6 +352,25 @@ export default function GroupDetailPage() {
                                     <span className="text-sm font-semibold">{batch.start_year}</span>
                                 </div>
                             </div>
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-zinc-400 uppercase">Group ID</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-mono font-medium text-zinc-500 break-all bg-zinc-50 dark:bg-zinc-950 p-1 rounded border border-zinc-100 dark:border-zinc-900">
+                                        {batch.id}
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-zinc-400 hover:text-zinc-900"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(batch.id);
+                                            toast.success('ID copied to clipboard');
+                                        }}
+                                    >
+                                        <Copy className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
                             <div className="space-y-1 border-t border-zinc-100 dark:border-zinc-900 pt-4">
                                 <span className="text-[10px] font-bold text-zinc-400 uppercase">Member Count</span>
                                 <div className="flex items-baseline gap-2 mt-1">
@@ -476,6 +503,6 @@ export default function GroupDetailPage() {
                     </Card>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

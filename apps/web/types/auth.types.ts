@@ -100,6 +100,7 @@ export interface UserListItem {
   role_id: string;
   role_name: string;
   user_type: string;
+  avatar_url?: string;
   student_id?: string;
   designation?: string;
   is_active: boolean;
