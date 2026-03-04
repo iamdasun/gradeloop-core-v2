@@ -1173,3 +1173,458 @@ export function EnrollStudentsDialog({
     </SideDialog>
   );
 }
+
+// ── Add Batch to Instance Dialog ──────────────────────────────────────────────
+
+export function AddBatchToInstanceDialog({
+  open,
+  onOpenChange,
+  instanceId,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  instanceId: string;
+  onSuccess?: () => void;
+}) {
+  const [batches, setBatches] = React.useState<Batch[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [search, setSearch] = React.useState('');
+  const [selectedBatchId, setSelectedBatchId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!open) {
+      setSearch('');
+      setSelectedBatchId(null);
+      return;
+    }
+    
+    const fetchBatches = async () => {
+      setLoading(true);
+      try {
+        const data = await batchesApi.list(false);
+        setBatches(data);
+      } catch (err) {
+        toast.error('Failed to load batches', handleApiError(err));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBatches();
+  }, [open]);
+
+  const filteredBatches = batches.filter((b) => {
+    const q = search.toLowerCase();
+    return (
+      b.name.toLowerCase().includes(q) ||
+      b.code.toLowerCase().includes(q)
+    );
+  });
+
+  const handleAddBatch = async () => {
+    if (!selectedBatchId) return;
+
+    setSubmitting(true);
+    try {
+      // Get all batch members
+      const members = await batchesApi.getMembersDetailed(selectedBatchId);
+      const userIds = members.map((m) => m.user_id);
+
+      // Enroll all batch members in the course instance
+      await Promise.all(
+        userIds.map((userId) =>
+          enrollmentsApi.enroll({
+            course_instance_id: instanceId,
+            user_id: userId,
+          })
+        )
+      );
+
+      toast.success(
+        'Batch added successfully',
+        `${userIds.length} students enrolled from batch`
+      );
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (err) {
+      toast.error('Failed to add batch', handleApiError(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <SideDialog open={open} onOpenChange={onOpenChange}>
+      <SideDialogContent>
+        <SideDialogHeader>
+          <SideDialogTitle>Add Batch to Course</SideDialogTitle>
+          <SideDialogDescription>
+            Select a batch to enroll all its students in this course instance.
+          </SideDialogDescription>
+        </SideDialogHeader>
+
+        <div className="space-y-4 flex-1">
+          <SectionHeader
+            icon={<Users className="h-3 w-3" />}
+            label="Select Batch"
+            variant="primary"
+          />
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search batches by name or code..."
+              className="pl-9 h-9 text-sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Batch List */}
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : filteredBatches.length === 0 ? (
+            <div className="py-8 text-center">
+              <Users className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+              <p className="text-sm text-muted-foreground">
+                {search ? 'No batches found' : 'No batches available'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {filteredBatches.map((batch) => (
+                <button
+                  key={batch.id}
+                  type="button"
+                  onClick={() => setSelectedBatchId(batch.id)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                    selectedBatchId === batch.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                    selectedBatchId === batch.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {selectedBatchId === batch.id ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <Users className="h-4 w-4" />
+                    )}
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="font-medium text-sm truncate">{batch.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {batch.code} • {batch.start_year}-{batch.end_year}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <SideDialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={!selectedBatchId || submitting}
+            onClick={handleAddBatch}
+            className="gap-1.5"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Adding Batch...
+              </>
+            ) : (
+              <>
+                <UserPlus className="h-3.5 w-3.5" />
+                Add Batch
+              </>
+            )}
+          </Button>
+        </SideDialogFooter>
+      </SideDialogContent>
+    </SideDialog>
+  );
+}
+
+// ── Add Individual Student Dialog ─────────────────────────────────────────────
+
+export function AddIndividualStudentDialog({
+  open,
+  onOpenChange,
+  instanceId,
+  excludeUserIds = [],
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  instanceId: string;
+  excludeUserIds?: string[];
+  onSuccess?: () => void;
+}) {
+  const [query, setQuery] = React.useState('');
+  const [results, setResults] = React.useState<UserListItem[]>([]);
+  const [selected, setSelected] = React.useState<UserListItem[]>([]);
+  const [searching, setSearching] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [dropdownOpen, setDropdownOpen] = React.useState(false);
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    if (!open) {
+      setQuery('');
+      setResults([]);
+      setSelected([]);
+      setDropdownOpen(false);
+      return;
+    }
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      setDropdownOpen(false);
+      return;
+    }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await usersApi.list({
+          search: query,
+          user_type: 'Student',
+          limit: 20,
+        });
+        const selectedIds = selected.map((s) => s.id);
+        const allExcluded = [...excludeUserIds, ...selectedIds];
+        const filtered = res.data.filter((u) => !allExcluded.includes(u.id));
+        setResults(filtered);
+        setDropdownOpen(filtered.length > 0);
+      } catch (err) {
+        setResults([]);
+        setDropdownOpen(false);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query, selected, excludeUserIds]);
+
+  const addStudent = (student: UserListItem) => {
+    setSelected((prev) => [...prev, student]);
+    setQuery('');
+    setResults([]);
+    setDropdownOpen(false);
+  };
+
+  const removeStudent = (userId: string) => {
+    setSelected((prev) => prev.filter((s) => s.id !== userId));
+  };
+
+  const handleEnroll = async () => {
+    if (selected.length === 0) return;
+
+    setSubmitting(true);
+    try {
+      await Promise.all(
+        selected.map((student) =>
+          enrollmentsApi.enroll({
+            course_instance_id: instanceId,
+            user_id: student.id,
+          })
+        )
+      );
+
+      toast.success(
+        `${selected.length} student${selected.length > 1 ? 's' : ''} enrolled`,
+        'Students added successfully'
+      );
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (err) {
+      toast.error('Failed to enroll students', handleApiError(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  function getEnrollInitials(name: string, email: string) {
+    const src = name || email;
+    return src
+      .split(/[.\-_\s@]/)
+      .map((p) => p[0]?.toUpperCase() ?? '')
+      .slice(0, 2)
+      .join('');
+  }
+
+  return (
+    <SideDialog open={open} onOpenChange={onOpenChange}>
+      <SideDialogContent>
+        <SideDialogHeader>
+          <SideDialogTitle>Add Individual Students</SideDialogTitle>
+          <SideDialogDescription>
+            Search and add students individually to this course instance.
+          </SideDialogDescription>
+        </SideDialogHeader>
+
+        <div className="space-y-4 flex-1">
+          <SectionHeader
+            icon={<Search className="h-3 w-3" />}
+            label="Search Students"
+            variant="info"
+          />
+
+          {/* Search Input */}
+          <div className="relative">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search by name, email, or ID..."
+                className="pl-9 h-9 text-sm"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => results.length > 0 && setDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setDropdownOpen(false), 150)}
+              />
+              {searching && (
+                <Loader2 className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
+              )}
+            </div>
+
+            {/* Dropdown Results */}
+            {dropdownOpen && results.length > 0 && (
+              <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg overflow-hidden max-h-[240px] overflow-y-auto">
+                {results.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-sm hover:bg-accent transition-colors text-left"
+                    onMouseDown={() => addStudent(u)}
+                  >
+                    <Avatar className="h-8 w-8 shrink-0">
+                      <AvatarFallback className="bg-info/10 text-info text-xs">
+                        {getEnrollInitials(u.full_name, u.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate text-sm">
+                        {u.full_name || u.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {u.email}
+                      </p>
+                    </div>
+                    {u.student_id && (
+                      <span className="text-xs text-muted-foreground shrink-0 font-mono">
+                        #{u.student_id}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {!searching && query.trim() && results.length === 0 && !dropdownOpen && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                No students found matching &ldquo;{query}&rdquo;.
+              </p>
+            )}
+          </div>
+
+          {/* Selected Students */}
+          {selected.length > 0 && (
+            <>
+              <SectionHeader
+                icon={<GraduationCap className="h-3 w-3" />}
+                label={`Selected (${selected.length})`}
+                variant="success"
+              />
+              <div className="rounded-lg border border-border overflow-hidden divide-y divide-border max-h-[300px] overflow-y-auto">
+                {selected.map((u) => (
+                  <div key={u.id} className="flex items-center gap-3 px-3 py-2.5">
+                    <Avatar className="h-8 w-8 shrink-0">
+                      <AvatarFallback className="bg-success/10 text-success text-xs">
+                        {getEnrollInitials(u.full_name, u.email)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">
+                        {u.full_name || u.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {u.email}
+                      </p>
+                    </div>
+                    {u.student_id && (
+                      <span className="text-xs text-muted-foreground font-mono shrink-0">
+                        #{u.student_id}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeStudent(u.id)}
+                      className="ml-1 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <SideDialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={selected.length === 0 || submitting}
+            className="gap-1.5"
+            onClick={handleEnroll}
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Enrolling...
+              </>
+            ) : (
+              <>
+                <UserPlus className="h-3.5 w-3.5" />
+                Enroll {selected.length > 0 ? `${selected.length} Student${selected.length > 1 ? 's' : ''}` : 'Students'}
+              </>
+            )}
+          </Button>
+        </SideDialogFooter>
+      </SideDialogContent>
+    </SideDialog>
+  );
+}

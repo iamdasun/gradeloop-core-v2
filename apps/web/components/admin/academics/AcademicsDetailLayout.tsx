@@ -6,27 +6,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils/cn';
 
-interface Tab {
-  id: string;
+interface Tab<T extends string = string> {
+  id: T;
   label: string;
   icon: LucideIcon;
 }
 
-interface AcademicsDetailLayoutProps {
-  tabs: Tab[];
-  activeTab: string;
-  onTabChange: (tabId: string) => void;
+interface AcademicsDetailLayoutProps<T extends string = string> {
+  tabs: Tab<T>[];
+  activeTab: T;
+  onTabChange: (tabId: T) => void;
   headerSlot?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function AcademicsDetailLayout({
+export function AcademicsDetailLayout<T extends string = string>({
   tabs,
   activeTab,
   onTabChange,
   headerSlot,
   children,
-}: AcademicsDetailLayoutProps) {
+}: AcademicsDetailLayoutProps<T>) {
   return (
     <div className="space-y-6">
       {/* Header Section (optional) */}

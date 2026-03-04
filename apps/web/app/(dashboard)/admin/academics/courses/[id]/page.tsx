@@ -107,7 +107,7 @@ export default function CourseDetailPage() {
             const data = await coursesApi.get(id);
             setCourse(data);
             setPageTitle(data.title);
-            setEditValues({ title: data.title, code: data.code, credits: data.credits, description: data.description ?? '' });
+            setEditValues({ title: data.title, credits: data.credits, description: data.description ?? '' });
         } catch (err) {
             setError(handleApiError(err));
             toast.error('Failed to load course details');
@@ -363,153 +363,153 @@ export default function CourseDetailPage() {
                         )}
 
                         <Card className="shadow-sm overflow-hidden">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Semester</TableHead>
-                                <TableHead>Batch</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-center">Max Enrollment</TableHead>
-                                <TableHead className="hidden md:table-cell">Created</TableHead>
-                                <TableHead className="w-10" />
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {instancesLoading ? (
-                                Array.from({ length: 4 }).map((_, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                                        <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
-                                        <TableCell><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
-                                        <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
-                                        <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Semester</TableHead>
+                                        <TableHead>Batch</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-center">Max Enrollment</TableHead>
+                                        <TableHead className="hidden md:table-cell">Created</TableHead>
+                                        <TableHead className="w-10" />
                                     </TableRow>
-                                ))
-                            ) : pagedInstances.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="py-16 text-center text-muted-foreground">
-                                        <Calendar className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
-                                        <p className="font-medium">No instances yet</p>
-                                        {canWrite && (
-                                            <p className="text-sm mt-1">Create the first instance to schedule this course.</p>
-                                        )}
-                                        {canWrite && (
-                                            <Button size="sm" className="mt-4 gap-1.5" onClick={() => setCreateInstanceOpen(true)}>
-                                                <Plus className="h-4 w-4" /> Create Instance
-                                            </Button>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                pagedInstances.map((instance) => {
-                                    const semester = semesterMap[instance.semester_id];
-                                    const batch = batchMap[instance.batch_id];
-                                    return (
-                                        <TableRow key={instance.id} className="group">
-                                            <TableCell>
-                                                <Link
-                                                    href={`/admin/academics/courses/${id}/instances/${instance.id}`}
-                                                    className="font-medium hover:text-primary transition-colors"
-                                                >
-                                                    {semester
-                                                        ? `${semester.name} (${semester.term_type})`
-                                                        : instance.semester_id.slice(0, 8)}
-                                                </Link>
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {batch ? `${batch.name} (${batch.code})` : instance.batch_id.slice(0, 8)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant={instanceStatusVariant(instance.status)}>
-                                                    {instance.status}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-center text-sm font-medium">
-                                                {instance.max_enrollment}
-                                            </TableCell>
-                                            <TableCell className="hidden md:table-cell text-sm text-muted-foreground whitespace-nowrap">
-                                                {new Date(instance.created_at).toLocaleDateString('en-US', { dateStyle: 'medium' })}
-                                            </TableCell>
-                                            <TableCell>
+                                </TableHeader>
+                                <TableBody>
+                                    {instancesLoading ? (
+                                        Array.from({ length: 4 }).map((_, i) => (
+                                            <TableRow key={i}>
+                                                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                                                <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                                                <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                                                <TableCell><Skeleton className="h-4 w-12 mx-auto" /></TableCell>
+                                                <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
+                                                <TableCell><Skeleton className="h-8 w-8 rounded-md" /></TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : pagedInstances.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="py-16 text-center text-muted-foreground">
+                                                <Calendar className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
+                                                <p className="font-medium">No instances yet</p>
                                                 {canWrite && (
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                            >
-                                                                <MoreVertical className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-40">
-                                                            <DropdownMenuItem
-                                                                className="gap-2"
-                                                                onClick={() => router.push(`/admin/academics/courses/${id}/instances/${instance.id}`)}
-                                                            >
-                                                                <BookOpen className="h-3.5 w-3.5" /> View
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                className="gap-2"
-                                                                onClick={() => setEditInstance(instance)}
-                                                            >
-                                                                <Pencil className="h-3.5 w-3.5" /> Edit
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
+                                                    <p className="text-sm mt-1">Create the first instance to schedule this course.</p>
+                                                )}
+                                                {canWrite && (
+                                                    <Button size="sm" className="mt-4 gap-1.5" onClick={() => setCreateInstanceOpen(true)}>
+                                                        <Plus className="h-4 w-4" /> Create Instance
+                                                    </Button>
                                                 )}
                                             </TableCell>
                                         </TableRow>
-                                    );
-                                })
-                            )}
-                        </TableBody>
-                    </Table>
+                                    ) : (
+                                        pagedInstances.map((instance) => {
+                                            const semester = semesterMap[instance.semester_id];
+                                            const batch = batchMap[instance.batch_id];
+                                            return (
+                                                <TableRow key={instance.id} className="group">
+                                                    <TableCell>
+                                                        <Link
+                                                            href={`/admin/academics/courses/${id}/instances/${instance.id}`}
+                                                            className="font-medium hover:text-primary transition-colors"
+                                                        >
+                                                            {semester
+                                                                ? `${semester.name} (${semester.term_type})`
+                                                                : instance.semester_id.slice(0, 8)}
+                                                        </Link>
+                                                    </TableCell>
+                                                    <TableCell className="text-sm text-muted-foreground">
+                                                        {batch ? `${batch.name} (${batch.code})` : instance.batch_id.slice(0, 8)}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={instanceStatusVariant(instance.status)}>
+                                                            {instance.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-center text-sm font-medium">
+                                                        {instance.max_enrollment}
+                                                    </TableCell>
+                                                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground whitespace-nowrap">
+                                                        {new Date(instance.created_at).toLocaleDateString('en-US', { dateStyle: 'medium' })}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {canWrite && (
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                    >
+                                                                        <MoreVertical className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" className="w-40">
+                                                                    <DropdownMenuItem
+                                                                        className="gap-2"
+                                                                        onClick={() => router.push(`/admin/academics/courses/${id}/instances/${instance.id}`)}
+                                                                    >
+                                                                        <BookOpen className="h-3.5 w-3.5" /> View
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem
+                                                                        className="gap-2"
+                                                                        onClick={() => setEditInstance(instance)}
+                                                                    >
+                                                                        <Pencil className="h-3.5 w-3.5" /> Edit
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    )}
+                                </TableBody>
+                            </Table>
 
-                    {/* Pagination */}
-                    {!instancesLoading && instances.length > INSTANCES_PER_PAGE && (
-                        <div className="flex items-center justify-between border-t border-border px-4 py-3">
-                            <p className="text-sm text-muted-foreground">
-                                Showing{' '}
-                                <span className="font-medium text-foreground">
-                                    {(instancesPage - 1) * INSTANCES_PER_PAGE + 1}
-                                </span>
-                                –
-                                <span className="font-medium text-foreground">
-                                    {Math.min(instancesPage * INSTANCES_PER_PAGE, instances.length)}
-                                </span>{' '}
-                                of{' '}
-                                <span className="font-medium text-foreground">{instances.length}</span>
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-1"
-                                    onClick={() => setInstancesPage((p) => Math.max(1, p - 1))}
-                                    disabled={instancesPage === 1}
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                    Prev
-                                </Button>
-                                <span className="text-sm text-muted-foreground px-1">
-                                    {instancesPage} / {totalPages}
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-1"
-                                    onClick={() => setInstancesPage((p) => Math.min(totalPages, p + 1))}
-                                    disabled={instancesPage >= totalPages}
-                                >
-                                    Next
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                </Card>
+                            {/* Pagination */}
+                            {!instancesLoading && instances.length > INSTANCES_PER_PAGE && (
+                                <div className="flex items-center justify-between border-t border-border px-4 py-3">
+                                    <p className="text-sm text-muted-foreground">
+                                        Showing{' '}
+                                        <span className="font-medium text-foreground">
+                                            {(instancesPage - 1) * INSTANCES_PER_PAGE + 1}
+                                        </span>
+                                        –
+                                        <span className="font-medium text-foreground">
+                                            {Math.min(instancesPage * INSTANCES_PER_PAGE, instances.length)}
+                                        </span>{' '}
+                                        of{' '}
+                                        <span className="font-medium text-foreground">{instances.length}</span>
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-1"
+                                            onClick={() => setInstancesPage((p) => Math.max(1, p - 1))}
+                                            disabled={instancesPage === 1}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                            Prev
+                                        </Button>
+                                        <span className="text-sm text-muted-foreground px-1">
+                                            {instancesPage} / {totalPages}
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-1"
+                                            onClick={() => setInstancesPage((p) => Math.min(totalPages, p + 1))}
+                                            disabled={instancesPage >= totalPages}
+                                        >
+                                            Next
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </Card>
                     </div>
                 )}
 
@@ -527,16 +527,14 @@ export default function CourseDetailPage() {
                                 <form onSubmit={handleSaveCourse} className="space-y-4">
                                     <div className="grid gap-4 md:grid-cols-2">
                                         <div className="space-y-2">
-                                            <Label htmlFor="code">Course Code *</Label>
+                                            <Label htmlFor="code">Course Code</Label>
                                             <input
                                                 id="code"
                                                 type="text"
-                                                required
                                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                                placeholder="e.g., CS101"
-                                                value={editValues.code ?? ''}
-                                                onChange={(e) => setEditValues({ ...editValues, code: e.target.value })}
-                                                disabled={!canWrite}
+                                                value={course.code}
+                                                disabled
+                                                title="Course code cannot be changed after creation"
                                             />
                                         </div>
 
