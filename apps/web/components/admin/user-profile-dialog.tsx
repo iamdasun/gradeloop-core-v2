@@ -189,8 +189,8 @@ export function UserProfileSideDialog({
                 <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
                   {user.full_name || "No Name"}
                 </h2>
-                <Badge variant={roleBadgeVariant(user.role_name)}>
-                  {user.role_name}
+                <Badge variant={roleBadgeVariant(user.user_type)} className="capitalize">
+                  {user.user_type}
                 </Badge>
                 <Badge variant={user.is_active ? "success" : "destructive"}>
                   {user.is_active ? "Active" : "Inactive"}

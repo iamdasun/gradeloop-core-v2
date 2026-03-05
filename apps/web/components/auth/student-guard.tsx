@@ -14,24 +14,19 @@ interface StudentGuardProps {
  *
  * - Unauthenticated users → /login
  * - Admin / super_admin  → /admin
- * - employee / instructor → /instructor
- * - student / learner    → render children
- * - Any other role       → access-denied screen
+ * - instructor → /instructor
+ * - student → render children
+ * - Any other user type → access-denied screen
  */
 export function StudentGuard({ children }: StudentGuardProps) {
     const router = useRouter();
     const { user, isHydrated, isLoading, isAuthenticated } = useAuthStore();
 
-    const roleName = user?.role_name?.toLowerCase().trim() ?? "";
+    const userType = user?.user_type?.toLowerCase().trim() ?? "";
 
-    const isStudent =
-        roleName === "student" ||
-        roleName === "learner";
-
-    const isAdmin = roleName === "admin" || roleName === "super_admin";
-    const isEmployee =
-        roleName === "employee" ||
-        roleName.includes("instructor");
+    const isStudent = userType === "student";
+    const isAdmin = userType === "admin" || userType === "super_admin";
+    const isInstructor = userType === "instructor";
 
     useEffect(() => {
         if (!isHydrated || isLoading) return;
@@ -44,10 +39,10 @@ export function StudentGuard({ children }: StudentGuardProps) {
             router.replace("/admin");
             return;
         }
-        if (isEmployee) {
+        if (isInstructor) {
             router.replace("/instructor");
         }
-    }, [isHydrated, isLoading, isAuthenticated, isAdmin, isEmployee, router]);
+    }, [isHydrated, isLoading, isAuthenticated, isAdmin, isInstructor, router]);
 
     // Waiting for hydration / token restore
     if (!isHydrated || isLoading) {
@@ -62,9 +57,9 @@ export function StudentGuard({ children }: StudentGuardProps) {
     }
 
     // Redirect in-flight
-    if (!isAuthenticated || isAdmin || isEmployee) return null;
+    if (!isAuthenticated || isAdmin || isInstructor) return null;
 
-    // Wrong role
+    // Wrong user type (not student)
     if (!isStudent) {
         return (
             <div className="flex h-screen flex-col items-center justify-center gap-4 text-muted-foreground">

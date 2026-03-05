@@ -14,16 +14,16 @@ interface InstructorGuardProps {
  *
  * - Unauthenticated users → /login
  * - Admin / super_admin → /admin  (admins have their own dashboard)
- * - employee → render children
- * - Any other role (e.g. student) → access-denied screen
+ * - instructor → render children
+ * - Any other user type (e.g. student) → access-denied screen
  */
 export function InstructorGuard({ children }: InstructorGuardProps) {
     const router = useRouter();
     const { user, isHydrated, isLoading, isAuthenticated } = useAuthStore();
 
-    const roleName = user?.role_name?.toLowerCase().trim() ?? "";
-    const isEmployee = roleName === "employee";
-    const isAdmin = roleName === "admin" || roleName === "super_admin";
+    const userType = user?.user_type?.toLowerCase().trim() ?? "";
+    const isInstructor = userType === "instructor";
+    const isAdmin = userType === "admin" || userType === "super_admin";
 
     useEffect(() => {
         if (!isHydrated || isLoading) return;
@@ -52,8 +52,8 @@ export function InstructorGuard({ children }: InstructorGuardProps) {
     // Redirect in-flight
     if (!isAuthenticated || isAdmin) return null;
 
-    // Wrong role (not employee, not admin)
-    if (!isEmployee) {
+    // Wrong user type (not instructor, not admin)
+    if (!isInstructor) {
         return (
             <div className="flex h-screen flex-col items-center justify-center gap-4 text-zinc-400">
                 <ShieldX className="h-12 w-12 text-red-400" />

@@ -170,7 +170,7 @@ function InstructorSearchInput({
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-foreground truncate">{value.full_name || value.email}</p>
-          <p className="text-xs text-muted-foreground truncate">{value.designation || value.role_name}</p>
+          <p className="text-xs text-muted-foreground truncate capitalize">{value.designation || value.user_type}</p>
         </div>
         <button
           type="button"
@@ -215,8 +215,8 @@ function InstructorSearchInput({
                 <p className="font-medium truncate">{u.full_name || u.email}</p>
                 <p className="text-xs text-muted-foreground truncate">{u.email}</p>
               </div>
-              <span className="text-xs text-muted-foreground shrink-0">
-                {u.designation || u.role_name}
+              <span className="text-xs text-muted-foreground shrink-0 capitalize">
+                {u.designation || u.user_type}
               </span>
             </button>
           ))}

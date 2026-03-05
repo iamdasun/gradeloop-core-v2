@@ -352,7 +352,7 @@ export default function UsersPage() {
                       <Users className="mx-auto h-10 w-10 text-zinc-300 dark:text-zinc-600 mb-3" />
                       <p className="font-medium">No users found</p>
                       <p className="text-sm mt-1">
-                        {debouncedSearch || roleFilter || statusFilter
+                        {debouncedSearch || userTypeFilter !== "all" || statusFilter
                           ? "Try adjusting your search or filters."
                           : "Get started by adding the first user."}
                       </p>
