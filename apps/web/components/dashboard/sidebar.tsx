@@ -74,7 +74,11 @@ const adminNavItems: NavItem[] = [
     subItems: [
       { title: "Users", href: "/admin/users", icon: Users },
       { title: "Roles & Permissions", href: "/admin/roles", icon: UserCog },
-      { title: "Groups & Batches", href: "/admin/academics/groups", icon: Users2 },
+      {
+        title: "Groups & Batches",
+        href: "/admin/academics/groups",
+        icon: Users2,
+      },
     ],
   },
   {
@@ -142,24 +146,30 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
   const displayName = user?.full_name || user?.email || "—";
   const initials = user?.full_name
     ? user.full_name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase()
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
     : user?.email?.slice(0, 2).toUpperCase() || "??";
+  const isEmployee =
+    user?.user_type === "employee" ||
+    user?.role_name?.toLowerCase().includes("instructor");
 
   // Determine active primary item
-  const activeRoot = navItems.find((item) => {
-    if (item.href === homeHref) return pathname === homeHref;
-    // Check if pathname starts with item.href
-    if (pathname.startsWith(item.href) && item.href !== homeHref) return true;
-    // Check if any subItems match
-    if (item.subItems?.some(sub => pathname.startsWith(sub.href))) return true;
-    return false;
-  }) || navItems[0];
+  const activeRoot =
+    navItems.find((item) => {
+      if (item.href === homeHref) return pathname === homeHref;
+      // Check if pathname starts with item.href
+      if (pathname.startsWith(item.href) && item.href !== homeHref) return true;
+      // Check if any subItems match
+      if (item.subItems?.some((sub) => pathname.startsWith(sub.href)))
+        return true;
+      return false;
+    }) || navItems[0];
 
-  const hasSecondaryContent = activeRoot?.subItems && activeRoot.subItems.length > 0;
+  const hasSecondaryContent =
+    activeRoot?.subItems && activeRoot.subItems.length > 0;
   const [isHovered, setIsHovered] = React.useState(false);
 
   const isPrimaryCollapsed = hasSecondaryContent ? !isHovered : collapsed;
@@ -170,25 +180,42 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
       <div
         className={cn(
           "relative z-20 flex flex-col items-center border-r bg-sidebar text-sidebar-foreground py-4 transition-all duration-300",
-          isPrimaryCollapsed ? "w-16" : "w-64 items-start"
+          isPrimaryCollapsed ? "w-16" : "w-64 items-start",
         )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Logo */}
-        <div className={cn("flex w-full mb-6", isPrimaryCollapsed ? "justify-center" : "justify-start px-4")}>
-          <Link href={homeHref} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105">
+        <div
+          className={cn(
+            "flex w-full mb-6",
+            isPrimaryCollapsed ? "justify-center" : "justify-start px-4",
+          )}
+        >
+          <Link
+            href={homeHref}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
+          >
             <GraduationCap className="h-6 w-6" />
           </Link>
           {!isPrimaryCollapsed && (
             <div className="ml-3 flex flex-col justify-center overflow-hidden">
-              <span className="font-bold text-lg leading-tight truncate">Gradeloop</span>
+              <span className="font-bold text-lg leading-tight truncate">
+                Gradeloop
+              </span>
             </div>
           )}
         </div>
 
         {/* Primary Navigation Icons */}
-        <nav className={cn("flex flex-1 flex-col gap-3 w-full", isPrimaryCollapsed ? "px-2 items-center" : "px-4 items-stretch overflow-y-auto")}>
+        <nav
+          className={cn(
+            "flex flex-1 flex-col gap-3 w-full",
+            isPrimaryCollapsed
+              ? "px-2 items-center"
+              : "px-4 items-stretch overflow-y-auto",
+          )}
+        >
           {navItems.map((item) => {
             const isActive = activeRoot.title === item.title;
             const Icon = item.icon;
@@ -198,15 +225,19 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
                   variant="ghost"
                   className={cn(
                     "h-12 w-full flex items-center rounded-xl transition-colors",
-                    isPrimaryCollapsed ? "justify-center p-0" : "justify-start px-4 gap-3",
+                    isPrimaryCollapsed
+                      ? "justify-center p-0"
+                      : "justify-start px-4 gap-3",
                     isActive
                       ? "bg-primary/10 text-primary font-semibold"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                   title={isPrimaryCollapsed ? item.title : undefined}
                 >
                   <Icon className="h-5 w-5 shrink-0" />
-                  {!isPrimaryCollapsed && <span className="truncate">{item.title}</span>}
+                  {!isPrimaryCollapsed && (
+                    <span className="truncate">{item.title}</span>
+                  )}
                 </Button>
               </Link>
             );
@@ -214,27 +245,64 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
         </nav>
 
         {/* Bottom Primary Actions */}
-        <div className={cn("mt-auto w-full", isPrimaryCollapsed ? "px-2 flex flex-col items-center gap-2" : "px-4")}>
-          <div className={cn("flex items-center gap-1 w-full", isPrimaryCollapsed ? "flex-col" : "flex-row")}>
+        <div
+          className={cn(
+            "mt-auto w-full",
+            isPrimaryCollapsed
+              ? "px-2 flex flex-col items-center gap-2"
+              : "px-4",
+          )}
+        >
+          <div
+            className={cn(
+              "flex items-center gap-1 w-full",
+              isPrimaryCollapsed ? "flex-col" : "flex-row",
+            )}
+          >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className={cn("h-12 rounded-xl hover:bg-sidebar-accent border-0", isPrimaryCollapsed ? "w-12 p-0 justify-center" : "flex-1 min-w-0 px-3 justify-start gap-3")}>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "h-12 rounded-xl hover:bg-sidebar-accent border-0",
+                    isPrimaryCollapsed
+                      ? "w-12 p-0 justify-center"
+                      : "flex-1 min-w-0 px-3 justify-start gap-3",
+                  )}
+                >
                   <Avatar className="h-8 w-8 ring-2 ring-primary/20 shrink-0">
-                    <AvatarFallback className="bg-primary/20 text-xs text-primary">{initials}</AvatarFallback>
+                    <AvatarFallback className="bg-primary/20 text-xs text-primary">
+                      {initials}
+                    </AvatarFallback>
                   </Avatar>
                   {!isPrimaryCollapsed && (
                     <div className="flex flex-col items-start overflow-hidden text-left flex-1 min-w-0">
-                      <span className="text-sm font-medium text-foreground truncate w-full">{displayName}</span>
-                      {isEmployee && <span className="text-xs text-muted-foreground truncate w-full">Instructor</span>}
+                      <span className="text-sm font-medium text-foreground truncate w-full">
+                        {displayName}
+                      </span>
+                      {isEmployee && (
+                        <span className="text-xs text-muted-foreground truncate w-full">
+                          Instructor
+                        </span>
+                      )}
                     </div>
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" side="right" className="w-56 mb-2 ml-2">
+              <DropdownMenuContent
+                align="end"
+                side="right"
+                className="w-56 mb-2 ml-2"
+              >
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/profile" className="flex w-full cursor-pointer items-center">Profile</Link>
+                  <Link
+                    href="/profile"
+                    className="flex w-full cursor-pointer items-center"
+                  >
+                    Profile
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -263,36 +331,46 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
       </div>
       {/* Secondary Sidebar Area */}
       {hasSecondaryContent && (
-        <div
-          className={cn("relative transition-all duration-300 z-10 w-64")}
-        >
-          <div className={cn(
-            "absolute inset-y-0 left-0 flex flex-col border-r bg-sidebar-background transition-all duration-300 h-full w-64 items-start"
-          )}>
+        <div className={cn("relative transition-all duration-300 z-10 w-64")}>
+          <div
+            className={cn(
+              "absolute inset-y-0 left-0 flex flex-col border-r bg-sidebar-background transition-all duration-300 h-full w-64 items-start",
+            )}
+          >
             <div className={cn("flex h-16 items-center w-full px-6")}>
-              <h2 className="text-lg font-semibold tracking-tight text-foreground font-heading">{activeRoot?.title || "Overview"}</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground font-heading">
+                {activeRoot?.title || "Overview"}
+              </h2>
             </div>
             <ScrollArea className={cn("flex-1 w-full px-4")}>
               <div className="flex flex-col gap-3 py-2 w-full items-center">
                 {/* Contextual Sub-navigation */}
                 <div className="flex flex-col gap-1 w-full">
                   {activeRoot.subItems!.map((subItem) => {
-                    const isChildActive = pathname === subItem.href || pathname.startsWith(subItem.href + "/");
+                    const isChildActive =
+                      pathname === subItem.href ||
+                      pathname.startsWith(subItem.href + "/");
                     return (
-                      <Link key={subItem.title} href={subItem.href} className="w-full text-left">
+                      <Link
+                        key={subItem.title}
+                        href={subItem.href}
+                        className="w-full text-left"
+                      >
                         <Button
                           variant="ghost"
                           className={cn(
                             "h-10 w-full flex items-center rounded-lg transition-colors justify-start px-3",
                             isChildActive
                               ? "bg-primary/10 text-primary font-medium"
-                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+                              : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
                           )}
                         >
-                          <span className="truncate text-sm">{subItem.title}</span>
+                          <span className="truncate text-sm">
+                            {subItem.title}
+                          </span>
                         </Button>
                       </Link>
-                    )
+                    );
                   })}
                 </div>
               </div>
@@ -309,7 +387,11 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
           onClick={() => onCollapsedChange(!collapsed)}
           className="absolute -right-3 top-6 z-50 h-6 w-6 rounded-full border bg-background text-foreground shadow-sm hover:bg-accent transition-all duration-300 flex items-center justify-center p-0"
         >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronLeft className="h-4 w-4" />
+          )}
         </Button>
       )}
     </div>
