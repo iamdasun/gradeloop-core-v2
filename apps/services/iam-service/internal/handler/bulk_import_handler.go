@@ -71,9 +71,9 @@ func (h *BulkImportHandler) ExecuteImport(c fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid column_mapping JSON")
 	}
 
-	// Get actor permissions from context (set by AuthMiddleware)
-	permissions, ok := c.Locals("permissions").([]string)
-	if !ok || permissions == nil {
+	// Get actor user type from context (set by AuthMiddleware)
+	actorUserType, ok := c.Locals("user_type").(string)
+	if !ok || actorUserType == "" {
 		return fiber.NewError(fiber.StatusForbidden, "Permission denied")
 	}
 
@@ -83,7 +83,7 @@ func (h *BulkImportHandler) ExecuteImport(c fiber.Ctx) error {
 	}
 	defer f.Close()
 
-	response, err := h.bulkImportService.ExecuteImport(c.RequestCtx(), f, file.Filename, mapping, permissions)
+	response, err := h.bulkImportService.ExecuteImport(c.RequestCtx(), f, file.Filename, mapping, actorUserType)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}

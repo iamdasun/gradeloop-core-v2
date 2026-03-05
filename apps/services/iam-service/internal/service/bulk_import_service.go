@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/gradeloop/iam-service/internal/domain"
 	"github.com/gradeloop/iam-service/internal/dto"
 	"github.com/gradeloop/iam-service/internal/repository"
 	"github.com/xuri/excelize/v2"
@@ -19,7 +19,7 @@ import (
 type BulkImportService interface {
 	GenerateTemplate(format string) ([]byte, string, error)
 	PreviewImport(ctx context.Context, reader io.Reader, filename string) (*dto.BulkImportPreviewResponse, error)
-	ExecuteImport(ctx context.Context, reader io.Reader, filename string, mapping map[string]string, actorPermissions []string) (*dto.BulkImportExecuteResponse, error)
+	ExecuteImport(ctx context.Context, reader io.Reader, filename string, mapping map[string]string, actorUserType string) (*dto.BulkImportExecuteResponse, error)
 }
 
 type bulkImportService struct {
@@ -181,18 +181,10 @@ func (s *bulkImportService) PreviewImport(ctx context.Context, reader io.Reader,
 	return nil, fmt.Errorf("unsupported file format")
 }
 
-func (s *bulkImportService) ExecuteImport(ctx context.Context, reader io.Reader, filename string, mapping map[string]string, actorPermissions []string) (*dto.BulkImportExecuteResponse, error) {
+func (s *bulkImportService) ExecuteImport(ctx context.Context, reader io.Reader, filename string, mapping map[string]string, actorUserType string) (*dto.BulkImportExecuteResponse, error) {
 	results := make([]dto.BulkImportResultRow, 0)
 	successCount := 0
 	totalProcessed := 0
-
-	// Valid user types for validation
-	validUserTypes := map[string]bool{
-		"student":     true,
-		"instructor":  true,
-		"admin":       true,
-		"super_admin": true,
-	}
 
 	processRow := func(rowIndex int, row []string, headers []string) {
 		totalProcessed++
@@ -210,14 +202,13 @@ func (s *bulkImportService) ExecuteImport(ctx context.Context, reader io.Reader,
 			return
 		}
 
-		// Map role name to ID
-		roleID, ok := roleMap[strings.ToLower(userRow.Role)]
-		if !ok {
+		// Validate user type
+		if !domain.IsValidUserType(userRow.UserType) {
 			results = append(results, dto.BulkImportResultRow{
 				RowIndex: rowIndex,
 				Email:    userRow.Email,
 				Success:  false,
-				Error:    fmt.Sprintf("role '%s' not found", userRow.Role),
+				Error:    fmt.Sprintf("invalid user type '%s'", userRow.UserType),
 			})
 			return
 		}
@@ -225,7 +216,6 @@ func (s *bulkImportService) ExecuteImport(ctx context.Context, reader io.Reader,
 		createReq := &dto.CreateUserRequest{
 			FullName:    userRow.FullName,
 			Email:       userRow.Email,
-			RoleID:      roleID.String(),
 			UserType:    userRow.UserType,
 			Department:  userRow.Department,
 			Faculty:     userRow.Faculty,
@@ -233,7 +223,7 @@ func (s *bulkImportService) ExecuteImport(ctx context.Context, reader io.Reader,
 			Designation: userRow.Designation,
 		}
 
-		_, err := s.userService.CreateUser(ctx, createReq, actorPermissions)
+		_, err := s.userService.CreateUser(ctx, createReq, actorUserType)
 		if err != nil {
 			results = append(results, dto.BulkImportResultRow{
 				RowIndex: rowIndex,
@@ -409,22 +399,18 @@ func (s *bulkImportService) validateRow(ctx context.Context, row dto.ImportUserR
 		}
 	}
 
-	if row.Role == "" {
-		errors = append(errors, "Role is required")
-	}
-
 	if row.UserType == "" {
 		errors = append(errors, "User Type is required")
 	} else {
 		lType := strings.ToLower(row.UserType)
-		if lType != "student" && lType != "employee" && lType != "all" {
-			errors = append(errors, "Invalid User Type (must be student, employee, or all)")
+		if lType != "student" && lType != "instructor" && lType != "admin" && lType != "super_admin" {
+			errors = append(errors, "Invalid User Type (must be student, instructor, admin, or super_admin)")
 		}
 
 		if lType == "student" && row.StudentID == "" {
 			errors = append(errors, "Student ID is required for students")
-		} else if lType == "employee" && row.Designation == "" {
-			errors = append(errors, "Designation is required for employees")
+		} else if lType == "instructor" && row.Designation == "" {
+			errors = append(errors, "Designation is required for instructors")
 		}
 	}
 

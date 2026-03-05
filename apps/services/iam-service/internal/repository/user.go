@@ -167,5 +167,3 @@ func (r *userRepository) GetUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]
 	}
 	return users, nil
 }
-
-

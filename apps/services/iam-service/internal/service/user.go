@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	ErrEmailTaken        = errors.New("email already exists")
-	ErrInvalidUserType   = errors.New("invalid user type")
+	ErrEmailTaken      = errors.New("email already exists")
+	ErrInvalidUserType = errors.New("invalid user type")
 )
 
 type UserService interface {
@@ -62,32 +62,15 @@ func NewUserService(
 	}
 }
 
-func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest, actorPermissions []string) (*dto.CreateUserResponse, error) {
-	// Check if actor has permission to create users
-	hasPermission := false
-	for _, perm := range actorPermissions {
-		if perm == "users:write" {
-			hasPermission = true
-			break
-		}
-	}
-	if !hasPermission {
+func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest, actorUserType string) (*dto.CreateUserResponse, error) {
+	// Check if actor has permission to create users (only admin and super_admin)
+	if actorUserType != "admin" && actorUserType != "super_admin" {
 		return nil, ErrUnauthorized
 	}
 
-	// Parse role ID
-	roleID, err := uuid.Parse(req.RoleID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid role ID: %w", err)
-	}
-
-	// Check if role exists
-	roleExists, err := s.userRepo.RoleExists(ctx, roleID)
-	if err != nil {
-		return nil, fmt.Errorf("checking role: %w", err)
-	}
-	if !roleExists {
-		return nil, ErrRoleNotFound
+	// Validate user type
+	if !domain.IsValidUserType(req.UserType) {
+		return nil, ErrInvalidUserType
 	}
 
 	// Check if email already exists
@@ -114,7 +97,7 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 		Email:                   req.Email,
 		FullName:                req.FullName,
 		PasswordHash:            "", // First-time user flow, password is empty initially
-		RoleID:                  &roleID,
+		UserType:                req.UserType,
 		Department:              req.Department,
 		Faculty:                 req.Faculty,
 		IsActive:                false,
@@ -140,12 +123,12 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 			tx.Rollback()
 			return nil, fmt.Errorf("creating student profile: %w", err)
 		}
-	} else if req.UserType == "employee" {
+	} else if req.UserType == "instructor" {
 		if req.Designation == "" {
 			tx.Rollback()
-			return nil, errors.New("designation is required for employee type")
+			return nil, errors.New("designation is required for instructor type")
 		}
-		profile := &domain.UserProfileEmployee{
+		profile := &domain.UserProfileInstructor{
 			UserID:      user.ID,
 			Designation: req.Designation,
 		}
@@ -196,14 +179,14 @@ func (s *userService) CreateUser(ctx context.Context, req *dto.CreateUserRequest
 		ID:        user.ID,
 		FullName:  user.FullName,
 		Email:     user.Email,
-		RoleID:    roleID,
+		UserType:  user.UserType,
 		IsActive:  user.IsActive,
 		ResetLink: resetLink,
 		Message:   fmt.Sprintf("User created successfully. A setup email has been sent to %s. The link expires at %s", user.Email, expiresAt.Format(time.RFC3339)),
 	}, nil
 }
 
-func (s *userService) GetUsers(ctx context.Context, page, limit int, userType string, roleID string, search string) (*dto.GetUsersResponse, error) {
+func (s *userService) GetUsers(ctx context.Context, page, limit int, userType string, search string) (*dto.GetUsersResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -212,42 +195,31 @@ func (s *userService) GetUsers(ctx context.Context, page, limit int, userType st
 	}
 	offset := (page - 1) * limit
 
-	users, err := s.userRepo.GetUsers(ctx, offset, limit, userType, roleID, search)
+	users, err := s.userRepo.GetUsers(ctx, offset, limit, userType, search)
 	if err != nil {
 		return nil, fmt.Errorf("fetching users: %w", err)
 	}
 
-	totalCount, err := s.userRepo.CountUsers(ctx, userType, roleID, search)
+	totalCount, err := s.userRepo.CountUsers(ctx, userType, search)
 	if err != nil {
 		return nil, fmt.Errorf("counting users: %w", err)
 	}
 
 	var userResponses []dto.UserResponse
 	for _, user := range users {
-		roleName := ""
-		if user.Role != nil {
-			roleName = user.Role.Name
-		}
-
-		var roleID uuid.UUID
-		if user.RoleID != nil {
-			roleID = *user.RoleID
-		}
-
-		resolvedUserType := "all"
 		studentID := ""
 		designation := ""
 
-		// Check for profiles
-		var student domain.UserProfileStudent
-		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
-			resolvedUserType = "student"
-			studentID = student.StudentID
-		} else {
-			var employee domain.UserProfileEmployee
-			if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&employee).Error; err == nil {
-				resolvedUserType = "employee"
-				designation = employee.Designation
+		// Check for profiles based on user type
+		if user.UserType == "student" {
+			var student domain.UserProfileStudent
+			if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
+				studentID = student.StudentID
+			}
+		} else if user.UserType == "instructor" {
+			var instructor domain.UserProfileInstructor
+			if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&instructor).Error; err == nil {
+				designation = instructor.Designation
 			}
 		}
 
@@ -256,9 +228,7 @@ func (s *userService) GetUsers(ctx context.Context, page, limit int, userType st
 			Email:       user.Email,
 			FullName:    user.FullName,
 			AvatarURL:   user.AvatarURL,
-			RoleID:      roleID,
-			RoleName:    roleName,
-			UserType:    resolvedUserType,
+			UserType:    user.UserType,
 			Faculty:     user.Faculty,
 			Department:  user.Department,
 			StudentID:   studentID,
@@ -290,20 +260,11 @@ func (s *userService) UpdateUser(ctx context.Context, id string, req *dto.Update
 		return nil, ErrUserNotFound
 	}
 
-	if req.RoleID != nil {
-		roleID, err := uuid.Parse(*req.RoleID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid role ID: %w", err)
+	if req.UserType != nil {
+		if !domain.IsValidUserType(*req.UserType) {
+			return nil, fmt.Errorf("invalid user type: %s", *req.UserType)
 		}
-
-		roleExists, err := s.userRepo.RoleExists(ctx, roleID)
-		if err != nil {
-			return nil, fmt.Errorf("checking role: %w", err)
-		}
-		if !roleExists {
-			return nil, ErrRoleNotFound
-		}
-		user.RoleID = &roleID
+		user.UserType = *req.UserType
 	}
 
 	if req.IsActive != nil {
@@ -314,15 +275,10 @@ func (s *userService) UpdateUser(ctx context.Context, id string, req *dto.Update
 		return nil, fmt.Errorf("updating user: %w", err)
 	}
 
-	var roleID uuid.UUID
-	if user.RoleID != nil {
-		roleID = *user.RoleID
-	}
-
 	return &dto.UpdateUserResponse{
 		ID:       user.ID,
 		Email:    user.Email,
-		RoleID:   roleID,
+		UserType: user.UserType,
 		IsActive: user.IsActive,
 		Message:  "User updated successfully",
 	}, nil
@@ -381,30 +337,19 @@ func (s *userService) GetProfile(ctx context.Context, id string) (*dto.UserRespo
 		return nil, ErrUserNotFound
 	}
 
-	roleName := ""
-	if user.Role != nil {
-		roleName = user.Role.Name
-	}
-
-	var roleID uuid.UUID
-	if user.RoleID != nil {
-		roleID = *user.RoleID
-	}
-
-	resolvedUserType := "all"
 	studentID := ""
 	designation := ""
 
-	// Check for profiles
-	var student domain.UserProfileStudent
-	if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
-		resolvedUserType = "student"
-		studentID = student.StudentID
-	} else {
-		var employee domain.UserProfileEmployee
-		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&employee).Error; err == nil {
-			resolvedUserType = "employee"
-			designation = employee.Designation
+	// Check for profiles based on user type
+	if user.UserType == "student" {
+		var student domain.UserProfileStudent
+		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
+			studentID = student.StudentID
+		}
+	} else if user.UserType == "instructor" {
+		var instructor domain.UserProfileInstructor
+		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&instructor).Error; err == nil {
+			designation = instructor.Designation
 		}
 	}
 
@@ -413,9 +358,7 @@ func (s *userService) GetProfile(ctx context.Context, id string) (*dto.UserRespo
 		Email:       user.Email,
 		FullName:    user.FullName,
 		AvatarURL:   user.AvatarURL,
-		RoleID:      roleID,
-		RoleName:    roleName,
-		UserType:    resolvedUserType,
+		UserType:    user.UserType,
 		Faculty:     user.Faculty,
 		Department:  user.Department,
 		StudentID:   studentID,
@@ -439,30 +382,19 @@ func (s *userService) GetUserByID(ctx context.Context, userID string) (*dto.User
 		return nil, ErrUserNotFound
 	}
 
-	roleName := ""
-	if user.Role != nil {
-		roleName = user.Role.Name
-	}
-
-	var roleID uuid.UUID
-	if user.RoleID != nil {
-		roleID = *user.RoleID
-	}
-
-	resolvedUserType := "all"
 	studentID := ""
 	designation := ""
 
-	// Check for profiles
-	var student domain.UserProfileStudent
-	if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
-		resolvedUserType = "student"
-		studentID = student.StudentID
-	} else {
-		var employee domain.UserProfileEmployee
-		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&employee).Error; err == nil {
-			resolvedUserType = "employee"
-			designation = employee.Designation
+	// Check for profiles based on user type
+	if user.UserType == "student" {
+		var student domain.UserProfileStudent
+		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
+			studentID = student.StudentID
+		}
+	} else if user.UserType == "instructor" {
+		var instructor domain.UserProfileInstructor
+		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&instructor).Error; err == nil {
+			designation = instructor.Designation
 		}
 	}
 
@@ -471,9 +403,7 @@ func (s *userService) GetUserByID(ctx context.Context, userID string) (*dto.User
 		Email:       user.Email,
 		FullName:    user.FullName,
 		AvatarURL:   user.AvatarURL,
-		RoleID:      roleID,
-		RoleName:    roleName,
-		UserType:    resolvedUserType,
+		UserType:    user.UserType,
 		Faculty:     user.Faculty,
 		Department:  user.Department,
 		StudentID:   studentID,
@@ -503,30 +433,19 @@ func (s *userService) GetUsersByIDs(ctx context.Context, ids []string) (*dto.Get
 
 	var userResponses []dto.UserResponse
 	for _, user := range users {
-		roleName := ""
-		if user.Role != nil {
-			roleName = user.Role.Name
-		}
-
-		var roleID uuid.UUID
-		if user.RoleID != nil {
-			roleID = *user.RoleID
-		}
-
-		resolvedUserType := "all"
 		studentID := ""
 		designation := ""
 
-		// Check for profiles
-		var student domain.UserProfileStudent
-		if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
-			resolvedUserType = "student"
-			studentID = student.StudentID
-		} else {
-			var employee domain.UserProfileEmployee
-			if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&employee).Error; err == nil {
-				resolvedUserType = "employee"
-				designation = employee.Designation
+		// Check for profiles based on user type
+		if user.UserType == "student" {
+			var student domain.UserProfileStudent
+			if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&student).Error; err == nil {
+				studentID = student.StudentID
+			}
+		} else if user.UserType == "instructor" {
+			var instructor domain.UserProfileInstructor
+			if err := s.db.WithContext(ctx).Where("user_id = ?", user.ID).First(&instructor).Error; err == nil {
+				designation = instructor.Designation
 			}
 		}
 
@@ -535,9 +454,7 @@ func (s *userService) GetUsersByIDs(ctx context.Context, ids []string) (*dto.Get
 			Email:       user.Email,
 			FullName:    user.FullName,
 			AvatarURL:   user.AvatarURL,
-			RoleID:      roleID,
-			RoleName:    roleName,
-			UserType:    resolvedUserType,
+			UserType:    user.UserType,
 			Faculty:     user.Faculty,
 			Department:  user.Department,
 			StudentID:   studentID,

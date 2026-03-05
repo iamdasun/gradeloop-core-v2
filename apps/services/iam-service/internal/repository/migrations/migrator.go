@@ -59,7 +59,7 @@ func (m *Migrator) migrateUsersToUserType() error {
 		// Update users based on their role names if roles table still exists
 		if m.db.Migrator().HasTable("roles") {
 			// Map role names to user types
-			updateQueries := []struct{
+			updateQueries := []struct {
 				RoleName string
 				UserType string
 			}{
@@ -125,7 +125,7 @@ func (m *Migrator) Rollback() error {
 		&domain.UserProfileStudent{},
 		&domain.User{},
 		"permissions", // legacy permissions table
-		"roles", // legacy roles table
+		"roles",       // legacy roles table
 	)
 	if err != nil {
 		return fmt.Errorf("rollback failed: %w", err)

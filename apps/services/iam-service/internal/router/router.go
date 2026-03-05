@@ -49,8 +49,6 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	users.Post("/import/preview", middleware.RequireAdmin(), cfg.BulkImportHandler.PreviewImport)
 	users.Post("/import/execute", middleware.RequireAdmin(), cfg.BulkImportHandler.ExecuteImport)
 
-
-
 	// Admin routes with authentication middleware
 	adminProtected := api.Group("", middleware.AuthMiddleware(cfg.JWTSecretKey))
 	cfg.AuthHandler.RegisterAdminRoutes(adminProtected)

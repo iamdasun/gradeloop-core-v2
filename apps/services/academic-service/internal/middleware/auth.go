@@ -11,20 +11,10 @@ import (
 
 // Claims matches the JWT structure from IAM Service
 type Claims struct {
-	UserID      string   `json:"user_id"`   // UUID string from IAM
-	Email       string   `json:"email"`     // Email from IAM (used as identifier)
-	RoleName    string   `json:"role_name"` // Single role string from IAM
-	Permissions []string `json:"permissions"`
+	UserID   string `json:"user_id"`   // UUID string from IAM
+	Email    string `json:"email"`     // Email from IAM (used as identifier)
+	UserType string `json:"user_type"` // User type: student, instructor, admin, super_admin
 	jwt.RegisteredClaims
-}
-
-// normalizeRole converts role names to a standard format for comparison
-// Handles: "Super Admin" -> "super_admin", "super_admin" -> "super_admin"
-func normalizeRole(role string) string {
-	// Convert to lowercase and replace spaces with underscores
-	normalized := strings.ToLower(strings.TrimSpace(role))
-	normalized = strings.ReplaceAll(normalized, " ", "_")
-	return normalized
 }
 
 func AuthMiddleware(secretKey []byte) fiber.Handler {
@@ -60,79 +50,67 @@ func AuthMiddleware(secretKey []byte) fiber.Handler {
 		// Store claims in context for handlers to access
 		c.Locals("user_id", claims.UserID)
 		c.Locals("username", claims.Email)
-		c.Locals("role_name", claims.RoleName)
-		c.Locals("permissions", claims.Permissions)
+		c.Locals("user_type", claims.UserType)
 
-		fmt.Printf("[DEBUG AuthMiddleware] path=%s user_id='%s' username='%s' role_name='%s' permissions=%v\n",
-			c.Path(), claims.UserID, claims.Email, claims.RoleName, claims.Permissions)
+		fmt.Printf("[DEBUG AuthMiddleware] path=%s user_id='%s' username='%s' user_type='%s'\n",
+			c.Path(), claims.UserID, claims.Email, claims.UserType)
 
 		return c.Next()
 	}
 }
 
-func RequirePermission(permission string) fiber.Handler {
+// RequireUserType checks if the user has the required user type
+func RequireUserType(userType string) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		permissions, ok := c.Locals("permissions").([]string)
-		if !ok {
-			return utils.ErrForbidden("No permissions found")
+		currentUserType, ok := c.Locals("user_type").(string)
+		if !ok || currentUserType == "" {
+			return utils.ErrForbidden("No user type found")
 		}
 
-		for _, p := range permissions {
-			if p == permission {
-				return c.Next()
-			}
-		}
-
-		return utils.ErrForbidden("Insufficient permissions")
-	}
-}
-
-// RequireRole checks if the user has the required role
-// Supports both formats: "Super Admin" and "super_admin"
-func RequireRole(role string) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		roleName, ok := c.Locals("role_name").(string)
-		if !ok || roleName == "" {
-			return utils.ErrForbidden("No role found")
-		}
-
-		// Normalize both roles for comparison
-		normalizedUserRole := normalizeRole(roleName)
-		normalizedRequiredRole := normalizeRole(role)
-
-		if normalizedUserRole == normalizedRequiredRole {
+		if currentUserType == userType {
 			return c.Next()
 		}
 
-		return utils.ErrForbidden("Insufficient role")
+		return utils.ErrForbidden("Insufficient privileges")
 	}
 }
 
-// RequireAnyRole checks if the user has any of the required roles
-// Supports both formats: "Super Admin" and "super_admin"
-func RequireAnyRole(roles ...string) fiber.Handler {
+// RequireAnyUserType checks if the user has any of the required user types
+func RequireAnyUserType(userTypes ...string) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		roleName, ok := c.Locals("role_name").(string)
-		if !ok || roleName == "" {
-			fmt.Printf("[DEBUG RequireAnyRole] No role found in locals\n")
-			return utils.ErrForbidden("No role found")
+		currentUserType, ok := c.Locals("user_type").(string)
+		if !ok || currentUserType == "" {
+			fmt.Printf("[DEBUG RequireAnyUserType] No user type found in locals\n")
+			return utils.ErrForbidden("No user type found")
 		}
 
-		// Normalize user's role
-		normalizedUserRole := normalizeRole(roleName)
-		fmt.Printf("[DEBUG RequireAnyRole] User role: '%s' -> normalized: '%s'\n", roleName, normalizedUserRole)
+		fmt.Printf("[DEBUG RequireAnyUserType] User type: '%s'\n", currentUserType)
 
-		// Check if user has any of the required roles
-		for _, role := range roles {
-			normalizedRequiredRole := normalizeRole(role)
-			fmt.Printf("[DEBUG RequireAnyRole] Checking against: '%s' -> normalized: '%s'\n", role, normalizedRequiredRole)
-			if normalizedUserRole == normalizedRequiredRole {
-				fmt.Printf("[DEBUG RequireAnyRole] ✓ MATCH! Allowing access\n")
+		// Check if user has any of the required user types
+		for _, ut := range userTypes {
+			fmt.Printf("[DEBUG RequireAnyUserType] Checking against: '%s'\n", ut)
+			if currentUserType == ut {
+				fmt.Printf("[DEBUG RequireAnyUserType] ✓ MATCH! Allowing access\n")
 				return c.Next()
 			}
 		}
 
-		fmt.Printf("[DEBUG RequireAnyRole] ✗ NO MATCH! User role '%s' not in %v\n", normalizedUserRole, roles)
-		return utils.ErrForbidden("Insufficient role")
+		fmt.Printf("[DEBUG RequireAnyUserType] ✗ NO MATCH! User type '%s' not in %v\n", currentUserType, userTypes)
+		return utils.ErrForbidden("Insufficient privileges")
 	}
+}
+
+// RequireAdmin requires admin or super_admin access
+func RequireAdmin() fiber.Handler {
+	return RequireAnyUserType("admin", "super_admin")
+}
+
+// RequireSuperAdmin requires super_admin access
+func RequireSuperAdmin() fiber.Handler {
+	return RequireUserType("super_admin")
+}
+
+// RequireInstructor requires instructor, admin, or super_admin access
+func RequireInstructor() fiber.Handler {
+	return RequireAnyUserType("instructor", "admin", "super_admin")
 }

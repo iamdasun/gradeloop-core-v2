@@ -3,30 +3,21 @@ package middleware
 import (
 	"strings"
 
+	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/utils"
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/utils"
 )
 
 // Claims mirrors the JWT structure emitted by the IAM Service.
 type Claims struct {
-	UserID      string   `json:"user_id"`
-	Email       string   `json:"email"`
-	RoleName    string   `json:"role_name"`
-	Permissions []string `json:"permissions"`
+	UserID   string `json:"user_id"`
+	Email    string `json:"email"`
+	UserType string `json:"user_type"` // student, instructor, admin, super_admin
 	jwt.RegisteredClaims
 }
 
-// normalizeRole converts role names to a canonical snake_case lowercase form
-// so that "Super Admin" and "super_admin" are treated identically.
-func normalizeRole(role string) string {
-	normalized := strings.ToLower(strings.TrimSpace(role))
-	normalized = strings.ReplaceAll(normalized, " ", "_")
-	return normalized
-}
-
 // AuthMiddleware validates the Bearer JWT in the Authorization header and
-// populates fiber.Ctx locals with user_id, username, role_name and permissions.
+// populates fiber.Ctx locals with user_id, username, user_type.
 func AuthMiddleware(secretKey []byte) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
@@ -62,46 +53,58 @@ func AuthMiddleware(secretKey []byte) fiber.Handler {
 
 		c.Locals("user_id", claims.UserID)
 		c.Locals("username", claims.Email)
-		c.Locals("role_name", claims.RoleName)
-		c.Locals("permissions", claims.Permissions)
+		c.Locals("user_type", claims.UserType)
 
 		return c.Next()
 	}
 }
 
-// RequireRole is a middleware that enforces a single required role.
-// Both "Super Admin" and "super_admin" formats are accepted.
-func RequireRole(role string) fiber.Handler {
+// RequireUserType is a middleware that enforces a single required user type.
+func RequireUserType(userType string) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		roleName, ok := c.Locals("role_name").(string)
-		if !ok || roleName == "" {
-			return utils.ErrForbidden("no role found")
+		currentUserType, ok := c.Locals("user_type").(string)
+		if !ok || currentUserType == "" {
+			return utils.ErrForbidden("no user type found")
 		}
 
-		if normalizeRole(roleName) == normalizeRole(role) {
+		if currentUserType == userType {
 			return c.Next()
 		}
 
-		return utils.ErrForbidden("insufficient role")
+		return utils.ErrForbidden("insufficient privileges")
 	}
 }
 
-// RequireAnyRole is a middleware that passes when the caller holds at least
-// one of the listed roles.
-func RequireAnyRole(roles ...string) fiber.Handler {
+// RequireAnyUserType is a middleware that passes when the caller holds at least
+// one of the listed user types.
+func RequireAnyUserType(userTypes ...string) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		roleName, ok := c.Locals("role_name").(string)
-		if !ok || roleName == "" {
-			return utils.ErrForbidden("no role found")
+		currentUserType, ok := c.Locals("user_type").(string)
+		if !ok || currentUserType == "" {
+			return utils.ErrForbidden("no user type found")
 		}
 
-		normalizedUser := normalizeRole(roleName)
-		for _, r := range roles {
-			if normalizedUser == normalizeRole(r) {
+		for _, ut := range userTypes {
+			if currentUserType == ut {
 				return c.Next()
 			}
 		}
 
-		return utils.ErrForbidden("insufficient role")
+		return utils.ErrForbidden("insufficient privileges")
 	}
+}
+
+// RequireAdmin requires admin or super_admin access
+func RequireAdmin() fiber.Handler {
+	return RequireAnyUserType("admin", "super_admin")
+}
+
+// RequireSuperAdmin requires super_admin access
+func RequireSuperAdmin() fiber.Handler {
+	return RequireUserType("super_admin")
+}
+
+// RequireInstructor requires instructor, admin, or super_admin access
+func RequireInstructor() fiber.Handler {
+	return RequireAnyUserType("instructor", "admin", "super_admin")
 }

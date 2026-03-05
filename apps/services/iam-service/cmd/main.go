@@ -107,8 +107,6 @@ func run() error {
 		cfg.FrontendURL,
 	)
 
-
-
 	bulkImportService := service.NewBulkImportService(
 		db.DB,
 		userRepo,

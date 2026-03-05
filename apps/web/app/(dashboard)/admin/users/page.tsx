@@ -63,11 +63,11 @@ function getInitials(fullName: string, email: string) {
     .join("");
 }
 
-function roleBadgeVariant(roleName: string) {
-  const l = roleName.toLowerCase();
+function userTypeBadgeVariant(userType: string) {
+  const l = userType.toLowerCase();
   if (l.includes("admin")) return "purple" as const;
-  if (l.includes("instructor") || l.includes("teacher")) return "info" as const;
-  if (l.includes("student") || l.includes("learner")) return "success" as const;
+  if (l.includes("instructor")) return "info" as const;
+  if (l.includes("student")) return "success" as const;
   return "secondary" as const;
 }
 
@@ -126,7 +126,6 @@ export default function UsersPage() {
   // ── Filter state ────────────────────────────────────────────────────────
   const [search, setSearch] = React.useState("");
   const [debouncedSearch, setDebouncedSearch] = React.useState("");
-  const [roleFilter, setRoleFilter] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("");
   const [userTypeFilter, setUserTypeFilter] = React.useState("all");
 
@@ -143,9 +142,6 @@ export default function UsersPage() {
   const [revokeUser, setRevokeUser] = React.useState<UserListItem | null>(null);
   const [deleteUser, setDeleteUser] = React.useState<UserListItem | null>(null);
 
-  const { roles, rolesLoading, rolesError, fetchRoles, refetchRoles } =
-    useAdminUsersStore();
-
   // ── Debounce search ──────────────────────────────────────────────────────
   React.useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
@@ -154,7 +150,7 @@ export default function UsersPage() {
 
   React.useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, roleFilter, statusFilter, userTypeFilter]);
+  }, [debouncedSearch, statusFilter, userTypeFilter]);
 
   // ── Fetch users ──────────────────────────────────────────────────────────
   const fetchUsers = React.useCallback(async () => {
@@ -164,7 +160,6 @@ export default function UsersPage() {
       const result = await usersApi.list({
         page,
         limit: PAGE_LIMIT,
-        role_id: roleFilter || undefined,
         search: debouncedSearch || undefined,
         user_type: userTypeFilter === "all" ? undefined : userTypeFilter,
       });
@@ -175,16 +170,13 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, roleFilter, debouncedSearch, userTypeFilter]);
+  }, [page, debouncedSearch, userTypeFilter]);
 
   React.useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
-  React.useEffect(() => {
-    fetchRoles();
-  }, [fetchRoles]);
 
-  // ── Client-side filtering (search & status only — role filter is server-side) ──
+  // ── Client-side filtering (status only) ──
   const displayUsers = React.useMemo(() => {
     return users.filter((u) => {
       // Status filter is still client-side because backend doesn't support it yet
@@ -218,7 +210,7 @@ export default function UsersPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Manage accounts, roles, and access.
+            Manage user accounts and access.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -249,7 +241,8 @@ export default function UsersPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="all">All Users</TabsTrigger>
           <TabsTrigger value="student">Students</TabsTrigger>
-          <TabsTrigger value="employee">Employees</TabsTrigger>
+          <TabsTrigger value="instructor">Instructors</TabsTrigger>
+          <TabsTrigger value="admin">Administrators</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -303,35 +296,6 @@ export default function UsersPage() {
             />
           </div>
           <SelectNative
-            className="sm:w-44"
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            disabled={rolesLoading}
-            title={rolesError ? `Roles unavailable: ${rolesError}` : undefined}
-          >
-            <option value="">
-              {rolesLoading
-                ? "Loading roles…"
-                : rolesError
-                  ? "Roles unavailable"
-                  : "All roles"}
-            </option>
-            {roles.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </SelectNative>
-          {rolesError && (
-            <button
-              type="button"
-              className="text-xs text-red-500 hover:underline shrink-0"
-              onClick={() => refetchRoles()}
-            >
-              Retry roles
-            </button>
-          )}
-          <SelectNative
             className="sm:w-40"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -367,7 +331,7 @@ export default function UsersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-[200px]">Full Name</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="hidden md:table-cell">Joined</TableHead>
                   <TableHead className="hidden lg:table-cell">
@@ -419,8 +383,8 @@ export default function UsersPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={roleBadgeVariant(user.role_name)}>
-                          {user.role_name}
+                        <Badge variant={userTypeBadgeVariant(user.user_type)}>
+                          {user.user_type}
                         </Badge>
                       </TableCell>
                       <TableCell>
