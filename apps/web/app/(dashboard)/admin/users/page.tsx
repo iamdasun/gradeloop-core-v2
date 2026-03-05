@@ -48,7 +48,6 @@ import { UserDetailsDialog } from "@/components/admin/user-details-dialog";
 import { UserProfileSideDialog } from "@/components/admin/user-profile-dialog";
 import { RevokeSessionsDialog } from "@/components/admin/revoke-sessions-dialog";
 import { DeleteUserDialog } from "@/components/admin/delete-user-dialog";
-import { useAdminUsersStore } from "@/lib/stores/adminUsersStore";
 import { usersApi, handleApiError } from "@/lib/api/users";
 import type { UserListItem } from "@/types/auth.types";
 
@@ -163,10 +162,11 @@ export default function UsersPage() {
         search: debouncedSearch || undefined,
         user_type: userTypeFilter === "all" ? undefined : userTypeFilter,
       });
-      setUsers(result.data);
-      setTotal(result.total);
+      setUsers(result.data || []);
+      setTotal(result.total || 0);
     } catch (err) {
       setError(handleApiError(err));
+      setUsers([]); // Reset to empty array on error
     } finally {
       setLoading(false);
     }
@@ -178,6 +178,7 @@ export default function UsersPage() {
 
   // ── Client-side filtering (status only) ──
   const displayUsers = React.useMemo(() => {
+    if (!users) return [];
     return users.filter((u) => {
       // Status filter is still client-side because backend doesn't support it yet
       if (statusFilter === "active" && !u.is_active) return false;
@@ -187,8 +188,8 @@ export default function UsersPage() {
   }, [users, statusFilter]);
 
   // ── Derived stats ────────────────────────────────────────────────────────────
-  const activeCount = users.filter((u) => u.is_active).length;
-  const inactiveCount = users.filter((u) => !u.is_active).length;
+  const activeCount = users ? users.filter((u) => u.is_active).length : 0;
+  const inactiveCount = users ? users.filter((u) => !u.is_active).length : 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
 
   // ── Handlers ─────────────────────────────────────────────────────────────────

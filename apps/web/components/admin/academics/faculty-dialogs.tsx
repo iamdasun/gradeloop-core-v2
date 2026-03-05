@@ -182,7 +182,7 @@ function LeadersEditor({
                         <option value="">Select employee…</option>
                         {employees.map((emp) => (
                           <option key={emp.id} value={emp.id}>
-                            {emp.username}
+                            {emp.full_name}
                             {emp.designation ? ` — ${emp.designation}` : ""}
                           </option>
                         ))}
@@ -277,7 +277,7 @@ export function CreateFacultyDialog({
       setErrors({});
       setEmployeesLoading(true);
       usersApi
-        .list({ user_type: "employee", limit: 200 })
+        .list({ user_type: "instructor", limit: 200 })
         .then((r) => setEmployees(r.data))
         .catch(() => setEmployees([]))
         .finally(() => setEmployeesLoading(false));
@@ -442,7 +442,7 @@ export function EditFacultyDialog({
 
       setEmployeesLoading(true);
       usersApi
-        .list({ user_type: "employee", limit: 200 })
+        .list({ user_type: "instructor", limit: 200 })
         .then((r) => setEmployees(r.data))
         .catch(() => setEmployees([]))
         .finally(() => setEmployeesLoading(false));

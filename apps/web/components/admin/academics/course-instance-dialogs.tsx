@@ -150,7 +150,7 @@ function InstructorSearchInput({
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await usersApi.list({ search: query, user_type: 'employee', limit: 8 });
+        const res = await usersApi.list({ search: query, user_type: 'instructor', limit: 8 });
         const filtered = res.data.filter((u) => !excludeIds.includes(u.id));
         setResults(filtered);
         setOpen(filtered.length > 0);
@@ -250,7 +250,7 @@ function TaChipInput({
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await usersApi.list({ search: query, user_type: 'employee', limit: 8 });
+        const res = await usersApi.list({ search: query, user_type: 'instructor', limit: 8 });
         const filtered = res.data.filter((u) => !existingIds.includes(u.id));
         setResults(filtered);
         setOpen(filtered.length > 0);

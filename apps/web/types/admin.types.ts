@@ -22,20 +22,17 @@ export interface PaginatedResponse<T> {
 export interface ListUsersParams {
   page?: number;
   limit?: number;
-  /** Filter by user type: "all" | "student" | "employee" */
+  /** Filter by user type: "all" | "student" | "instructor" | "admin" | "super_admin" */
   user_type?: string;
-  /** Filter by role UUID — forwarded as role_id to backend GET /users */
-  role_id?: string;
   /** Search by name or email — forwarded as search query to backend */
   search?: string;
 }
 
-/** POST /users — backend requires user_type; student/employee need extra fields. */
+/** POST /users — backend requires user_type; student/instructor need extra fields. */
 export interface CreateUserRequest {
   full_name: string;
   email: string;
-  role_id: string;
-  /** "student" | "employee" | "admin" */
+  /** "student" | "instructor" | "admin" | "super_admin" */
   user_type: string;
   student_id?: string;
   designation?: string;
@@ -46,18 +43,18 @@ export interface CreateUserResponse {
   id: string;
   full_name: string;
   email: string;
-  role_id: string;
+  user_type: string;
   is_active: boolean;
   activation_link: string;
   message: string;
 }
 
 /**
- * PUT /users/:id — backend only accepts role_id and is_active.
+ * PUT /users/:id — backend accepts user_type and is_active.
  * username / email / full_name are NOT updatable via this endpoint.
  */
 export interface UpdateUserRequest {
-  role_id?: string;
+  user_type?: string;
   is_active?: boolean;
 }
 
@@ -65,7 +62,7 @@ export interface UpdateUserRequest {
 export interface UpdateUserResponse {
   id: string;
   email: string;
-  role_id: string;
+  user_type: string;
   is_active: boolean;
   message: string;
 }

@@ -14,10 +14,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SelectNative } from '@/components/ui/select-native';
-import { useAdminUsersStore } from '@/lib/stores/adminUsersStore';
 import { usersApi, handleApiError } from '@/lib/api/users';
 import { toast } from '@/lib/hooks/use-toast';
 import type { CreateUserRequest, CreateUserResponse, FormErrors } from '@/types/admin.types';
+import { USER_TYPES } from '@/types/auth.types';
 
 interface Props {
   open: boolean;
@@ -28,8 +28,7 @@ interface Props {
 const EMPTY: CreateUserRequest = {
   full_name: '',
   email: '',
-  role_id: '',
-  user_type: '',
+  user_type: 'student',
 };
 
 function validate(values: CreateUserRequest): FormErrors {
@@ -40,24 +39,18 @@ function validate(values: CreateUserRequest): FormErrors {
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
     errors.email = 'Enter a valid email address';
   }
-  if (!values.role_id) errors.role_id = 'Role is required';
+  if (!values.user_type) errors.user_type = 'User Type is required';
   if (values.user_type === 'student' && !values.student_id?.trim())
     errors.student_id = 'Student ID is required for student type';
-  if (values.user_type === 'employee' && !values.designation?.trim())
-    errors.designation = 'Designation is required for employee type';
+  if (values.user_type === 'instructor' && !values.designation?.trim())
+    errors.designation = 'Designation is required for instructor type';
   return errors;
 }
 
 export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
-  const { roles, rolesLoading, rolesError, fetchRoles, refetchRoles } = useAdminUsersStore();
   const [values, setValues] = React.useState<CreateUserRequest>(EMPTY);
   const [errors, setErrors] = React.useState<FormErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
-
-  // Fetch roles once when dialog opens
-  React.useEffect(() => {
-    if (open) fetchRoles();
-  }, [open, fetchRoles]);
 
   // Reset form when dialog opens
   React.useEffect(() => {
@@ -67,18 +60,8 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
     }
   }, [open]);
 
-  // User Type is now inferred from the selected role
-
-
   function set(field: keyof CreateUserRequest, value: string) {
-    setValues((prev) => {
-      const next = { ...prev, [field]: value };
-      if (field === 'role_id') {
-        const role = roles.find((r) => r.id === value);
-        next.user_type = role?.user_type || 'all';
-      }
-      return next;
-    });
+    setValues((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
 
@@ -158,38 +141,32 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
             )}
           </div>
 
-          {/* Role */}
+          {/* User Type */}
           <div className="space-y-1.5">
-            <Label htmlFor="cu-role">
-              Role <span className="text-red-500">*</span>
+            <Label htmlFor="cu-user-type">
+              User Type <span className="text-red-500">*</span>
             </Label>
             <SelectNative
-              id="cu-role"
-              value={values.role_id}
-              onChange={(e) => set('role_id', e.target.value)}
-              disabled={submitting || rolesLoading}
-              title={rolesError ? `Roles unavailable: ${rolesError}` : undefined}
+              id="cu-user-type"
+              value={values.user_type}
+              onChange={(e) => set('user_type', e.target.value)}
+              disabled={submitting}
             >
-              <option value="">
-                {rolesLoading ? 'Loading roles…' : rolesError ? 'Roles unavailable' : 'Select a role'}
+              <option value={USER_TYPES.STUDENT} className="capitalize">
+                {USER_TYPES.STUDENT}
               </option>
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
+              <option value={USER_TYPES.INSTRUCTOR} className="capitalize">
+                {USER_TYPES.INSTRUCTOR}
+              </option>
+              <option value={USER_TYPES.ADMIN} className="capitalize">
+                {USER_TYPES.ADMIN}
+              </option>
+              <option value={USER_TYPES.SUPER_ADMIN} className="capitalize">
+                Super Admin
+              </option>
             </SelectNative>
-            {rolesError && (
-              <button
-                type="button"
-                className="text-xs text-red-500 hover:underline"
-                onClick={() => refetchRoles()}
-              >
-                Retry loading roles
-              </button>
-            )}
-            {errors.role_id && (
-              <p className="text-xs text-red-500">{errors.role_id}</p>
+            {errors.user_type && (
+              <p className="text-xs text-red-500">{errors.user_type}</p>
             )}
           </div>
 
@@ -213,8 +190,8 @@ export function CreateUserDialog({ open, onOpenChange, onSuccess }: Props) {
             </div>
           )}
 
-          {/* Designation (only for employee type) */}
-          {values.user_type === 'employee' && (
+          {/* Designation (only for instructor type) */}
+          {values.user_type === 'instructor' && (
             <div className="space-y-1.5">
               <Label htmlFor="cu-designation">
                 Designation <span className="text-red-500">*</span>

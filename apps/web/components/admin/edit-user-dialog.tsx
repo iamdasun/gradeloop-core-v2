@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SelectNative } from "@/components/ui/select-native";
-import { useAdminUsersStore } from "@/lib/stores/adminUsersStore";
 import { usersApi, handleApiError } from "@/lib/api/users";
 import { toast } from "@/lib/hooks/use-toast";
 import type {
