@@ -763,29 +763,48 @@ export default function VivaSessionPage() {
     return (
         <div className="fixed inset-0 z-[100] w-full h-full bg-black text-emerald-50 overflow-hidden font-sans selection:bg-emerald-500/30">
             {/* Ambient Background Effects */}
-            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-black">
+                {/* Primary Reactive Glow (Top Left) */}
                 <motion.div
                     animate={{
-                        opacity: sending ? 0.4 : 0.15,
-                        scale: sending ? 1.2 : 1,
-                        x: sending ? [0, 20, 0] : 0,
-                        backgroundColor: sending ? "rgba(20, 184, 166, 0.2)" : "rgba(16, 185, 129, 0.1)"
+                        opacity: sending ? 0.4 : 0.2,
+                        scale: sending ? 1.15 : 1,
+                        backgroundColor: sending ? "rgba(20, 184, 166, 0.25)" : "rgba(16, 185, 129, 0.15)"
                     }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute -top-[20%] -left-[10%] w-[80vw] h-[80vw] rounded-full blur-[120px]"
+                    transition={{ duration: 3, ease: "easeInOut" }}
+                    className="absolute -top-[10%] -left-[10%] w-[80vw] h-[80vw] rounded-full blur-[120px]"
                 />
+
+                {/* Secondary Reactive Glow (Bottom Right) */}
                 <motion.div
                     animate={{
-                        opacity: isRecording ? 0.5 : 0.15,
-                        scale: isRecording ? 1.3 : 1,
-                        x: isRecording ? [0, -20, 0] : 0,
-                        backgroundColor: isRecording ? "rgba(16, 185, 129, 0.25)" : "rgba(20, 184, 166, 0.1)"
+                        opacity: isRecording ? 0.5 : 0.2,
+                        scale: isRecording ? 1.25 : 1,
+                        backgroundColor: isRecording ? "rgba(16, 185, 129, 0.3)" : "rgba(20, 184, 166, 0.15)"
                     }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute -bottom-[20%] -right-[10%] w-[70vw] h-[70vw] rounded-full blur-[100px]"
+                    transition={{ duration: 2.5, ease: "easeInOut" }}
+                    className="absolute -bottom-[10%] -right-[10%] w-[70vw] h-[70vw] rounded-full blur-[100px]"
                 />
-                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+
+                {/* Slow Ambient Float Movement */}
+                <motion.div
+                    animate={{
+                        x: [0, 40, -40, 0],
+                        y: [0, -30, 30, 0],
+                    }}
+                    transition={{
+                        duration: 30,
+                        repeat: Infinity,
+                        ease: "linear"
+                    }}
+                    className="absolute inset-0 opacity-20"
+                >
+                    <div className="absolute top-[25%] left-[35%] w-48 h-48 rounded-full bg-emerald-500/20 blur-[80px]" />
+                    <div className="absolute bottom-[35%] right-[25%] w-64 h-64 rounded-full bg-teal-500/20 blur-[100px]" />
+                </motion.div>
+
+                <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" />
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.12] mix-blend-overlay"></div>
             </div>
 
             {/* Top Navigation / HeaderBar */}
