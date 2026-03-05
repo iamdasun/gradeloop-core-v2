@@ -15,7 +15,6 @@ import {
   ZoomOut,
   RotateCcw,
   Send,
-  ExternalLink,
 } from "lucide-react";
 import { MIN_FONT_SIZE, MAX_FONT_SIZE, DEFAULT_FONT_SIZE } from "./constants";
 import { cn } from "@/lib/utils";
@@ -24,7 +23,6 @@ interface ToolbarProps {
   onRun: () => void;
   onSubmit?: () => void;
   onSave?: () => void;
-  onOpenInNewWindow?: () => void;
   isExecuting: boolean;
   fontSize: number;
   onFontSizeChange: (size: number) => void;
@@ -36,7 +34,6 @@ export function Toolbar({
   onRun,
   onSubmit,
   onSave,
-  onOpenInNewWindow,
   isExecuting,
   fontSize,
   onFontSizeChange,
@@ -61,56 +58,8 @@ export function Toolbar({
 
   return (
     <div className="flex items-center justify-between border-b bg-background px-4 py-2">
+      {/* Left: Save + Font controls */}
       <div className="flex items-center gap-2">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                onClick={onRun}
-                disabled={disabled || isExecuting}
-                size="default"
-                className="gap-2"
-              >
-                {isExecuting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Running
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    Run Code
-                  </>
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Run your code (Cmd/Ctrl + Enter)</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-
-        {showSubmitButton && onSubmit && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={onSubmit}
-                  disabled={disabled || isExecuting}
-                  variant="default"
-                  className="gap-2"
-                >
-                  <Send className="h-4 w-4" />
-                  Submit Solution
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Submit your solution for grading</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-
         {onSave && (
           <TooltipProvider>
             <Tooltip>
@@ -130,10 +79,8 @@ export function Toolbar({
             </Tooltip>
           </TooltipProvider>
         )}
-      </div>
 
-      <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1 border-r pr-2">
+        <div className="flex items-center gap-1">
           <span className="text-xs text-muted-foreground mr-1">Font:</span>
           <TooltipProvider>
             <Tooltip>
@@ -195,23 +142,45 @@ export function Toolbar({
             </Tooltip>
           </TooltipProvider>
         </div>
+      </div>
 
-        {onOpenInNewWindow && (
+      {/* Right: Run + Submit (icon-only) */}
+      <div className="flex items-center gap-2">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={onRun}
+                disabled={disabled || isExecuting}
+                size="icon"
+              >
+                {isExecuting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{isExecuting ? "Running…" : "Run Code (Cmd/Ctrl + Enter)"}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        {showSubmitButton && onSubmit && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  onClick={onOpenInNewWindow}
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5"
+                  onClick={onSubmit}
+                  disabled={disabled || isExecuting}
+                  size="icon"
                 >
-                  <ExternalLink className="h-3 w-3" />
-                  <span className="text-xs">New Window</span>
+                  <Send className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>Open IDE in a new window</p>
+                <p>Submit Solution</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

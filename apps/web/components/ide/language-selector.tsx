@@ -13,17 +13,21 @@ import {
 import { Code2, Loader2 } from "lucide-react";
 import type { LanguageOption } from "./types";
 import { DEFAULT_LANGUAGE_ID } from "./constants";
+import { cn } from "@/lib/utils";
 
 interface LanguageSelectorProps {
   value: number;
   onChange: (languageId: number) => void;
   disabled?: boolean;
+  /** Renders a compact version for use in the status bar */
+  compact?: boolean;
 }
 
 export function LanguageSelector({
   value,
   onChange,
   disabled = false,
+  compact = false,
 }: LanguageSelectorProps) {
   const [languages, setLanguages] = useState<LanguageOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -90,9 +94,12 @@ export function LanguageSelector({
 
   if (isLoading) {
     return (
-      <div className="flex h-10 w-64 items-center justify-center rounded-md border border-input bg-background px-3">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        <span className="text-sm text-muted-foreground">Loading languages...</span>
+      <div className={cn(
+        "flex items-center justify-center rounded-md border border-input bg-background px-3",
+        compact ? "h-7 w-48" : "h-10 w-64"
+      )}>
+        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+        <span className={cn("text-muted-foreground", compact ? "text-xs" : "text-sm")}>Loading...</span>
       </div>
     );
   }
@@ -111,8 +118,8 @@ export function LanguageSelector({
       onValueChange={handleValueChange}
       disabled={disabled}
     >
-      <SelectTrigger className="w-64">
-        <Code2 className="mr-2 h-4 w-4" />
+      <SelectTrigger className={cn(compact ? "h-7 w-48 text-xs" : "w-64")}>
+        <Code2 className={cn("mr-2 shrink-0", compact ? "h-3 w-3" : "h-4 w-4")} />
         <SelectValue>
           {selectedLanguage?.name || "Select Language"}
         </SelectValue>

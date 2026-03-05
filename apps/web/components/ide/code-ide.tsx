@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { EditorPanel } from "./editor-panel";
-import { LanguageSelector } from "./language-selector";
 import { ExecutionPanel } from "./execution-panel";
 import { StatusBar } from "./status-bar";
 import { Toolbar } from "./toolbar";
@@ -121,13 +120,6 @@ export function CodeIDE({
     }
   }, [code, language, stdin, assignmentId]);
 
-  const handleOpenInNewWindow = useCallback(() => {
-    if (typeof window !== "undefined" && assignmentId) {
-      const url = `/ide/student/${assignmentId}?inline=true`;
-      window.open(url, "gradeloop-ide", "width=1400,height=900");
-    }
-  }, [assignmentId]);
-
   // Calculate execution status
   const getExecutionStatus = (): ExecutionStatus => {
     if (isExecuting) return "running";
@@ -143,25 +135,17 @@ export function CodeIDE({
 
   return (
     <div className="flex h-full flex-col bg-background">
-      {/* Header with Language Selector and Toolbar */}
-      <div className="flex items-center justify-between border-b px-4 py-2">
-        <LanguageSelector
-          value={language}
-          onChange={handleLanguageChange}
-          disabled={readOnly || isExecuting}
-        />
-        <Toolbar
-          onRun={handleRun}
-          onSubmit={showSubmitButton ? handleSubmit : undefined}
-          onSave={handleSave}
-          onOpenInNewWindow={assignmentId ? handleOpenInNewWindow : undefined}
-          isExecuting={isExecuting}
-          fontSize={fontSize}
-          onFontSizeChange={setFontSize}
-          showSubmitButton={showSubmitButton}
-          disabled={readOnly}
-        />
-      </div>
+      {/* Toolbar */}
+      <Toolbar
+        onRun={handleRun}
+        onSubmit={showSubmitButton ? handleSubmit : undefined}
+        onSave={handleSave}
+        isExecuting={isExecuting}
+        fontSize={fontSize}
+        onFontSizeChange={setFontSize}
+        showSubmitButton={showSubmitButton}
+        disabled={readOnly}
+      />
 
       {/* Main content area with 2-panel layout */}
       <div className="flex flex-1 overflow-hidden">
@@ -214,7 +198,13 @@ export function CodeIDE({
       </div>
 
       {/* Status bar */}
-      <StatusBar data={statusBarData} isExecuting={isExecuting} />
+      <StatusBar
+        data={statusBarData}
+        isExecuting={isExecuting}
+        language={language}
+        onLanguageChange={handleLanguageChange}
+        languageSelectorDisabled={readOnly || isExecuting}
+      />
     </div>
   );
 }

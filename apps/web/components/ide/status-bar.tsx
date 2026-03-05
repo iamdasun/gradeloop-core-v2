@@ -5,13 +5,23 @@ import { Clock, Database, Loader2 } from "lucide-react";
 import type { StatusBarData, ExecutionStatus } from "./types";
 import { STATUS_CONFIG } from "./constants";
 import { cn } from "@/lib/utils";
+import { LanguageSelector } from "./language-selector";
 
 interface StatusBarProps {
   data: StatusBarData;
   isExecuting: boolean;
+  language: number;
+  onLanguageChange: (languageId: number) => void;
+  languageSelectorDisabled?: boolean;
 }
 
-export function StatusBar({ data, isExecuting }: StatusBarProps) {
+export function StatusBar({
+  data,
+  isExecuting,
+  language,
+  onLanguageChange,
+  languageSelectorDisabled = false,
+}: StatusBarProps) {
   const statusConfig = STATUS_CONFIG[data.status];
 
   const formatTime = (time: string | null) => {
@@ -28,8 +38,16 @@ export function StatusBar({ data, isExecuting }: StatusBarProps) {
   };
 
   return (
-    <div className="flex items-center justify-between border-t bg-muted/20 px-4 py-1.5 text-xs">
-      <div className="flex items-center gap-4">
+    <div className="flex items-center justify-between border-t bg-muted/20 px-3 py-1.5 text-xs">
+      <div className="flex items-center gap-3">
+        {/* Language / compiler selector */}
+        <LanguageSelector
+          value={language}
+          onChange={onLanguageChange}
+          disabled={languageSelectorDisabled}
+          compact
+        />
+        <div className="h-4 w-px bg-border" />
         <div className="flex items-center gap-2">
           <span className="text-muted-foreground">Status:</span>
           {isExecuting ? (
