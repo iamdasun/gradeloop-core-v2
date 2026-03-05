@@ -1,14 +1,25 @@
-'use client';
+"use client";
 
 /**
  * Course Instance dialogs: Create (2-step) + Edit (with Settings section)
  * Uses SideDialog + brand tokens from globals.css
  */
-import * as React from 'react';
+import * as React from "react";
 import {
-  Calendar, Loader2, Search, X, GraduationCap, BookOpen, Users,
-  Settings2, ChevronRight, ChevronLeft, Check, UserPlus,
-} from 'lucide-react';
+  Calendar,
+  Loader2,
+  Search,
+  X,
+  GraduationCap,
+  BookOpen,
+  Users,
+  Settings2,
+  ChevronRight,
+  ChevronLeft,
+  Check,
+  UserPlus,
+  Trash2,
+} from "lucide-react";
 import {
   SideDialog,
   SideDialogContent,
@@ -16,28 +27,29 @@ import {
   SideDialogFooter,
   SideDialogHeader,
   SideDialogTitle,
-} from '@/components/ui/side-dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+} from "@/components/ui/side-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   courseInstancesApi,
   courseInstructorsApi,
   semestersApi,
   batchesApi,
   enrollmentsApi,
-} from '@/lib/api/academics';
-import { usersApi } from '@/lib/api/users';
-import { handleApiError } from '@/lib/api/axios';
-import { toast } from '@/lib/hooks/use-toast';
+} from "@/lib/api/academics";
+import { usersApi } from "@/lib/api/users";
+import { handleApiError } from "@/lib/api/axios";
+import { toast } from "@/lib/hooks/use-toast";
 import type {
   CourseInstance,
   Semester,
@@ -47,26 +59,34 @@ import type {
   CourseInstanceStatus,
   AcademicFormErrors,
   EnrollStudentRequest,
-} from '@/types/academics.types';
-import type { UserListItem } from '@/types/auth.types';
+  CourseInstructor,
+  Enrollment,
+  InstructorRole,
+} from "@/types/academics.types";
+import type { UserListItem } from "@/types/auth.types";
 
-const STATUSES: CourseInstanceStatus[] = ['Planned', 'Active', 'Completed', 'Cancelled'];
+const STATUSES: CourseInstanceStatus[] = [
+  "Planned",
+  "Active",
+  "Completed",
+  "Cancelled",
+];
 
 // ── Palette-mapped Section Header ─────────────────────────────────────────────
 
-type SectionVariant = 'primary' | 'success' | 'info' | 'warning';
+type SectionVariant = "primary" | "success" | "info" | "warning";
 
 const sectionVariantClasses: Record<SectionVariant, { icon: string }> = {
-  primary: { icon: 'bg-primary/10 text-primary' },
-  success: { icon: 'bg-success/15 text-success' },
-  info:    { icon: 'bg-info/10 text-info' },
-  warning: { icon: 'bg-warning/10 text-warning' },
+  primary: { icon: "bg-primary/10 text-primary" },
+  success: { icon: "bg-success/15 text-success" },
+  info: { icon: "bg-info/10 text-info" },
+  warning: { icon: "bg-warning/10 text-warning" },
 };
 
 function SectionHeader({
   icon,
   label,
-  variant = 'primary',
+  variant = "primary",
 }: {
   icon: React.ReactNode;
   label: string;
@@ -75,7 +95,9 @@ function SectionHeader({
   const cls = sectionVariantClasses[variant];
   return (
     <div className="flex items-center gap-2.5 mb-4 mt-2">
-      <div className={`flex h-6 w-6 items-center justify-center rounded-full shrink-0 ${cls.icon}`}>
+      <div
+        className={`flex h-6 w-6 items-center justify-center rounded-full shrink-0 ${cls.icon}`}
+      >
         {icon}
       </div>
       <span className="text-sm font-semibold text-foreground">{label}</span>
@@ -98,26 +120,32 @@ function StepIndicator({ step, steps }: { step: number; steps: string[] }) {
             <div className="flex flex-col items-center gap-1 min-w-[5rem]">
               <div
                 className={[
-                  'h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors',
+                  "h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors",
                   done
-                    ? 'bg-success text-success-foreground'
+                    ? "bg-success text-success-foreground"
                     : active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground',
-                ].join(' ')}
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground",
+                ].join(" ")}
               >
                 {done ? <Check className="h-3.5 w-3.5" /> : num}
               </div>
               <span
                 className={`text-[11px] font-medium leading-tight text-center ${
-                  active ? 'text-primary' : done ? 'text-success' : 'text-muted-foreground'
+                  active
+                    ? "text-primary"
+                    : done
+                      ? "text-success"
+                      : "text-muted-foreground"
                 }`}
               >
                 {label}
               </span>
             </div>
             {idx < steps.length - 1 && (
-              <div className={`flex-1 h-px mb-4 mx-1 transition-colors ${done ? 'bg-success' : 'bg-border'}`} />
+              <div
+                className={`flex-1 h-px mb-4 mx-1 transition-colors ${done ? "bg-success" : "bg-border"}`}
+              />
             )}
           </React.Fragment>
         );
@@ -139,19 +167,27 @@ function InstructorSearchInput({
   onSelect: (user: UserListItem | null) => void;
   excludeIds?: string[];
 }) {
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<UserListItem[]>([]);
   const [searching, setSearching] = React.useState(false);
   const [open, setOpen] = React.useState(false);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
-    if (!query.trim()) { setResults([]); setOpen(false); return; }
+    if (!query.trim()) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await usersApi.list({ search: query, user_type: 'instructor', limit: 8 });
+        const res = await usersApi.list({
+          search: query,
+          user_type: "instructor",
+          limit: 8,
+        });
         const filtered = res.data.filter((u) => !excludeIds.includes(u.id));
         setResults(filtered);
         setOpen(filtered.length > 0);
@@ -170,8 +206,12 @@ function InstructorSearchInput({
           {(value.full_name || value.email)[0]?.toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-foreground truncate">{value.full_name || value.email}</p>
-          <p className="text-xs text-muted-foreground truncate capitalize">{value.designation || value.user_type}</p>
+          <p className="font-medium text-foreground truncate">
+            {value.full_name || value.email}
+          </p>
+          <p className="text-xs text-muted-foreground truncate capitalize">
+            {value.designation || value.user_type}
+          </p>
         </div>
         <button
           type="button"
@@ -207,14 +247,20 @@ function InstructorSearchInput({
               key={u.id}
               type="button"
               className="flex w-full items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
-              onMouseDown={() => { onSelect(u); setQuery(''); setOpen(false); }}
+              onMouseDown={() => {
+                onSelect(u);
+                setQuery("");
+                setOpen(false);
+              }}
             >
               <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0">
                 {(u.full_name || u.email)[0]?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{u.full_name || u.email}</p>
-                <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {u.email}
+                </p>
               </div>
               <span className="text-xs text-muted-foreground shrink-0 capitalize">
                 {u.designation || u.user_type}
@@ -238,7 +284,7 @@ function TaChipInput({
   onChange: (users: UserListItem[]) => void;
   excludeIds?: string[];
 }) {
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<UserListItem[]>([]);
   const [searching, setSearching] = React.useState(false);
   const [open, setOpen] = React.useState(false);
@@ -246,12 +292,20 @@ function TaChipInput({
   const existingIds = value.map((u) => u.id).concat(excludeIds);
 
   React.useEffect(() => {
-    if (!query.trim()) { setResults([]); setOpen(false); return; }
+    if (!query.trim()) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await usersApi.list({ search: query, user_type: 'instructor', limit: 8 });
+        const res = await usersApi.list({
+          search: query,
+          user_type: "instructor",
+          limit: 8,
+        });
         const filtered = res.data.filter((u) => !existingIds.includes(u.id));
         setResults(filtered);
         setOpen(filtered.length > 0);
@@ -261,7 +315,7 @@ function TaChipInput({
         setSearching(false);
       }
     }, 300);
-  }, [query, existingIds.join(',')]);
+  }, [query, existingIds.join(",")]);
 
   return (
     <div className="relative">
@@ -283,13 +337,15 @@ function TaChipInput({
         ))}
         <input
           className="flex-1 min-w-[120px] bg-transparent text-sm outline-none placeholder:text-muted-foreground py-0.5 px-1"
-          placeholder={value.length === 0 ? 'Search by name...' : 'Add more...'}
+          placeholder={value.length === 0 ? "Search by name..." : "Add more..."}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onFocus={() => results.length > 0 && setOpen(true)}
         />
-        {searching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground ml-1" />}
+        {searching && (
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground ml-1" />
+        )}
       </div>
       {open && results.length > 0 && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
@@ -300,7 +356,7 @@ function TaChipInput({
               className="flex w-full items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
               onMouseDown={() => {
                 onChange([...value, u]);
-                setQuery('');
+                setQuery("");
                 setOpen(false);
               }}
             >
@@ -309,7 +365,9 @@ function TaChipInput({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{u.full_name || u.email}</p>
-                <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {u.email}
+                </p>
               </div>
             </button>
           ))}
@@ -331,7 +389,7 @@ function StudentChipInput({
   value: UserListItem[];
   onChange: (users: UserListItem[]) => void;
 }) {
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<UserListItem[]>([]);
   const [searching, setSearching] = React.useState(false);
   const [open, setOpen] = React.useState(false);
@@ -339,12 +397,20 @@ function StudentChipInput({
   const existingIds = value.map((u) => u.id);
 
   React.useEffect(() => {
-    if (!query.trim()) { setResults([]); setOpen(false); return; }
+    if (!query.trim()) {
+      setResults([]);
+      setOpen(false);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await usersApi.list({ search: query, user_type: 'student', limit: 10 });
+        const res = await usersApi.list({
+          search: query,
+          user_type: "student",
+          limit: 10,
+        });
         const filtered = res.data.filter((u) => !existingIds.includes(u.id));
         setResults(filtered);
         setOpen(filtered.length > 0);
@@ -354,8 +420,8 @@ function StudentChipInput({
         setSearching(false);
       }
     }, 300);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, existingIds.join(',')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, existingIds.join(",")]);
 
   return (
     <div className="relative">
@@ -380,13 +446,19 @@ function StudentChipInput({
         ))}
         <input
           className="flex-1 min-w-[160px] bg-transparent text-sm outline-none placeholder:text-muted-foreground py-0.5 px-1"
-          placeholder={value.length === 0 ? 'Search by name or student ID...' : 'Add more...'}
+          placeholder={
+            value.length === 0
+              ? "Search by name or student ID..."
+              : "Add more..."
+          }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onFocus={() => results.length > 0 && setOpen(true)}
         />
-        {searching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground ml-1" />}
+        {searching && (
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground ml-1" />
+        )}
       </div>
       {open && results.length > 0 && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
@@ -395,14 +467,20 @@ function StudentChipInput({
               key={u.id}
               type="button"
               className="flex w-full items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
-              onMouseDown={() => { onChange([...value, u]); setQuery(''); setOpen(false); }}
+              onMouseDown={() => {
+                onChange([...value, u]);
+                setQuery("");
+                setOpen(false);
+              }}
             >
               <div className="h-7 w-7 rounded-full bg-success/10 flex items-center justify-center text-success text-xs font-bold shrink-0">
                 {(u.full_name || u.email)[0]?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">{u.full_name || u.email}</p>
-                <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {u.email}
+                </p>
               </div>
               {u.student_id && (
                 <span className="text-xs text-muted-foreground shrink-0 font-mono">
@@ -424,13 +502,17 @@ function StudentChipInput({
 
 function validateStep1(semesterId: string): AcademicFormErrors {
   const e: AcademicFormErrors = {};
-  if (!semesterId) e.semester_id = 'Semester is required';
+  if (!semesterId) e.semester_id = "Semester is required";
   return e;
 }
 
-function validateStep2(batchId: string, students: UserListItem[]): AcademicFormErrors {
+function validateStep2(
+  batchId: string,
+  students: UserListItem[],
+): AcademicFormErrors {
   const e: AcademicFormErrors = {};
-  if (!batchId && students.length === 0) e.batch_id = 'Select a batch or add at least one student';
+  if (!batchId && students.length === 0)
+    e.batch_id = "Select a batch or add at least one student";
   return e;
 }
 
@@ -444,7 +526,7 @@ interface CreateCourseInstanceDialogProps {
   onSuccess: (instance: CourseInstance) => void;
 }
 
-const STEP_LABELS = ['General & Staff', 'Enrollment'];
+const STEP_LABELS = ["General & Staff", "Enrollment"];
 
 export function CreateCourseInstanceDialog({
   open,
@@ -457,14 +539,17 @@ export function CreateCourseInstanceDialog({
   const [step, setStep] = React.useState(1);
 
   // Step 1 fields
-  const [instanceName, setInstanceName] = React.useState('');
-  const [semesterId, setSemesterId] = React.useState('');
-  const [customCourseCode, setCustomCourseCode] = React.useState(courseCode ?? '');
-  const [leadInstructor, setLeadInstructor] = React.useState<UserListItem | null>(null);
+  const [instanceName, setInstanceName] = React.useState("");
+  const [semesterId, setSemesterId] = React.useState("");
+  const [customCourseCode, setCustomCourseCode] = React.useState(
+    courseCode ?? "",
+  );
+  const [leadInstructor, setLeadInstructor] =
+    React.useState<UserListItem | null>(null);
   const [tas, setTas] = React.useState<UserListItem[]>([]);
 
   // Step 2 fields
-  const [batchId, setBatchId] = React.useState('');
+  const [batchId, setBatchId] = React.useState("");
   const [students, setStudents] = React.useState<UserListItem[]>([]);
   const [maxEnrollment, setMaxEnrollment] = React.useState(30);
 
@@ -478,26 +563,37 @@ export function CreateCourseInstanceDialog({
   React.useEffect(() => {
     if (open) {
       setStep(1);
-      setInstanceName('');
-      setSemesterId('');
-      setCustomCourseCode(courseCode ?? '');
+      setInstanceName("");
+      setSemesterId("");
+      setCustomCourseCode(courseCode ?? "");
       setLeadInstructor(null);
       setTas([]);
-      setBatchId('');
+      setBatchId("");
       setStudents([]);
       setMaxEnrollment(30);
       setErrors({});
       setMetaLoading(true);
       Promise.all([semestersApi.list(), batchesApi.list()])
-        .then(([sems, bats]) => { setSemesters(sems); setBatches(bats); })
-        .catch(() => toast.error('Failed to load options', 'Could not fetch semesters or batches.'))
+        .then(([sems, bats]) => {
+          setSemesters(sems);
+          setBatches(bats);
+        })
+        .catch(() =>
+          toast.error(
+            "Failed to load options",
+            "Could not fetch semesters or batches.",
+          ),
+        )
         .finally(() => setMetaLoading(false));
     }
   }, [open, courseCode]);
 
   function handleNext() {
     const errs = validateStep1(semesterId);
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
     setErrors({});
     setStep(2);
   }
@@ -505,14 +601,17 @@ export function CreateCourseInstanceDialog({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validateStep2(batchId, students);
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
     setErrors({});
 
     const req: CreateCourseInstanceRequest = {
       course_id: courseId,
       semester_id: semesterId,
       batch_id: batchId,
-      status: 'Planned',
+      status: "Planned",
       max_enrollment: maxEnrollment,
     };
 
@@ -526,10 +625,10 @@ export function CreateCourseInstanceDialog({
           await courseInstructorsApi.assign({
             course_instance_id: instance.id,
             user_id: leadInstructor.id,
-            role: 'Lead Instructor',
+            role: "Lead Instructor",
           });
         } catch (err) {
-          console.error('Failed to assign lead instructor:', err);
+          console.error("Failed to assign lead instructor:", err);
         }
       }
 
@@ -539,18 +638,32 @@ export function CreateCourseInstanceDialog({
           await courseInstructorsApi.assign({
             course_instance_id: instance.id,
             user_id: ta.id,
-            role: 'Teaching Assistant',
+            role: "TA",
           });
         } catch (err) {
-          console.error('Failed to assign teaching assistant:', err);
+          console.error("Failed to assign teaching assistant:", err);
         }
       }
 
-      toast.success('Instance created', 'Course instance has been scheduled.');
+      // Enroll students
+      for (const student of students) {
+        try {
+          await enrollmentsApi.enroll({
+            course_instance_id: instance.id,
+            user_id: student.id,
+            status: "Enrolled",
+            allow_individual: true,
+          });
+        } catch (err) {
+          console.error("Failed to enroll student:", err);
+        }
+      }
+
+      toast.success("Instance created", "Course instance has been scheduled.");
       onOpenChange(false);
       onSuccess(instance);
     } catch (err) {
-      toast.error('Failed to create instance', handleApiError(err));
+      toast.error("Failed to create instance", handleApiError(err));
     } finally {
       setSubmitting(false);
     }
@@ -567,18 +680,23 @@ export function CreateCourseInstanceDialog({
             <Calendar className="h-5 w-5 text-primary" />
             Create Course Instance
           </SideDialogTitle>
-          <SideDialogDescription>Setup details for the new academic session</SideDialogDescription>
+          <SideDialogDescription>
+            Setup details for the new academic session
+          </SideDialogDescription>
         </SideDialogHeader>
 
         {/* Step Indicator */}
         <StepIndicator step={step} steps={STEP_LABELS} />
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-0 flex-1">
-
           {/* ── STEP 1: General Info + Staff Assignment ──────────── */}
           {step === 1 && (
             <>
-              <SectionHeader icon={<BookOpen className="h-3 w-3" />} label="General Info" variant="primary" />
+              <SectionHeader
+                icon={<BookOpen className="h-3 w-3" />}
+                label="General Info"
+                variant="primary"
+              />
 
               <div className="space-y-4 mb-6">
                 <div className="space-y-1.5">
@@ -598,7 +716,8 @@ export function CreateCourseInstanceDialog({
                     </Label>
                     {metaLoading ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground h-9">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />{" "}
+                        Loading…
                       </div>
                     ) : (
                       <Select
@@ -613,17 +732,23 @@ export function CreateCourseInstanceDialog({
                         </SelectTrigger>
                         <SelectContent>
                           {semesters.length === 0 ? (
-                            <SelectItem value="__none" disabled>No semesters available</SelectItem>
+                            <SelectItem value="__none" disabled>
+                              No semesters available
+                            </SelectItem>
                           ) : (
                             semesters.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.name}
+                              </SelectItem>
                             ))
                           )}
                         </SelectContent>
                       </Select>
                     )}
                     {errors.semester_id && (
-                      <p className="text-xs text-destructive">{errors.semester_id}</p>
+                      <p className="text-xs text-destructive">
+                        {errors.semester_id}
+                      </p>
                     )}
                   </div>
 
@@ -639,7 +764,11 @@ export function CreateCourseInstanceDialog({
                 </div>
               </div>
 
-              <SectionHeader icon={<Users className="h-3 w-3" />} label="Staff Assignment" variant="info" />
+              <SectionHeader
+                icon={<Users className="h-3 w-3" />}
+                label="Staff Assignment"
+                variant="info"
+              />
 
               <div className="space-y-4 mb-6">
                 <div className="space-y-1.5">
@@ -653,12 +782,20 @@ export function CreateCourseInstanceDialog({
                 </div>
                 <div className="space-y-1.5">
                   <Label>Teaching Assistants</Label>
-                  <TaChipInput value={tas} onChange={setTas} excludeIds={leadInstructorId} />
+                  <TaChipInput
+                    value={tas}
+                    onChange={setTas}
+                    excludeIds={leadInstructorId}
+                  />
                 </div>
               </div>
 
               <SideDialogFooter>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
                   Cancel
                 </Button>
                 <Button type="button" onClick={handleNext} className="gap-1.5">
@@ -671,7 +808,11 @@ export function CreateCourseInstanceDialog({
           {/* ── STEP 2: Student Enrollment + Instance Settings ───── */}
           {step === 2 && (
             <>
-              <SectionHeader icon={<GraduationCap className="h-3 w-3" />} label="Student Enrollment" variant="success" />
+              <SectionHeader
+                icon={<GraduationCap className="h-3 w-3" />}
+                label="Student Enrollment"
+                variant="success"
+              />
 
               <div className="space-y-4 mb-6">
                 <div className="space-y-1.5">
@@ -693,7 +834,9 @@ export function CreateCourseInstanceDialog({
                       </SelectTrigger>
                       <SelectContent>
                         {batches.length === 0 ? (
-                          <SelectItem value="__none" disabled>No batches available</SelectItem>
+                          <SelectItem value="__none" disabled>
+                            No batches available
+                          </SelectItem>
                         ) : (
                           batches.map((b) => (
                             <SelectItem key={b.id} value={b.id}>
@@ -709,7 +852,9 @@ export function CreateCourseInstanceDialog({
                 {/* OR divider */}
                 <div className="flex items-center gap-3">
                   <div className="flex-1 h-px bg-border" />
-                  <span className="text-xs text-muted-foreground">or add individually</span>
+                  <span className="text-xs text-muted-foreground">
+                    or add individually
+                  </span>
                   <div className="flex-1 h-px bg-border" />
                 </div>
 
@@ -724,14 +869,20 @@ export function CreateCourseInstanceDialog({
               </div>
 
               {/* Settings section */}
-              <SectionHeader icon={<Settings2 className="h-3 w-3" />} label="Instance Settings" variant="warning" />
+              <SectionHeader
+                icon={<Settings2 className="h-3 w-3" />}
+                label="Instance Settings"
+                variant="warning"
+              />
 
               <div className="space-y-4 mb-6">
                 <div className="rounded-lg border border-border bg-muted/30 divide-y divide-border">
                   {/* Max Enrollment */}
                   <div className="flex items-center justify-between gap-4 px-4 py-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">Max Enrollment</p>
+                      <p className="text-sm font-medium text-foreground">
+                        Max Enrollment
+                      </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Maximum students allowed in this instance
                       </p>
@@ -740,7 +891,9 @@ export function CreateCourseInstanceDialog({
                       type="number"
                       min={1}
                       value={maxEnrollment}
-                      onChange={(e) => setMaxEnrollment(parseInt(e.target.value, 10) || 1)}
+                      onChange={(e) =>
+                        setMaxEnrollment(parseInt(e.target.value, 10) || 1)
+                      }
                       className="w-20 text-center text-sm h-8"
                     />
                   </div>
@@ -748,7 +901,9 @@ export function CreateCourseInstanceDialog({
                   {/* Initial Status (read-only) */}
                   <div className="flex items-center justify-between gap-4 px-4 py-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">Initial Status</p>
+                      <p className="text-sm font-medium text-foreground">
+                        Initial Status
+                      </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Status when the instance is created
                       </p>
@@ -761,14 +916,29 @@ export function CreateCourseInstanceDialog({
               </div>
 
               <SideDialogFooter>
-                <Button type="button" variant="outline" onClick={() => setStep(1)} className="gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStep(1)}
+                  className="gap-1.5"
+                >
                   <ChevronLeft className="h-3.5 w-3.5" /> Back
                 </Button>
-                <Button type="submit" disabled={submitting || metaLoading} className="gap-1.5">
+                <Button
+                  type="submit"
+                  disabled={submitting || metaLoading}
+                  className="gap-1.5"
+                >
                   {submitting ? (
-                    <><Loader2 className="h-3.5 w-3.5 animate-spin" />Creating…</>
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Creating…
+                    </>
                   ) : (
-                    <><Check className="h-3.5 w-3.5" /> Save &amp; Create Instance</>
+                    <>
+                      <Check className="h-3.5 w-3.5" /> Save &amp; Create
+                      Instance
+                    </>
                   )}
                 </Button>
               </SideDialogFooter>
@@ -791,6 +961,8 @@ interface EditCourseInstanceDialogProps {
   onSuccess: (updated: CourseInstance) => void;
 }
 
+type EditTab = "settings" | "students" | "instructors";
+
 export function EditCourseInstanceDialog({
   open,
   onOpenChange,
@@ -799,31 +971,268 @@ export function EditCourseInstanceDialog({
   batchName,
   onSuccess,
 }: EditCourseInstanceDialogProps) {
-  const [status, setStatus] = React.useState<CourseInstanceStatus>(instance.status);
-  const [maxEnrollment, setMaxEnrollment] = React.useState(instance.max_enrollment);
+  const [activeTab, setActiveTab] = React.useState<EditTab>("settings");
+  const [status, setStatus] = React.useState<CourseInstanceStatus>(
+    instance.status,
+  );
+  const [maxEnrollment, setMaxEnrollment] = React.useState(
+    instance.max_enrollment,
+  );
   const [errors, setErrors] = React.useState<AcademicFormErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
+
+  // Students state
+  const [students, setStudents] = React.useState<Enrollment[]>([]);
+  const [loadingStudents, setLoadingStudents] = React.useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = React.useState("");
+  const [studentSearchResults, setStudentSearchResults] = React.useState<
+    UserListItem[]
+  >([]);
+  const [searchingStudents, setSearchingStudents] = React.useState(false);
+  const [studentDropdownOpen, setStudentDropdownOpen] = React.useState(false);
+  const studentDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+
+  // Instructors state
+  const [instructors, setInstructors] = React.useState<CourseInstructor[]>([]);
+  const [loadingInstructors, setLoadingInstructors] = React.useState(false);
+  const [instructorSearchQuery, setInstructorSearchQuery] = React.useState("");
+  const [instructorSearchResults, setInstructorSearchResults] = React.useState<
+    UserListItem[]
+  >([]);
+  const [searchingInstructors, setSearchingInstructors] = React.useState(false);
+  const [instructorDropdownOpen, setInstructorDropdownOpen] =
+    React.useState(false);
+  const [selectedInstructor, setSelectedInstructor] =
+    React.useState<UserListItem | null>(null);
+  const [instructorRole, setInstructorRole] =
+    React.useState<InstructorRole>("Instructor");
+  const instructorDebounceRef = React.useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  const studentIds = React.useMemo(
+    () => new Set(students.map((s) => s.user_id)),
+    [students],
+  );
+
+  const instructorIds = React.useMemo(
+    () => new Set(instructors.map((i) => i.user_id)),
+    [instructors],
+  );
 
   React.useEffect(() => {
     if (open) {
       setStatus(instance.status);
       setMaxEnrollment(instance.max_enrollment);
       setErrors({});
+      setActiveTab("settings");
     }
   }, [open, instance]);
 
-  const statusVariant: Record<CourseInstanceStatus, { badge: string; dot: string }> = {
-    Planned:   { badge: 'bg-warning/10 text-warning-muted-foreground border-warning/20',   dot: 'bg-warning' },
-    Active:    { badge: 'bg-success/10 text-success-muted-foreground border-success/20',   dot: 'bg-success' },
-    Completed: { badge: 'bg-info/10 text-info-muted-foreground border-info/20',             dot: 'bg-info' },
-    Cancelled: { badge: 'bg-destructive/10 text-destructive border-destructive/20',         dot: 'bg-destructive' },
+  // Load students when dialog opens or students tab is activated
+  React.useEffect(() => {
+    if (open && activeTab === "students") {
+      loadStudents();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activeTab]);
+
+  // Load instructors when dialog opens or instructors tab is activated
+  React.useEffect(() => {
+    if (open && activeTab === "instructors") {
+      loadInstructors();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activeTab]);
+
+  // Student search effect
+  React.useEffect(() => {
+    if (!studentSearchQuery.trim()) {
+      setStudentSearchResults([]);
+      setStudentDropdownOpen(false);
+      return;
+    }
+    if (studentDebounceRef.current) clearTimeout(studentDebounceRef.current);
+    studentDebounceRef.current = setTimeout(async () => {
+      setSearchingStudents(true);
+      try {
+        const res = await usersApi.list({
+          search: studentSearchQuery,
+          user_type: "student",
+          limit: 10,
+        });
+        const filtered = res.data.filter((u) => !studentIds.has(u.id));
+        setStudentSearchResults(filtered);
+        setStudentDropdownOpen(filtered.length > 0);
+      } catch {
+        setStudentSearchResults([]);
+      } finally {
+        setSearchingStudents(false);
+      }
+    }, 300);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentSearchQuery]);
+
+  // Instructor search effect
+  React.useEffect(() => {
+    if (!instructorSearchQuery.trim()) {
+      setInstructorSearchResults([]);
+      setInstructorDropdownOpen(false);
+      return;
+    }
+    if (instructorDebounceRef.current)
+      clearTimeout(instructorDebounceRef.current);
+    instructorDebounceRef.current = setTimeout(async () => {
+      setSearchingInstructors(true);
+      try {
+        const res = await usersApi.list({
+          search: instructorSearchQuery,
+          user_type: "instructor",
+          limit: 10,
+        });
+        const filtered = res.data.filter((u) => !instructorIds.has(u.id));
+        setInstructorSearchResults(filtered);
+        setInstructorDropdownOpen(filtered.length > 0);
+      } catch {
+        setInstructorSearchResults([]);
+      } finally {
+        setSearchingInstructors(false);
+      }
+    }, 300);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instructorSearchQuery]);
+
+  const statusVariant: Record<
+    CourseInstanceStatus,
+    { badge: string; dot: string }
+  > = {
+    Planned: {
+      badge: "bg-warning/10 text-warning-muted-foreground border-warning/20",
+      dot: "bg-warning",
+    },
+    Active: {
+      badge: "bg-success/10 text-success-muted-foreground border-success/20",
+      dot: "bg-success",
+    },
+    Completed: {
+      badge: "bg-info/10 text-info-muted-foreground border-info/20",
+      dot: "bg-info",
+    },
+    Cancelled: {
+      badge: "bg-destructive/10 text-destructive border-destructive/20",
+      dot: "bg-destructive",
+    },
   };
+
+  async function loadStudents() {
+    setLoadingStudents(true);
+    try {
+      const data = await enrollmentsApi.list(instance.id);
+      setStudents(data);
+    } catch (err) {
+      toast.error("Failed to load students", handleApiError(err));
+    } finally {
+      setLoadingStudents(false);
+    }
+  }
+
+  async function loadInstructors() {
+    setLoadingInstructors(true);
+    try {
+      const data = await courseInstructorsApi.getByInstance(instance.id);
+      setInstructors(data);
+    } catch (err) {
+      toast.error("Failed to load instructors", handleApiError(err));
+    } finally {
+      setLoadingInstructors(false);
+    }
+  }
+
+  function addStudent(student: UserListItem) {
+    setStudentSearchQuery("");
+    setStudentSearchResults([]);
+    setStudentDropdownOpen(false);
+    enrollStudent(student);
+  }
+
+  async function enrollStudent(student: UserListItem) {
+    try {
+      await enrollmentsApi.enroll({
+        course_instance_id: instance.id,
+        user_id: student.id,
+        status: "Enrolled",
+        allow_individual: true,
+      } satisfies EnrollStudentRequest);
+      toast.success(
+        "Student enrolled",
+        `${student.full_name || student.email} has been added.`,
+      );
+      loadStudents();
+    } catch (err) {
+      toast.error("Failed to enroll student", handleApiError(err));
+    }
+  }
+
+  async function removeStudent(userId: string) {
+    try {
+      await enrollmentsApi.remove(instance.id, userId);
+      toast.success("Student removed", "The student has been unenrolled.");
+      loadStudents();
+    } catch (err) {
+      toast.error("Failed to remove student", handleApiError(err));
+    }
+  }
+
+  function addInstructor(instructor: UserListItem) {
+    setSelectedInstructor(instructor);
+    setInstructorSearchQuery("");
+    setInstructorSearchResults([]);
+    setInstructorDropdownOpen(false);
+  }
+
+  async function assignInstructor() {
+    if (!selectedInstructor) return;
+    try {
+      await courseInstructorsApi.assign({
+        course_instance_id: instance.id,
+        user_id: selectedInstructor.id,
+        role: instructorRole,
+      });
+      toast.success(
+        "Instructor assigned",
+        `${selectedInstructor.full_name || selectedInstructor.email} has been added as ${instructorRole}.`,
+      );
+      setSelectedInstructor(null);
+      setInstructorRole("Instructor");
+      loadInstructors();
+    } catch (err) {
+      toast.error("Failed to assign instructor", handleApiError(err));
+    }
+  }
+
+  async function removeInstructor(userId: string) {
+    try {
+      await courseInstructorsApi.remove(instance.id, userId);
+      toast.success(
+        "Instructor removed",
+        "The instructor has been removed from this course.",
+      );
+      loadInstructors();
+    } catch (err) {
+      toast.error("Failed to remove instructor", handleApiError(err));
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs: AcademicFormErrors = {};
-    if (maxEnrollment <= 0) errs.max_enrollment = 'Must be a positive number';
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    if (maxEnrollment <= 0) errs.max_enrollment = "Must be a positive number";
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -831,19 +1240,34 @@ export function EditCourseInstanceDialog({
         status,
         max_enrollment: maxEnrollment,
       });
-      toast.success('Instance updated');
+      toast.success("Instance updated");
       onOpenChange(false);
       onSuccess(updated);
     } catch (err) {
-      toast.error('Failed to update instance', handleApiError(err));
+      toast.error("Failed to update instance", handleApiError(err));
     } finally {
       setSubmitting(false);
     }
   }
 
+  function getInitials(name: string, email: string) {
+    const src = name || email;
+    return src
+      .split(/[.\-_\s@]/)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .slice(0, 2)
+      .join("");
+  }
+
+  const roleBadgeVariant: Record<InstructorRole, string> = {
+    "Lead Instructor": "bg-primary/10 text-primary border-primary/20",
+    Instructor: "bg-info/10 text-info-muted-foreground border-info/20",
+    TA: "bg-success/10 text-success-muted-foreground border-success/20",
+  };
+
   return (
     <SideDialog open={open} onOpenChange={onOpenChange}>
-      <SideDialogContent>
+      <SideDialogContent className="flex flex-col max-h-[90vh]">
         <SideDialogHeader>
           <SideDialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5 text-primary" />
@@ -857,99 +1281,516 @@ export function EditCourseInstanceDialog({
         </SideDialogHeader>
 
         {/* Instance overview card */}
-        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 mb-4">
+        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 mb-2 shrink-0">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground truncate">
-                {semesterName || 'Unknown Semester'}
+                {semesterName || "Unknown Semester"}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {batchName ? `Batch: ${batchName}` : `ID: ${instance.id.slice(0, 8)}`}
+                {batchName
+                  ? `Batch: ${batchName}`
+                  : `ID: ${instance.id.slice(0, 8)}`}
               </p>
             </div>
             <span
               className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium shrink-0 ${statusVariant[instance.status].badge}`}
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${statusVariant[instance.status].dot}`} />
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${statusVariant[instance.status].dot}`}
+              />
               {instance.status}
             </span>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-0 flex-1">
+        {/* Tabs */}
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as EditTab)}
+          className="flex flex-col flex-1 min-h-0"
+        >
+          <TabsList className="w-full justify-start shrink-0">
+            <TabsTrigger value="settings" className="gap-2">
+              <Settings2 className="h-3.5 w-3.5" />
+              Settings
+            </TabsTrigger>
+            <TabsTrigger value="students" className="gap-2">
+              <Users className="h-3.5 w-3.5" />
+              Students
+              {students.length > 0 && (
+                <span className="ml-1 text-xs bg-muted-foreground/20 text-muted-foreground px-1.5 py-0.5 rounded-full">
+                  {students.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="instructors" className="gap-2">
+              <GraduationCap className="h-3.5 w-3.5" />
+              Instructors
+              {instructors.length > 0 && (
+                <span className="ml-1 text-xs bg-muted-foreground/20 text-muted-foreground px-1.5 py-0.5 rounded-full">
+                  {instructors.length}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Settings section */}
-          <SectionHeader icon={<Settings2 className="h-3 w-3" />} label="Instance Settings" variant="warning" />
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {/* Settings Tab */}
+            <TabsContent
+              value="settings"
+              className="mt-4 data-[state=inactive]:hidden"
+            >
+              <SectionHeader
+                icon={<Settings2 className="h-3 w-3" />}
+                label="Instance Settings"
+                variant="warning"
+              />
 
-          <div className="rounded-lg border border-border bg-muted/30 divide-y divide-border mb-6">
-            {/* Status */}
-            <div className="flex items-center justify-between gap-4 px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">Status</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Current operational state of this instance
-                </p>
+              <div className="rounded-lg border border-border bg-muted/30 divide-y divide-border mb-6">
+                {/* Status */}
+                <div className="flex items-center justify-between gap-4 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      Status
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Current operational state of this instance
+                    </p>
+                  </div>
+                  <Select
+                    value={status}
+                    onValueChange={(v) => setStatus(v as CourseInstanceStatus)}
+                  >
+                    <SelectTrigger className="w-32 h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUSES.map((s) => (
+                        <SelectItem key={s} value={s} className="text-xs">
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Max Enrollment */}
+                <div className="flex items-center justify-between gap-4 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      Max Enrollment
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Maximum number of students for this instance
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={maxEnrollment}
+                      onChange={(e) =>
+                        setMaxEnrollment(parseInt(e.target.value, 10) || 1)
+                      }
+                      className="w-20 text-center text-sm h-8"
+                    />
+                    {errors.max_enrollment && (
+                      <p className="text-xs text-destructive">
+                        {errors.max_enrollment}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Instance ID (read-only) */}
+                <div className="flex items-center justify-between gap-4 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">
+                      Instance ID
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Unique identifier for this course instance
+                    </p>
+                  </div>
+                  <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded">
+                    {instance.id.slice(0, 8)}…
+                  </span>
+                </div>
               </div>
-              <Select value={status} onValueChange={(v) => setStatus(v as CourseInstanceStatus)}>
-                <SelectTrigger className="w-32 h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUSES.map((s) => (
-                    <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
 
-            {/* Max Enrollment */}
-            <div className="flex items-center justify-between gap-4 px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">Max Enrollment</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Maximum number of students for this instance
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-1">
+              <SideDialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="gap-1.5"
+                  onClick={handleSubmit}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Saving…
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </SideDialogFooter>
+            </TabsContent>
+
+            {/* Students Tab */}
+            <TabsContent
+              value="students"
+              className="mt-4 data-[state=inactive]:hidden"
+            >
+              <SectionHeader
+                icon={<UserPlus className="h-3 w-3" />}
+                label="Add Students"
+                variant="primary"
+              />
+
+              {/* Search input */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 <Input
-                  type="number"
-                  min={1}
-                  value={maxEnrollment}
-                  onChange={(e) => setMaxEnrollment(parseInt(e.target.value, 10) || 1)}
-                  className="w-20 text-center text-sm h-8"
+                  placeholder="Search by name, email or student ID…"
+                  className="pl-9 pr-9"
+                  value={studentSearchQuery}
+                  onChange={(e) => setStudentSearchQuery(e.target.value)}
+                  onBlur={() =>
+                    setTimeout(() => setStudentDropdownOpen(false), 150)
+                  }
+                  onFocus={() =>
+                    studentSearchResults.length > 0 &&
+                    setStudentDropdownOpen(true)
+                  }
                 />
-                {errors.max_enrollment && (
-                  <p className="text-xs text-destructive">{errors.max_enrollment}</p>
+                {searchingStudents && (
+                  <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                )}
+                {/* Suggestions dropdown */}
+                {studentDropdownOpen && studentSearchResults.length > 0 && (
+                  <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
+                    {studentSearchResults.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-sm hover:bg-accent transition-colors text-left"
+                        onMouseDown={() => addStudent(u)}
+                      >
+                        <Avatar className="h-8 w-8 shrink-0">
+                          <AvatarFallback className="bg-success/10 text-success text-xs">
+                            {getInitials(u.full_name, u.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate text-sm">
+                            {u.full_name || u.email}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {u.email}
+                          </p>
+                        </div>
+                        {u.student_id && (
+                          <span className="text-xs text-muted-foreground shrink-0 font-mono">
+                            #{u.student_id}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {!searchingStudents &&
+                  studentSearchQuery.trim() &&
+                  studentSearchResults.length === 0 &&
+                  !studentDropdownOpen && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      No students found matching &ldquo;{studentSearchQuery}
+                      &rdquo;.
+                    </p>
+                  )}
+              </div>
+
+              <SectionHeader
+                icon={<Users className="h-3 w-3" />}
+                label={`Enrolled Students (${students.length})`}
+                variant="success"
+              />
+
+              {loadingStudents ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : students.length === 0 ? (
+                <div className="rounded-lg border border-border bg-muted/30 px-4 py-8 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No students enrolled yet.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Search above to add students to this course instance.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border overflow-hidden divide-y divide-border max-h-[300px] overflow-y-auto">
+                  {students.map((s) => (
+                    <div
+                      key={s.user_id}
+                      className="flex items-center gap-3 px-3 py-2.5"
+                    >
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarFallback className="bg-success/10 text-success text-xs">
+                          {getInitials(s.full_name, s.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">
+                          {s.full_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {s.email}
+                        </p>
+                      </div>
+                      {s.student_id && (
+                        <span className="text-xs text-muted-foreground font-mono shrink-0">
+                          #{s.student_id}
+                        </span>
+                      )}
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
+                          s.status === "Enrolled"
+                            ? "bg-success/10 text-success-muted-foreground border-success/20"
+                            : "bg-muted text-muted-foreground border-border"
+                        }`}
+                      >
+                        {s.status}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeStudent(s.user_id)}
+                        className="ml-1 text-muted-foreground hover:text-destructive transition-colors shrink-0 p-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Instructors Tab */}
+            <TabsContent
+              value="instructors"
+              className="mt-4 data-[state=inactive]:hidden"
+            >
+              <SectionHeader
+                icon={<UserPlus className="h-3 w-3" />}
+                label="Add Instructor"
+                variant="primary"
+              />
+
+              {/* Instructor selection */}
+              <div className="space-y-3 mb-4">
+                {/* Search input */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Search instructors by name or email…"
+                    className="pl-9 pr-9"
+                    value={instructorSearchQuery}
+                    onChange={(e) => setInstructorSearchQuery(e.target.value)}
+                    onBlur={() =>
+                      setTimeout(() => setInstructorDropdownOpen(false), 150)
+                    }
+                    onFocus={() =>
+                      instructorSearchResults.length > 0 &&
+                      setInstructorDropdownOpen(true)
+                    }
+                  />
+                  {searchingInstructors && (
+                    <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                  )}
+                  {/* Suggestions dropdown */}
+                  {instructorDropdownOpen &&
+                    instructorSearchResults.length > 0 && (
+                      <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
+                        {instructorSearchResults.map((u) => (
+                          <button
+                            key={u.id}
+                            type="button"
+                            className="flex w-full items-center gap-3 px-3 py-2.5 text-sm hover:bg-accent transition-colors text-left"
+                            onMouseDown={() => addInstructor(u)}
+                          >
+                            <Avatar className="h-8 w-8 shrink-0">
+                              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                {getInitials(u.full_name, u.email)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate text-sm">
+                                {u.full_name || u.email}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {u.email}
+                              </p>
+                            </div>
+                            <span className="text-xs text-muted-foreground shrink-0 capitalize">
+                              {u.designation || u.user_type}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  {!searchingInstructors &&
+                    instructorSearchQuery.trim() &&
+                    instructorSearchResults.length === 0 &&
+                    !instructorDropdownOpen && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        No instructors found matching &ldquo;
+                        {instructorSearchQuery}&rdquo;.
+                      </p>
+                    )}
+                </div>
+
+                {/* Selected instructor and role */}
+                {selectedInstructor && (
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 p-3">
+                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                          {getInitials(
+                            selectedInstructor.full_name,
+                            selectedInstructor.email,
+                          )}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {selectedInstructor.full_name ||
+                            selectedInstructor.email}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {selectedInstructor.email}
+                        </p>
+                      </div>
+                    </div>
+                    <Select
+                      value={instructorRole}
+                      onValueChange={(v) =>
+                        setInstructorRole(v as InstructorRole)
+                      }
+                    >
+                      <SelectTrigger className="w-36 h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(
+                          [
+                            "Lead Instructor",
+                            "Instructor",
+                            "TA",
+                          ] as InstructorRole[]
+                        ).map((role) => (
+                          <SelectItem
+                            key={role}
+                            value={role}
+                            className="text-xs"
+                          >
+                            {role}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={assignInstructor}
+                      className="h-8 gap-1"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      Add
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedInstructor(null);
+                        setInstructorSearchQuery("");
+                      }}
+                      className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
                 )}
               </div>
-            </div>
 
-            {/* Instance ID (read-only) */}
-            <div className="flex items-center justify-between gap-4 px-4 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">Instance ID</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Unique identifier for this course instance
-                </p>
-              </div>
-              <span className="text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded">
-                {instance.id.slice(0, 8)}…
-              </span>
-            </div>
+              <SectionHeader
+                icon={<GraduationCap className="h-3 w-3" />}
+                label={`Assigned Instructors (${instructors.length})`}
+                variant="info"
+              />
+
+              {loadingInstructors ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : instructors.length === 0 ? (
+                <div className="rounded-lg border border-border bg-muted/30 px-4 py-8 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    No instructors assigned yet.
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Search above to add instructors to this course instance.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-border overflow-hidden divide-y divide-border max-h-[300px] overflow-y-auto">
+                  {instructors.map((i) => (
+                    <div
+                      key={i.user_id}
+                      className="flex items-center gap-3 px-3 py-2.5"
+                    >
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                          {getInitials(i.full_name, i.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">
+                          {i.full_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {i.email}
+                        </p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium shrink-0 ${roleBadgeVariant[i.role as InstructorRole]}`}
+                      >
+                        {i.role}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeInstructor(i.user_id)}
+                        className="ml-1 text-muted-foreground hover:text-destructive transition-colors shrink-0 p-1"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
           </div>
-
-          <SideDialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting} className="gap-1.5">
-              {submitting
-                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Saving…</>
-                : <><Check className="h-3.5 w-3.5" />Save Changes</>
-              }
-            </Button>
-          </SideDialogFooter>
-        </form>
+        </Tabs>
       </SideDialogContent>
     </SideDialog>
   );
@@ -970,9 +1811,9 @@ function getEnrollInitials(name: string, email: string) {
   const src = name || email;
   return src
     .split(/[.\-_\s@]/)
-    .map((p) => p[0]?.toUpperCase() ?? '')
+    .map((p) => p[0]?.toUpperCase() ?? "")
     .slice(0, 2)
-    .join('');
+    .join("");
 }
 
 export function EnrollStudentsDialog({
@@ -982,7 +1823,7 @@ export function EnrollStudentsDialog({
   enrolledUserIds = [],
   onSuccess,
 }: EnrollStudentsDialogProps) {
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<UserListItem[]>([]);
   const [searching, setSearching] = React.useState(false);
   const [selected, setSelected] = React.useState<UserListItem[]>([]);
@@ -993,22 +1834,33 @@ export function EnrollStudentsDialog({
   // Reset when dialog opens/closes
   React.useEffect(() => {
     if (!open) {
-      setQuery('');
+      setQuery("");
       setResults([]);
       setSelected([]);
       setDropdownOpen(false);
     }
   }, [open]);
 
-  const selectedIds = React.useMemo(() => new Set(selected.map((u) => u.id)), [selected]);
+  const selectedIds = React.useMemo(
+    () => new Set(selected.map((u) => u.id)),
+    [selected],
+  );
 
   React.useEffect(() => {
-    if (!query.trim()) { setResults([]); setDropdownOpen(false); return; }
+    if (!query.trim()) {
+      setResults([]);
+      setDropdownOpen(false);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await usersApi.list({ search: query, user_type: 'student', limit: 10 });
+        const res = await usersApi.list({
+          search: query,
+          user_type: "student",
+          limit: 10,
+        });
         const filtered = res.data.filter(
           (u) => !selectedIds.has(u.id) && !enrolledUserIds.includes(u.id),
         );
@@ -1020,12 +1872,12 @@ export function EnrollStudentsDialog({
         setSearching(false);
       }
     }, 300);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
   function addStudent(u: UserListItem) {
     setSelected((prev) => [...prev, u]);
-    setQuery('');
+    setQuery("");
     setResults([]);
     setDropdownOpen(false);
   }
@@ -1043,7 +1895,7 @@ export function EnrollStudentsDialog({
         await enrollmentsApi.enroll({
           course_instance_id: courseInstanceId,
           user_id: student.id,
-          status: 'Enrolled',
+          status: "Enrolled",
           allow_individual: true, // Allow enrolling students outside of batch
         } satisfies EnrollStudentRequest);
       } catch {
@@ -1058,23 +1910,23 @@ export function EnrollStudentsDialog({
         onSuccess();
         onOpenChange(false);
         // import toast lazily to avoid circular deps — use dynamic import
-        (await import('@/lib/hooks/use-toast')).toast.warning(
+        (await import("@/lib/hooks/use-toast")).toast.warning(
           `${succeeded} student(s) enrolled`,
-          `Failed to enroll: ${errors.join(', ')}`,
+          `Failed to enroll: ${errors.join(", ")}`,
         );
       } else {
         // all failed
-        (await import('@/lib/hooks/use-toast')).toast.error(
-          'Enrollment failed',
-          `Could not enroll: ${errors.join(', ')}`,
+        (await import("@/lib/hooks/use-toast")).toast.error(
+          "Enrollment failed",
+          `Could not enroll: ${errors.join(", ")}`,
         );
       }
     } else {
       onSuccess();
       onOpenChange(false);
-      (await import('@/lib/hooks/use-toast')).toast.success(
+      (await import("@/lib/hooks/use-toast")).toast.success(
         `${selected.length} student(s) enrolled`,
-        'Students have been added to this course instance.',
+        "Students have been added to this course instance.",
       );
     }
   }
@@ -1088,14 +1940,18 @@ export function EnrollStudentsDialog({
             Enroll Students
           </SideDialogTitle>
           <SideDialogDescription>
-            Search for students and add them individually to this course instance.
+            Search for students and add them individually to this course
+            instance.
           </SideDialogDescription>
         </SideDialogHeader>
 
         <div className="flex flex-col gap-4 flex-1 overflow-y-auto">
-
           {/* ── Search input ── */}
-          <SectionHeader icon={<Search className="h-3 w-3" />} label="Find Students" variant="primary" />
+          <SectionHeader
+            icon={<Search className="h-3 w-3" />}
+            label="Find Students"
+            variant="primary"
+          />
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
@@ -1126,8 +1982,12 @@ export function EnrollStudentsDialog({
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-sm">{u.full_name || u.email}</p>
-                      <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                      <p className="font-medium truncate text-sm">
+                        {u.full_name || u.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {u.email}
+                      </p>
                     </div>
                     {u.student_id && (
                       <span className="text-xs text-muted-foreground shrink-0 font-mono">
@@ -1138,9 +1998,14 @@ export function EnrollStudentsDialog({
                 ))}
               </div>
             )}
-            {!searching && query.trim() && results.length === 0 && !dropdownOpen && (
-              <p className="mt-2 text-xs text-muted-foreground">No students found matching &ldquo;{query}&rdquo;.</p>
-            )}
+            {!searching &&
+              query.trim() &&
+              results.length === 0 &&
+              !dropdownOpen && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No students found matching &ldquo;{query}&rdquo;.
+                </p>
+              )}
           </div>
 
           {/* ── Selected students ── */}
@@ -1153,15 +2018,22 @@ export function EnrollStudentsDialog({
               />
               <div className="rounded-lg border border-border overflow-hidden divide-y divide-border">
                 {selected.map((u) => (
-                  <div key={u.id} className="flex items-center gap-3 px-3 py-2.5">
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-3 px-3 py-2.5"
+                  >
                     <Avatar className="h-8 w-8 shrink-0">
                       <AvatarFallback className="bg-success/10 text-success text-xs">
                         {getEnrollInitials(u.full_name, u.email)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{u.full_name || u.email}</p>
-                      <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                      <p className="font-medium text-sm truncate">
+                        {u.full_name || u.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {u.email}
+                      </p>
                     </div>
                     {u.student_id && (
                       <span className="text-xs text-muted-foreground font-mono shrink-0">
@@ -1183,7 +2055,12 @@ export function EnrollStudentsDialog({
         </div>
 
         <SideDialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
             Cancel
           </Button>
           <Button
@@ -1192,10 +2069,20 @@ export function EnrollStudentsDialog({
             className="gap-1.5"
             onClick={handleEnroll}
           >
-            {submitting
-              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />Enrolling…</>
-              : <><UserPlus className="h-3.5 w-3.5" />Enroll {selected.length > 0 ? `${selected.length} Student${selected.length > 1 ? 's' : ''}` : 'Students'}</>
-            }
+            {submitting ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Enrolling…
+              </>
+            ) : (
+              <>
+                <UserPlus className="h-3.5 w-3.5" />
+                Enroll{" "}
+                {selected.length > 0
+                  ? `${selected.length} Student${selected.length > 1 ? "s" : ""}`
+                  : "Students"}
+              </>
+            )}
           </Button>
         </SideDialogFooter>
       </SideDialogContent>
@@ -1219,23 +2106,25 @@ export function AddBatchToInstanceDialog({
   const [batches, setBatches] = React.useState<Batch[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [search, setSearch] = React.useState('');
-  const [selectedBatchId, setSelectedBatchId] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState("");
+  const [selectedBatchId, setSelectedBatchId] = React.useState<string | null>(
+    null,
+  );
 
   React.useEffect(() => {
     if (!open) {
-      setSearch('');
+      setSearch("");
       setSelectedBatchId(null);
       return;
     }
-    
+
     const fetchBatches = async () => {
       setLoading(true);
       try {
         const data = await batchesApi.list(false);
         setBatches(data);
       } catch (err) {
-        toast.error('Failed to load batches', handleApiError(err));
+        toast.error("Failed to load batches", handleApiError(err));
       } finally {
         setLoading(false);
       }
@@ -1246,10 +2135,7 @@ export function AddBatchToInstanceDialog({
 
   const filteredBatches = batches.filter((b) => {
     const q = search.toLowerCase();
-    return (
-      b.name.toLowerCase().includes(q) ||
-      b.code.toLowerCase().includes(q)
-    );
+    return b.name.toLowerCase().includes(q) || b.code.toLowerCase().includes(q);
   });
 
   const handleAddBatch = async () => {
@@ -1267,18 +2153,20 @@ export function AddBatchToInstanceDialog({
           enrollmentsApi.enroll({
             course_instance_id: instanceId,
             user_id: userId,
-          })
-        )
+            status: "Enrolled",
+            allow_individual: true,
+          }),
+        ),
       );
 
       toast.success(
-        'Batch added successfully',
-        `${userIds.length} students enrolled from batch`
+        "Batch added successfully",
+        `${userIds.length} students enrolled from batch`,
       );
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
-      toast.error('Failed to add batch', handleApiError(err));
+      toast.error("Failed to add batch", handleApiError(err));
     } finally {
       setSubmitting(false);
     }
@@ -1321,7 +2209,7 @@ export function AddBatchToInstanceDialog({
             <div className="py-8 text-center">
               <Users className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
               <p className="text-sm text-muted-foreground">
-                {search ? 'No batches found' : 'No batches available'}
+                {search ? "No batches found" : "No batches available"}
               </p>
             </div>
           ) : (
@@ -1333,15 +2221,17 @@ export function AddBatchToInstanceDialog({
                   onClick={() => setSelectedBatchId(batch.id)}
                   className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${
                     selectedBatchId === batch.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
                   }`}
                 >
-                  <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                    selectedBatchId === batch.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground'
-                  }`}>
+                  <div
+                    className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                      selectedBatchId === batch.id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
                     {selectedBatchId === batch.id ? (
                       <Check className="h-4 w-4" />
                     ) : (
@@ -1408,7 +2298,7 @@ export function AddIndividualStudentDialog({
   excludeUserIds?: string[];
   onSuccess?: () => void;
 }) {
-  const [query, setQuery] = React.useState('');
+  const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<UserListItem[]>([]);
   const [selected, setSelected] = React.useState<UserListItem[]>([]);
   const [searching, setSearching] = React.useState(false);
@@ -1418,7 +2308,7 @@ export function AddIndividualStudentDialog({
 
   React.useEffect(() => {
     if (!open) {
-      setQuery('');
+      setQuery("");
       setResults([]);
       setSelected([]);
       setDropdownOpen(false);
@@ -1440,7 +2330,7 @@ export function AddIndividualStudentDialog({
       try {
         const res = await usersApi.list({
           search: query,
-          user_type: 'Student',
+          user_type: "Student",
           limit: 20,
         });
         const selectedIds = selected.map((s) => s.id);
@@ -1463,7 +2353,7 @@ export function AddIndividualStudentDialog({
 
   const addStudent = (student: UserListItem) => {
     setSelected((prev) => [...prev, student]);
-    setQuery('');
+    setQuery("");
     setResults([]);
     setDropdownOpen(false);
   };
@@ -1482,20 +2372,20 @@ export function AddIndividualStudentDialog({
           enrollmentsApi.enroll({
             course_instance_id: instanceId,
             user_id: student.id,
-            status: 'Enrolled',
+            status: "Enrolled",
             allow_individual: true, // Allow enrolling students outside of batch
-          })
-        )
+          }),
+        ),
       );
 
       toast.success(
-        `${selected.length} student${selected.length > 1 ? 's' : ''} enrolled`,
-        'Students added successfully'
+        `${selected.length} student${selected.length > 1 ? "s" : ""} enrolled`,
+        "Students added successfully",
       );
       onOpenChange(false);
       onSuccess?.();
     } catch (err) {
-      toast.error('Failed to enroll students', handleApiError(err));
+      toast.error("Failed to enroll students", handleApiError(err));
     } finally {
       setSubmitting(false);
     }
@@ -1505,9 +2395,9 @@ export function AddIndividualStudentDialog({
     const src = name || email;
     return src
       .split(/[.\-_\s@]/)
-      .map((p) => p[0]?.toUpperCase() ?? '')
+      .map((p) => p[0]?.toUpperCase() ?? "")
       .slice(0, 2)
-      .join('');
+      .join("");
   }
 
   return (
@@ -1577,11 +2467,14 @@ export function AddIndividualStudentDialog({
               </div>
             )}
 
-            {!searching && query.trim() && results.length === 0 && !dropdownOpen && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                No students found matching &ldquo;{query}&rdquo;.
-              </p>
-            )}
+            {!searching &&
+              query.trim() &&
+              results.length === 0 &&
+              !dropdownOpen && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No students found matching &ldquo;{query}&rdquo;.
+                </p>
+              )}
           </div>
 
           {/* Selected Students */}
@@ -1594,7 +2487,10 @@ export function AddIndividualStudentDialog({
               />
               <div className="rounded-lg border border-border overflow-hidden divide-y divide-border max-h-[300px] overflow-y-auto">
                 {selected.map((u) => (
-                  <div key={u.id} className="flex items-center gap-3 px-3 py-2.5">
+                  <div
+                    key={u.id}
+                    className="flex items-center gap-3 px-3 py-2.5"
+                  >
                     <Avatar className="h-8 w-8 shrink-0">
                       <AvatarFallback className="bg-success/10 text-success text-xs">
                         {getEnrollInitials(u.full_name, u.email)}
@@ -1650,7 +2546,10 @@ export function AddIndividualStudentDialog({
             ) : (
               <>
                 <UserPlus className="h-3.5 w-3.5" />
-                Enroll {selected.length > 0 ? `${selected.length} Student${selected.length > 1 ? 's' : ''}` : 'Students'}
+                Enroll{" "}
+                {selected.length > 0
+                  ? `${selected.length} Student${selected.length > 1 ? "s" : ""}`
+                  : "Students"}
               </>
             )}
           </Button>
