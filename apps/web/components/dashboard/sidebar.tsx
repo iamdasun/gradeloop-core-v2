@@ -32,6 +32,7 @@ import {
   Menu,
   UserCog,
   Key,
+  Mic2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -117,6 +118,20 @@ const instructorNavItems: NavItem[] = [
     icon: BookOpen,
   },
   {
+    title: "Assessments",
+    href: "/instructor/assessments",
+    icon: FileText,
+    subItems: [
+      { title: "Assignments", href: "/instructor/assessments", icon: FileText },
+      { title: "Viva Dashboard", href: "/instructor/assessments/dashboard", icon: Mic2 },
+    ],
+  },
+  {
+    title: "Students",
+    href: "/instructor/students",
+    icon: GraduationCap,
+  },
+  {
     title: "Settings",
     href: "/instructor/settings",
     icon: Settings,
@@ -139,6 +154,11 @@ const studentNavItems: NavItem[] = [
     title: "Submissions",
     href: "/student/submissions",
     icon: ClipboardList,
+  },
+  {
+    title: "Viva Assessments",
+    href: "/student/assessments/my-sessions",
+    icon: Mic2,
   },
 ];
 
@@ -173,11 +193,11 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
   const displayName = user?.full_name || user?.email || "—";
   const initials = user?.full_name
     ? user.full_name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase()
     : user?.email?.slice(0, 2).toUpperCase() || "??";
 
   // Determine active primary item
