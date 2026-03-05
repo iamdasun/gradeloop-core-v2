@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select';
 import {
   courseInstancesApi,
+  courseInstructorsApi,
   semestersApi,
   batchesApi,
   enrollmentsApi,
@@ -518,6 +519,33 @@ export function CreateCourseInstanceDialog({
     setSubmitting(true);
     try {
       const instance = await courseInstancesApi.create(req);
+
+      // Assign lead instructor
+      if (leadInstructor) {
+        try {
+          await courseInstructorsApi.assign({
+            course_instance_id: instance.id,
+            user_id: leadInstructor.id,
+            role: 'Lead Instructor',
+          });
+        } catch (err) {
+          console.error('Failed to assign lead instructor:', err);
+        }
+      }
+
+      // Assign teaching assistants
+      for (const ta of tas) {
+        try {
+          await courseInstructorsApi.assign({
+            course_instance_id: instance.id,
+            user_id: ta.id,
+            role: 'Teaching Assistant',
+          });
+        } catch (err) {
+          console.error('Failed to assign teaching assistant:', err);
+        }
+      }
+
       toast.success('Instance created', 'Course instance has been scheduled.');
       onOpenChange(false);
       onSuccess(instance);

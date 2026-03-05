@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/gradeloop/academic-service/internal/client"
@@ -12,7 +13,7 @@ import (
 )
 
 // InstructorHandler handles instructor-scoped HTTP requests.
-// These endpoints are accessible to employees, admins, and super admins.
+// These endpoints are accessible to instructors, admins, and super admins.
 type InstructorHandler struct {
 	courseInstructorService service.CourseInstructorService
 	enrollmentService       service.EnrollmentService
