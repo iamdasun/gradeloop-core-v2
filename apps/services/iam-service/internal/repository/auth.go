@@ -41,12 +41,10 @@ func (r *authRepository) GetUserByEmail(ctx context.Context, email string) (*dto
 			users.email,
 			users.full_name,
 			users.password_hash,
-			users.role_id,
-			roles.name as role_name,
+			users.user_type,
 			users.is_active,
 			users.is_password_reset_required
 		`).
-		Joins("LEFT JOIN roles ON roles.id = users.role_id AND roles.deleted_at IS NULL").
 		Where("users.email = ? AND users.deleted_at IS NULL", email).
 		First(&user)
 
@@ -56,21 +54,6 @@ func (r *authRepository) GetUserByEmail(ctx context.Context, email string) (*dto
 		}
 		return nil, query.Error
 	}
-
-	// Fetch permissions
-	var permissions []string
-	permQuery := r.db.WithContext(ctx).
-		Table("permissions").
-		Joins("INNER JOIN role_permissions ON role_permissions.permission_id = permissions.id").
-		Joins("INNER JOIN roles ON roles.id = role_permissions.role_id").
-		Where("roles.id = ? AND permissions.deleted_at IS NULL", user.RoleID).
-		Pluck("permissions.name", &permissions)
-
-	if permQuery.Error != nil {
-		return nil, permQuery.Error
-	}
-
-	user.Permissions = permissions
 
 	return &user, nil
 }

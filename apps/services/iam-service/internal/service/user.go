@@ -16,13 +16,13 @@ import (
 )
 
 var (
-	ErrEmailTaken   = errors.New("email already exists")
-	ErrRoleNotFound = errors.New("role not found")
+	ErrEmailTaken        = errors.New("email already exists")
+	ErrInvalidUserType   = errors.New("invalid user type")
 )
 
 type UserService interface {
-	CreateUser(ctx context.Context, req *dto.CreateUserRequest, actorPermissions []string) (*dto.CreateUserResponse, error)
-	GetUsers(ctx context.Context, page, limit int, userType string, roleID string, search string) (*dto.GetUsersResponse, error)
+	CreateUser(ctx context.Context, req *dto.CreateUserRequest, actorUserType string) (*dto.CreateUserResponse, error)
+	GetUsers(ctx context.Context, page, limit int, userType string, search string) (*dto.GetUsersResponse, error)
 	UpdateUser(ctx context.Context, id string, req *dto.UpdateUserRequest) (*dto.UpdateUserResponse, error)
 	DeleteUser(ctx context.Context, id string) error
 	RestoreUser(ctx context.Context, id string) error

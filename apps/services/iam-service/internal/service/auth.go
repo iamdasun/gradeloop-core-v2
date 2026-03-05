@@ -30,7 +30,7 @@ type AuthService interface {
 	Login(ctx context.Context, email, password string) (*dto.LoginResponse, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*dto.RefreshTokenResponse, error)
 	Logout(ctx context.Context, refreshToken string) error
-	RevokeUserSessions(ctx context.Context, userID uuid.UUID, actorPermissions []string) (*dto.RevokeUserSessionsResponse, error)
+	RevokeUserSessions(ctx context.Context, userID uuid.UUID, actorUserType string) (*dto.RevokeUserSessionsResponse, error)
 }
 
 type authService struct {
@@ -89,8 +89,7 @@ func (s *authService) Login(ctx context.Context, email, password string) (*dto.L
 		user.ID,
 		user.Email,
 		user.FullName,
-		user.RoleName,
-		user.Permissions,
+		user.UserType,
 		s.secretKey,
 		15*time.Minute,
 	)
@@ -169,8 +168,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*d
 		user.ID,
 		user.Email,
 		user.FullName,
-		user.RoleName,
-		user.Permissions,
+		user.UserType,
 		s.secretKey,
 		15*time.Minute,
 	)
@@ -230,12 +228,10 @@ func (s *authService) getUserByID(ctx context.Context, userID uuid.UUID) (*dto.U
 			users.email,
 			users.full_name,
 			users.password_hash,
-			users.role_id,
-			roles.name as role_name,
+			users.user_type,
 			users.is_active,
 			users.is_password_reset_required
 		`).
-		Joins("LEFT JOIN roles ON roles.id = users.role_id AND roles.deleted_at IS NULL").
 		Where("users.id = ? AND users.deleted_at IS NULL", userID).
 		First(&user)
 
@@ -246,34 +242,12 @@ func (s *authService) getUserByID(ctx context.Context, userID uuid.UUID) (*dto.U
 		return nil, query.Error
 	}
 
-	// Fetch permissions
-	var permissions []string
-	permQuery := s.db.WithContext(ctx).
-		Table("permissions").
-		Joins("INNER JOIN role_permissions ON role_permissions.permission_id = permissions.id").
-		Joins("INNER JOIN roles ON roles.id = role_permissions.role_id").
-		Where("roles.id = ? AND permissions.deleted_at IS NULL", user.RoleID).
-		Pluck("permissions.name", &permissions)
-
-	if permQuery.Error != nil {
-		return nil, permQuery.Error
-	}
-
-	user.Permissions = permissions
-
 	return &user, nil
 }
 
-func (s *authService) RevokeUserSessions(ctx context.Context, userID uuid.UUID, actorPermissions []string) (*dto.RevokeUserSessionsResponse, error) {
-	// Check if actor has permission to manage user sessions
-	hasPermission := false
-	for _, perm := range actorPermissions {
-		if perm == "users:write" || perm == "users:delete" {
-			hasPermission = true
-			break
-		}
-	}
-	if !hasPermission {
+func (s *authService) RevokeUserSessions(ctx context.Context, userID uuid.UUID, actorUserType string) (*dto.RevokeUserSessionsResponse, error) {
+	// Check if actor has permission to manage user sessions (only admin and super_admin)
+	if actorUserType != "admin" && actorUserType != "super_admin" {
 		return nil, ErrUnauthorized
 	}
 

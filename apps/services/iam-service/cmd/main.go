@@ -66,8 +66,6 @@ func run() error {
 
 	authRepo := repository.NewAuthRepository(db.DB)
 	userRepo := repository.NewUserRepository(db.DB)
-	roleRepo := repository.NewRoleRepository(db.DB)
-	permissionRepo := repository.NewPermissionRepository(db.DB)
 
 	baseService := service.NewBaseService(db.DB)
 	defer baseService.Close()
@@ -109,21 +107,11 @@ func run() error {
 		cfg.FrontendURL,
 	)
 
-	roleService := service.NewRoleService(
-		db.DB,
-		roleRepo,
-		permissionRepo,
-	)
 
-	permissionService := service.NewPermissionService(
-		db.DB,
-		permissionRepo,
-	)
 
 	bulkImportService := service.NewBulkImportService(
 		db.DB,
 		userRepo,
-		roleRepo,
 		userService,
 	)
 
@@ -149,8 +137,6 @@ func run() error {
 		cfg.JWT.CookieSameSite,
 	)
 	userHandler := handler.NewUserHandler(userService, minioStorage)
-	roleHandler := handler.NewRoleHandler(roleService)
-	permissionHandler := handler.NewPermissionHandler(permissionService)
 	bulkImportHandler := handler.NewBulkImportHandler(bulkImportService)
 
 	app := fiber.New(fiber.Config{
@@ -171,8 +157,6 @@ func run() error {
 		HealthHandler:     healthHandler,
 		AuthHandler:       authHandler,
 		UserHandler:       userHandler,
-		RoleHandler:       roleHandler,
-		PermissionHandler: permissionHandler,
 		BulkImportHandler: bulkImportHandler,
 		JWTSecretKey:      []byte(cfg.JWT.SecretKey),
 	})

@@ -25,21 +25,19 @@ type BulkImportService interface {
 type bulkImportService struct {
 	db          *gorm.DB
 	userRepo    repository.UserRepository
-	roleRepo    repository.RoleRepository
 	userService UserService
 }
 
-func NewBulkImportService(db *gorm.DB, userRepo repository.UserRepository, roleRepo repository.RoleRepository, userService UserService) BulkImportService {
+func NewBulkImportService(db *gorm.DB, userRepo repository.UserRepository, userService UserService) BulkImportService {
 	return &bulkImportService{
 		db:          db,
 		userRepo:    userRepo,
-		roleRepo:    roleRepo,
 		userService: userService,
 	}
 }
 
 func (s *bulkImportService) GenerateTemplate(format string) ([]byte, string, error) {
-	headers := []string{"Full Name", "Email", "Role", "User Type", "Department", "Faculty", "Student ID", "Designation"}
+	headers := []string{"Full Name", "Email", "User Type", "Department", "Faculty", "Student ID", "Designation"}
 
 	if format == "csv" {
 		var b strings.Builder
@@ -188,15 +186,12 @@ func (s *bulkImportService) ExecuteImport(ctx context.Context, reader io.Reader,
 	successCount := 0
 	totalProcessed := 0
 
-	// Fetch all roles for mapping name to ID
-	roles, err := s.roleRepo.GetAllRoles(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("fetching roles: %w", err)
-	}
-
-	roleMap := make(map[string]uuid.UUID)
-	for _, r := range roles {
-		roleMap[strings.ToLower(r.Name)] = r.ID
+	// Valid user types for validation
+	validUserTypes := map[string]bool{
+		"student":     true,
+		"instructor":  true,
+		"admin":       true,
+		"super_admin": true,
 	}
 
 	processRow := func(rowIndex int, row []string, headers []string) {

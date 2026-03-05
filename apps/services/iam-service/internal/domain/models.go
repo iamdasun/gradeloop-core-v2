@@ -7,24 +7,20 @@ import (
 	"gorm.io/gorm"
 )
 
-type Role struct {
-	ID           uuid.UUID      `gorm:"type:uuid;primarykey" json:"id"`
-	Name         string         `gorm:"uniqueIndex;not null;size:100" json:"name"`
-	UserType     string         `gorm:"not null;default:'all';size:10" json:"user_type"`
-	IsSystemRole bool           `gorm:"not null;default:false" json:"is_system_role"`
-	Permissions  []Permission   `gorm:"many2many:role_permissions;" json:"permissions,omitempty"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
-}
+// UserType constants
+const (
+	UserTypeStudent    = "student"
+	UserTypeInstructor = "instructor"
+	UserTypeAdmin      = "admin"
+	UserTypeSuperAdmin = "super_admin"
+)
 
-type Permission struct {
-	ID          uuid.UUID      `gorm:"type:uuid;primarykey" json:"id"`
-	Name        string         `gorm:"uniqueIndex;not null;size:100" json:"name"`
-	Description string         `gorm:"size:500" json:"description"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+// Valid user types
+var ValidUserTypes = []string{
+	UserTypeStudent,
+	UserTypeInstructor,
+	UserTypeAdmin,
+	UserTypeSuperAdmin,
 }
 
 type User struct {
@@ -35,8 +31,7 @@ type User struct {
 	Faculty                 string         `gorm:"size:255" json:"faculty"`
 	Department              string         `gorm:"size:255" json:"department"`
 	PasswordHash            string         `gorm:"size:255" json:"-"`
-	RoleID                  *uuid.UUID     `gorm:"type:uuid;index" json:"role_id"`
-	Role                    *Role          `gorm:"foreignKey:RoleID" json:"role,omitempty"`
+	UserType                string         `gorm:"not null;size:20;index" json:"user_type"`
 	IsActive                bool           `gorm:"not null;default:true" json:"is_active"`
 	IsPasswordResetRequired bool           `gorm:"not null;default:false" json:"is_password_reset_required"`
 	EmailVerified           bool           `gorm:"not null;default:false" json:"email_verified"`
@@ -52,7 +47,7 @@ type UserProfileStudent struct {
 	User      User      `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"user,omitempty"`
 }
 
-type UserProfileEmployee struct {
+type UserProfileInstructor struct {
 	UserID      uuid.UUID `gorm:"type:uuid;primaryKey" json:"user_id"`
 	Designation string    `gorm:"not null;size:100" json:"designation"`
 	User        User      `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE" json:"user,omitempty"`
@@ -76,4 +71,36 @@ type PasswordResetToken struct {
 	ExpiresAt time.Time  `gorm:"not null;index" json:"expires_at"`
 	UsedAt    *time.Time `gorm:"index" json:"used_at,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
+}
+
+// User helper methods
+
+// IsValidUserType checks if the given user type is valid
+func IsValidUserType(userType string) bool {
+	for _, validType := range ValidUserTypes {
+		if validType == userType {
+			return true
+		}
+	}
+	return false
+}
+
+// HasAdminAccess returns true if the user has admin or super_admin access
+func (u *User) HasAdminAccess() bool {
+	return u.UserType == UserTypeAdmin || u.UserType == UserTypeSuperAdmin
+}
+
+// IsSuperAdmin returns true if the user is a super admin
+func (u *User) IsSuperAdmin() bool {
+	return u.UserType == UserTypeSuperAdmin
+}
+
+// IsStudent returns true if the user is a student
+func (u *User) IsStudent() bool {
+	return u.UserType == UserTypeStudent
+}
+
+// IsInstructor returns true if the user is an instructor
+func (u *User) IsInstructor() bool {
+	return u.UserType == UserTypeInstructor
 }

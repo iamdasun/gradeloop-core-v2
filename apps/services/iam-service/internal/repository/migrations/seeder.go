@@ -24,154 +24,11 @@ func NewSeeder(db *gorm.DB, logger *zap.Logger) *Seeder {
 }
 
 func (s *Seeder) Seed() error {
-	if err := s.seedRoles(); err != nil {
-		return fmt.Errorf("seeding roles: %w", err)
-	}
-
-	if err := s.seedPermissions(); err != nil {
-		return fmt.Errorf("seeding permissions: %w", err)
-	}
-
-	if err := s.seedRolePermissions(); err != nil {
-		return fmt.Errorf("seeding role_permissions: %w", err)
-	}
-
 	if err := s.seedSuperAdmin(); err != nil {
 		return fmt.Errorf("seeding super_admin: %w", err)
 	}
 
 	s.logger.Info("database seeding completed successfully")
-	return nil
-}
-
-func (s *Seeder) seedRoles() error {
-	roles := []struct {
-		Name         string
-		UserType     string
-		IsSystemRole bool
-	}{
-		{Name: "super_admin", UserType: "all", IsSystemRole: true},
-		{Name: "admin", UserType: "all", IsSystemRole: true},
-		{Name: "employee", UserType: "employee", IsSystemRole: true},
-		{Name: "student", UserType: "student", IsSystemRole: true},
-	}
-
-	for _, roleData := range roles {
-		var role domain.Role
-		result := s.db.Where(domain.Role{Name: roleData.Name}).
-			Attrs(domain.Role{
-				ID:           uuid.New(),
-				UserType:     roleData.UserType,
-				IsSystemRole: roleData.IsSystemRole,
-			}).
-			FirstOrCreate(&role)
-
-		if result.Error != nil {
-			return result.Error
-		}
-
-		// If role already exists but doesn't have user_type set, update it
-		if result.RowsAffected == 0 && (role.UserType == "" || role.UserType != roleData.UserType) {
-			if err := s.db.Model(&role).Update("user_type", roleData.UserType).Error; err != nil {
-				s.logger.Error("failed to update role user_type",
-					zap.String("role", roleData.Name),
-					zap.Error(err))
-				return err
-			}
-			s.logger.Info("updated existing role with user_type",
-				zap.String("role", roleData.Name),
-				zap.String("user_type", roleData.UserType))
-		}
-	}
-
-	return nil
-}
-
-func (s *Seeder) seedPermissions() error {
-	permissions := []domain.Permission{
-		{Name: "users:read", Description: "View user information"},
-		{Name: "users:write", Description: "Create and update users"},
-		{Name: "users:delete", Description: "Delete users"},
-		{Name: "roles:read", Description: "View roles"},
-		{Name: "roles:write", Description: "Create and update roles"},
-		{Name: "roles:delete", Description: "Delete roles"},
-		{Name: "permissions:read", Description: "View permissions"},
-		{Name: "permissions:write", Description: "Manage permissions"},
-		{Name: "students:read", Description: "View student profiles"},
-		{Name: "students:write", Description: "Manage student profiles"},
-		{Name: "employees:read", Description: "View employee profiles"},
-		{Name: "employees:write", Description: "Manage employee profiles"},
-		// Instructor-scoped permissions
-		{Name: "courses:read", Description: "View assigned courses and course instances"},
-		{Name: "assignments:read", Description: "View assignments for assigned courses"},
-		{Name: "submissions:read", Description: "View submissions for assigned courses"},
-	}
-
-	for _, permData := range permissions {
-		var perm domain.Permission
-		if err := s.db.Where(domain.Permission{Name: permData.Name}).
-			Attrs(domain.Permission{ID: uuid.New(), Description: permData.Description}).
-			FirstOrCreate(&perm).Error; err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *Seeder) seedRolePermissions() error {
-	// ── Super Admin: gets ALL permissions ────────────────────────────────────
-	var superAdminRole domain.Role
-	if err := s.db.Where("name = ?", "super_admin").First(&superAdminRole).Error; err != nil {
-		return err
-	}
-
-	var allPermissions []domain.Permission
-	if err := s.db.Find(&allPermissions).Error; err != nil {
-		return err
-	}
-
-	type RolePermission struct {
-		RoleID       uuid.UUID `gorm:"type:uuid;primaryKey"`
-		PermissionID uuid.UUID `gorm:"type:uuid;primaryKey"`
-	}
-
-	for _, perm := range allPermissions {
-		rp := RolePermission{
-			RoleID:       superAdminRole.ID,
-			PermissionID: perm.ID,
-		}
-		if err := s.db.FirstOrCreate(&rp).Error; err != nil {
-			return err
-		}
-	}
-
-	// ── Employee: instructor-scoped permissions ──────────────────────────────
-	var employeeRole domain.Role
-	if err := s.db.Where("name = ?", "employee").First(&employeeRole).Error; err != nil {
-		s.logger.Warn("employee role not found, skipping employee permissions")
-		return nil
-	}
-
-	employeePermNames := []string{"courses:read", "students:read", "assignments:read", "submissions:read"}
-	var employeePerms []domain.Permission
-	if err := s.db.Where("name IN ?", employeePermNames).Find(&employeePerms).Error; err != nil {
-		return err
-	}
-
-	for _, perm := range employeePerms {
-		rp := RolePermission{
-			RoleID:       employeeRole.ID,
-			PermissionID: perm.ID,
-		}
-		if err := s.db.FirstOrCreate(&rp).Error; err != nil {
-			return err
-		}
-	}
-
-	s.logger.Info("assigned instructor permissions to employee role",
-		zap.Int("count", len(employeePerms)))
-
 	return nil
 }
 
@@ -189,11 +46,6 @@ func (s *Seeder) seedSuperAdmin() error {
 		return fmt.Errorf("password cannot be a default value")
 	}
 
-	var superAdminRole domain.Role
-	if err := s.db.Where("name = ?", "super_admin").First(&superAdminRole).Error; err != nil {
-		return err
-	}
-
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("hashing password: %w", err)
@@ -201,22 +53,20 @@ func (s *Seeder) seedSuperAdmin() error {
 
 	var existingUser domain.User
 	if err := s.db.Where("email = ?", email).First(&existingUser).Error; err == nil {
-		// User exists, update password and ensure it's active
+		// User exists, update password and ensure it's active with super_admin user_type
 		updates := map[string]interface{}{
 			"password_hash":              string(hashedPassword),
 			"is_active":                  true,
 			"is_password_reset_required": false,
-			"role_id":                    superAdminRole.ID,
+			"user_type":                  "super_admin",
 			"email":                      email,
 		}
-
-		// Update email to match the email
-		updates["email"] = email
 
 		if err := s.db.Model(&existingUser).Updates(updates).Error; err != nil {
 			return fmt.Errorf("updating super admin user: %w", err)
 		}
 
+		s.logger.Info("updated existing super admin user", zap.String("email", email))
 		return nil
 	} else if err != gorm.ErrRecordNotFound {
 		return fmt.Errorf("checking for existing user: %w", err)
@@ -228,7 +78,7 @@ func (s *Seeder) seedSuperAdmin() error {
 		Email:                   email,
 		FullName:                "Super Admin",
 		PasswordHash:            string(hashedPassword),
-		RoleID:                  &superAdminRole.ID,
+		UserType:                "super_admin",
 		IsActive:                true,
 		IsPasswordResetRequired: false,
 	}
@@ -237,5 +87,6 @@ func (s *Seeder) seedSuperAdmin() error {
 		return fmt.Errorf("creating super admin user: %w", err)
 	}
 
+	s.logger.Info("created super admin user", zap.String("email", email))
 	return nil
 }

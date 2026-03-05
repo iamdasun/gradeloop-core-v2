@@ -24,11 +24,9 @@ func (m *Migrator) Run() error {
 	m.logger.Info("running database migrations")
 
 	err := m.db.AutoMigrate(
-		&domain.Role{},
-		&domain.Permission{},
 		&domain.User{},
 		&domain.UserProfileStudent{},
-		&domain.UserProfileEmployee{},
+		&domain.UserProfileInstructor{},
 		&domain.RefreshToken{},
 		&domain.PasswordResetToken{},
 	)
@@ -37,7 +35,7 @@ func (m *Migrator) Run() error {
 	}
 
 	// Run custom migrations
-	if err := m.migrateRoleUserType(); err != nil {
+	if err := m.migrateUsersToUserType(); err != nil {
 		return fmt.Errorf("user_type migration failed: %w", err)
 	}
 
@@ -45,63 +43,74 @@ func (m *Migrator) Run() error {
 	return nil
 }
 
-func (m *Migrator) migrateRoleUserType() error {
-	m.logger.Info("migrating existing roles to add user_type")
+func (m *Migrator) migrateUsersToUserType() error {
+	m.logger.Info("migrating existing users to user_type system")
 
-	// Check if user_type column exists
-	if !m.db.Migrator().HasColumn(&domain.Role{}, "user_type") {
-		m.logger.Info("user_type column does not exist, will be created by AutoMigrate")
+	// Check if user_type column exists on users table
+	if !m.db.Migrator().HasColumn(&domain.User{}, "user_type") {
+		m.logger.Info("user_type column does not exist on users table, will be created by AutoMigrate")
 		return nil
 	}
 
-	// Update existing roles with user_type based on their names
-	type roleUpdate struct {
-		Name     string
-		UserType string
-	}
+	// Check if role_id column still exists (for migration from old system)
+	if m.db.Migrator().HasColumn(&domain.User{}, "role_id") {
+		m.logger.Info("migrating users from role_id to user_type")
 
-	updates := []roleUpdate{
-		{Name: "super_admin", UserType: "all"},
-		{Name: "admin", UserType: "all"},
-		{Name: "employee", UserType: "employee"},
-		{Name: "student", UserType: "student"},
-	}
+		// Update users based on their role names if roles table still exists
+		if m.db.Migrator().HasTable("roles") {
+			// Map role names to user types
+			updateQueries := []struct{
+				RoleName string
+				UserType string
+			}{
+				{"super_admin", "super_admin"},
+				{"admin", "admin"},
+				{"employee", "instructor"},
+				{"student", "student"},
+			}
 
-	for _, update := range updates {
-		result := m.db.Model(&domain.Role{}).
-			Where("name = ? AND (user_type = '' OR user_type IS NULL)", update.Name).
-			Update("user_type", update.UserType)
+			for _, update := range updateQueries {
+				result := m.db.Exec(`
+					UPDATE users 
+					SET user_type = ? 
+					WHERE role_id IN (
+						SELECT id FROM roles WHERE name = ?
+					) AND (user_type IS NULL OR user_type = '')
+				`, update.UserType, update.RoleName)
+
+				if result.Error != nil {
+					m.logger.Error("failed to update user user_type",
+						zap.String("role", update.RoleName),
+						zap.String("user_type", update.UserType),
+						zap.Error(result.Error))
+					return result.Error
+				}
+
+				if result.RowsAffected > 0 {
+					m.logger.Info("migrated users to user_type",
+						zap.String("role", update.RoleName),
+						zap.String("user_type", update.UserType),
+						zap.Int64("users_updated", result.RowsAffected))
+				}
+			}
+		}
+
+		// Set any remaining users without user_type to 'student' as default
+		result := m.db.Model(&domain.User{}).
+			Where("user_type IS NULL OR user_type = ''").
+			Update("user_type", "student")
 
 		if result.Error != nil {
-			m.logger.Error("failed to update role user_type",
-				zap.String("role", update.Name),
-				zap.Error(result.Error))
 			return result.Error
 		}
 
 		if result.RowsAffected > 0 {
-			m.logger.Info("updated role user_type",
-				zap.String("role", update.Name),
-				zap.String("user_type", update.UserType),
-				zap.Int64("rows_affected", result.RowsAffected))
+			m.logger.Info("set default user_type for remaining users",
+				zap.Int64("users_updated", result.RowsAffected))
 		}
 	}
 
-	// Set any remaining roles without user_type to 'all'
-	result := m.db.Model(&domain.Role{}).
-		Where("user_type = '' OR user_type IS NULL").
-		Update("user_type", "all")
-
-	if result.Error != nil {
-		return result.Error
-	}
-
-	if result.RowsAffected > 0 {
-		m.logger.Info("set default user_type for remaining roles",
-			zap.Int64("rows_affected", result.RowsAffected))
-	}
-
-	m.logger.Info("role user_type migration completed")
+	m.logger.Info("user type migration completed")
 	return nil
 }
 
@@ -111,12 +120,12 @@ func (m *Migrator) Rollback() error {
 	err := m.db.Migrator().DropTable(
 		&domain.RefreshToken{},
 		&domain.PasswordResetToken{},
-		"role_permissions", // many2many table name
-		&domain.UserProfileEmployee{},
+		"role_permissions", // legacy many2many table name
+		&domain.UserProfileInstructor{},
 		&domain.UserProfileStudent{},
 		&domain.User{},
-		&domain.Permission{},
-		&domain.Role{},
+		"permissions", // legacy permissions table
+		"roles", // legacy roles table
 	)
 	if err != nil {
 		return fmt.Errorf("rollback failed: %w", err)
