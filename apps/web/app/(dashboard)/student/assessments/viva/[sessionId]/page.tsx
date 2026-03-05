@@ -13,6 +13,8 @@ import {
     BarChart3,
     CornerDownRight,
     Info,
+    Mic,
+    Square,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ivasApi } from "@/lib/ivas-api";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { motion, AnimatePresence } from "framer-motion";
 import type {
     ChatMessage,
     QuestionWithContext,
@@ -186,6 +189,115 @@ export default function VivaSessionPage() {
     const [inputValue, setInputValue] = React.useState("");
     const [abandonConfirm, setAbandonConfirm] = React.useState(false);
     const [abandoning, setAbandoning] = React.useState(false);
+
+    // Keep reference to the active websocket
+    const wsRef = React.useRef<WebSocket | null>(null);
+
+    // Web Speech API hook logic
+    const [isRecording, setIsRecording] = React.useState(false);
+    const [recordingTime, setRecordingTime] = React.useState(0);
+    const [interimTranscript, setInterimTranscript] = React.useState("");
+    const recognitionRef = React.useRef<any>(null);
+    const recordingIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    // Stop recording timer when component unmounts
+    React.useEffect(() => {
+        return () => {
+            if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+            if (recognitionRef.current) recognitionRef.current.stop();
+        };
+    }, []);
+
+    const startRecording = () => {
+        // Stop any ongoing TTS audio
+        document.querySelectorAll('audio').forEach(audio => {
+            audio.pause();
+            audio.currentTime = 0;
+        });
+
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            addMessage({ role: "system", content: "Error: Your browser does not support the Web Speech API. Please use Chrome or Edge." });
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        let finalTranscript = '';
+
+        recognition.onstart = () => {
+            setIsRecording(true);
+            setRecordingTime(0);
+            recordingIntervalRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+        };
+
+        recognition.onresult = (event: any) => {
+            let interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interim += event.results[i][0].transcript;
+                }
+            }
+            setInterimTranscript(interim || finalTranscript);
+        };
+
+        recognition.onerror = (event: any) => {
+            if (event.error === 'no-speech') {
+                // If the user stops speaking for a while, just stop recording and submit what we have implicitly
+                if (finalTranscript.trim()) {
+                    handleSubmit(finalTranscript.trim());
+                }
+            } else if (event.error !== 'aborted') {
+                addMessage({ role: "system", content: `Speech recognition error: ${event.error}` });
+            }
+            stopRecording(false);
+        };
+
+        recognition.onend = () => {
+            if (finalTranscript.trim()) {
+                // Submit the transcribed text
+                handleSubmit(finalTranscript.trim());
+            }
+            stopRecording(false); // Make sure state is reset without double-submitting
+            setInterimTranscript("");
+        };
+
+        recognitionRef.current = recognition;
+        try {
+            recognition.start();
+        } catch (e) {
+            console.error("Could not start recognition:", e);
+        }
+    };
+
+    const stopRecording = (shouldSubmit: boolean = true) => {
+        setIsRecording(false);
+        if (recordingIntervalRef.current) {
+            clearInterval(recordingIntervalRef.current);
+            recordingIntervalRef.current = null;
+        }
+        if (recognitionRef.current) {
+            // Stop speech recognition (this will trigger onend event, which handles submission if shouldSubmit is implicitly handled there. 
+            // In continuous mode, calling stop() finalizes the current speech and triggers onend)
+            try {
+                // Prevent the onend from double firing if we manually cancelled it or if we don't want it to submit empty
+                if (!shouldSubmit) {
+                    recognitionRef.current.onend = null;
+                }
+                recognitionRef.current.stop();
+            } catch (e) {
+                // Ignore
+            }
+            recognitionRef.current = null;
+        }
+    };
 
     const bottomRef = React.useRef<HTMLDivElement>(null);
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -366,73 +478,207 @@ export default function VivaSessionPage() {
         // If session exists but no messages (shouldn't happen normally)
     }, [sessionId, initializing, session, messages.length, user?.id]);
 
-    const handleSubmit = async () => {
-        if (!inputValue.trim() || !currentQuestion || sending || isComplete) return;
+    // --- Voice WebSocket Connection ---
+    React.useEffect(() => {
+        if (!user?.id || !sessionId || sessionId === "new" || isComplete || initializing) return;
 
-        const responseText = inputValue.trim();
-        setInputValue("");
+        const baseUrl = process.env.NEXT_PUBLIC_IVAS_API_URL || "https://ivas.sudila.com";
+        const wsBaseUrl = baseUrl.replace(/^http/, "ws");
+        const wsUrl = `${wsBaseUrl}/api/v1/assessments/sessions/${encodeURIComponent(sessionId)}/voice`;
+
+        let ws: WebSocket | null = null;
+
+        const connect = () => {
+            ws = new WebSocket(wsUrl);
+            wsRef.current = ws;
+
+            ws.onopen = () => {
+                console.log("Voice WebSocket connected");
+                // On open, optionally tell the backend we are here for this question (if supported check first)
+                if (currentQuestion?.question_instance_id) {
+                    ws?.send(JSON.stringify({
+                        type: 'start_session',
+                        question_instance_id: currentQuestion.question_instance_id,
+                        question_text: currentQuestion.question_text,
+                    }));
+                }
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    // Try to parse as JSON first (based on the sample)
+                    const msg = JSON.parse(event.data);
+
+                    // Route WebSocket actions matching the HTML test logic
+                    if (msg.type === "instructor_response") {
+                        addMessage({ role: "system", content: "Instructor: " + msg.message });
+                        if (msg.audio_b64) playBase64Audio(msg.audio_b64, true);
+                        setSending(false);
+                    } else if (msg.type === "evaluation") {
+                        addMessage({
+                            role: "assistant",
+                            content: msg.feedback || "Evaluation complete",
+                            metadata: {
+                                isFeedback: true,
+                                score: msg.score ?? undefined,
+                                misconceptions: msg.misconceptions ?? undefined,
+                            },
+                        });
+                        if (msg.audio_b64) playBase64Audio(msg.audio_b64, true);
+                    } else if (msg.type === "next_question") {
+                        setCurrentQuestion({
+                            ...msg,
+                            question_text: msg.question_text,
+                            question_instance_id: msg.question_instance_id,
+                            is_follow_up: msg.is_follow_up
+                        } as any);
+
+                        addMessage({
+                            role: "assistant",
+                            content: msg.question_text,
+                            metadata: {
+                                questionType: msg.is_follow_up ? "follow_up" : "new",
+                            },
+                        });
+                        if (msg.audio_b64) playBase64Audio(msg.audio_b64);
+                        setSending(false);
+                    } else if (msg.type === "session_complete") {
+                        setIsComplete(true);
+                        setFinalData({
+                            final_score: msg.final_score,
+                            max_score: msg.max_score,
+                            competency_summary: msg.competency_summary,
+                        });
+                        if (msg.message) addMessage({ role: "system", content: msg.message });
+                        if (msg.audio_b64) playBase64Audio(msg.audio_b64, true);
+                        setCurrentQuestion(null);
+                        setSending(false);
+                    } else if (msg.type === "error") {
+                        addMessage({ role: "system", content: `Error: ${msg.message}` });
+                        setSending(false);
+                    }
+
+                    // Fallbacks for direct audio property payload
+                    if (msg.audio) {
+                        playBase64Audio(msg.audio);
+                    } else if (msg.audioContent) {
+                        playBase64Audio(msg.audioContent);
+                    }
+                } catch {
+                    // Not JSON, assume raw base64 string
+                    if (typeof event.data === "string" && event.data.length > 20) {
+                        playBase64Audio(event.data);
+                    }
+                }
+            };
+
+            // --- Voice Audio Playback Logic from Test ---
+            const audioQueue: string[] = [];
+            let isPlaying = false;
+
+            const playNextInQueue = () => {
+                if (audioQueue.length === 0) {
+                    isPlaying = false;
+                    return;
+                }
+                isPlaying = true;
+                const url = audioQueue.shift()!;
+                const audio = new window.Audio(url);
+                audio.onended = () => {
+                    URL.revokeObjectURL(url);
+                    playNextInQueue();
+                };
+                audio.onerror = (e) => {
+                    console.error("Error playing audio", e);
+                    URL.revokeObjectURL(url);
+                    playNextInQueue();
+                };
+                audio.play().catch(e => {
+                    console.warn("Audio autoplay blocked by browser or failed", e);
+                    isPlaying = false;
+                });
+            };
+
+            const playBase64Audio = (base64Data: string, cancelPrevious = false) => {
+                try {
+                    if (!base64Data) return;
+
+                    if (cancelPrevious) {
+                        audioQueue.length = 0; // Clear array
+                        document.querySelectorAll('audio').forEach(audio => {
+                            audio.pause();
+                            audio.currentTime = 0;
+                        });
+                        isPlaying = false;
+                    }
+
+                    // Convert base64 to blob URL
+                    const binaryString = atob(base64Data);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    const blob = new Blob([bytes], { type: 'audio/mp3' });
+                    const url = URL.createObjectURL(blob);
+
+                    audioQueue.push(url);
+                    if (!isPlaying) {
+                        playNextInQueue();
+                    }
+                } catch (err) {
+                    console.error("Error queueing audio data", err);
+                }
+            };
+
+            ws.onerror = (err) => {
+                console.error("Voice WebSocket error", err);
+            };
+
+            ws.onclose = () => {
+                console.log("Voice WebSocket closed");
+                if (wsRef.current === ws) wsRef.current = null;
+            };
+        };
+
+        connect();
+
+        return () => {
+            if (ws) {
+                ws.close();
+            }
+        };
+    }, [sessionId, isComplete, initializing, user?.id]);
+
+    const handleSubmit = async (transcribedText?: string) => {
+        if ((!inputValue.trim() && !transcribedText) || !currentQuestion || sending || isComplete) return;
+
+        let responseText = transcribedText || inputValue.trim();
+        let audioBase64: string | undefined = undefined;
+
         setSending(true);
 
         // Optimistically add user message
         addMessage({ role: "user", content: responseText });
 
         try {
-            const result = await ivasApi.submitResponse(sessionId, {
-                question_instance_id: currentQuestion.question_instance_id,
-                response_text: responseText,
-            });
+            // If the WebSocket is alive, send over WebSocket exactly as the HTML test does
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({
+                    type: 'message',
+                    question_instance_id: currentQuestion.question_instance_id,
+                    text: responseText,
+                }));
 
-            // Add feedback message
-            if (result.feedback_text) {
-                addMessage({
-                    role: "assistant",
-                    content: result.feedback_text,
-                    metadata: {
-                        isFeedback: true,
-                        score: result.evaluation_score ?? undefined,
-                        misconceptions: result.detected_misconceptions ?? undefined,
-                    },
-                });
-            }
-
-            // System message if present
-            if (result.message) {
-                addMessage({ role: "system", content: result.message });
-            }
-
-            if (result.is_complete) {
-                setIsComplete(true);
-                setFinalData({
-                    final_score: result.final_score,
-                    max_score: result.max_score,
-                    competency_summary: result.competency_summary,
-                });
-                setCurrentQuestion(null);
-            } else if (result.next_question) {
-                setCurrentQuestion(result.next_question);
-                addMessage({
-                    role: "assistant",
-                    content: result.next_question.question_text,
-                    metadata: {
-                        competency: result.next_question.competency,
-                        difficulty: result.next_question.difficulty,
-                        questionType: result.next_question.question_type,
-                    },
-                });
+                // Do NOT set sending(false) here. We will organically clear sending=false when 'evaluation' or 'error' comes back from WS
+            } else {
+                addMessage({ role: "system", content: "Error: WebSocket stream is disconnected. Please refresh the page." });
+                setSending(false);
             }
         } catch (err) {
-            const message =
-                err instanceof Error ? err.message : "Failed to submit response.";
-            if (message.toLowerCase().includes("already")) {
-                addMessage({ role: "system", content: "Response already submitted." });
-            } else if (message.toLowerCase().includes("not active") || message.toLowerCase().includes("400")) {
-                addMessage({ role: "system", content: "Session has ended." });
-                setIsComplete(true);
-            } else {
-                addMessage({ role: "system", content: `Error: ${message}` });
-            }
-        } finally {
+            const message = err instanceof Error ? err.message : "Failed to submit response.";
+            addMessage({ role: "system", content: `Error: ${message}` });
             setSending(false);
+        } finally {
             textareaRef.current?.focus();
         }
     };
@@ -615,28 +861,131 @@ export default function VivaSessionPage() {
                     </div>
                 ) : (
                     <div className="flex gap-3 items-end">
-                        <Textarea
-                            ref={textareaRef}
-                            rows={3}
-                            placeholder="Type your answer… (Enter to send, Shift+Enter for new line)"
-                            className="flex-1 resize-none"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            disabled={sending || isComplete}
-                        />
-                        <Button
-                            size="icon"
-                            className="h-[72px] w-12 shrink-0"
-                            onClick={handleSubmit}
-                            disabled={!inputValue.trim() || sending || isComplete}
-                        >
-                            {sending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                        <AnimatePresence mode="popLayout">
+                            {isRecording ? (
+                                <motion.div
+                                    key="recording"
+                                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, scale: 0.95, filter: "blur(4px)" }}
+                                    transition={{ duration: 0.3, ease: "easeOut" }}
+                                    className="flex-1 flex flex-col gap-2 relative bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/40 dark:to-emerald-900/10 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-4 overflow-hidden shadow-inner"
+                                >
+                                    {/* Pulsating background circles for "live" feel */}
+                                    <motion.div
+                                        animate={{ scale: [1, 1.05, 1], opacity: [0.1, 0.2, 0.1] }}
+                                        transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                                        className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl pointer-events-none"
+                                    />
+                                    <motion.div
+                                        animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.15, 0.1] }}
+                                        transition={{ repeat: Infinity, duration: 3, ease: "easeInOut", delay: 0.5 }}
+                                        className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-teal-500/20 blur-2xl pointer-events-none"
+                                    />
+
+                                    <div className="flex items-center justify-between relative z-10 w-full">
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+                                                <motion.span
+                                                    animate={{ scale: [1, 1.5, 1] }}
+                                                    transition={{ repeat: Infinity, duration: 1.5 }}
+                                                    className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
+                                                />
+                                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                            </div>
+                                            <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-sm">
+                                                Listening...
+                                            </span>
+                                            <span className="text-emerald-600/70 dark:text-emerald-500/70 font-mono text-xs ml-1">
+                                                {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                                            </span>
+                                        </div>
+
+                                        <Button
+                                            size="sm"
+                                            onClick={() => stopRecording(true)}
+                                            className="shrink-0 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 px-4"
+                                        >
+                                            <Square className="h-3.5 w-3.5 mr-2 fill-current" />
+                                            Submit
+                                        </Button>
+                                    </div>
+
+                                    <div className="relative z-10 mt-2 h-[48px] overflow-hidden flex items-start">
+                                        <p className="text-emerald-800 dark:text-emerald-200 text-sm font-medium leading-relaxed italic opacity-80 line-clamp-2">
+                                            {interimTranscript || "Speak now..."}
+                                        </p>
+                                    </div>
+                                </motion.div>
                             ) : (
-                                <Send className="h-4 w-4" />
+                                <motion.div
+                                    key="textarea"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.98 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="flex-1"
+                                >
+                                    <Textarea
+                                        ref={textareaRef}
+                                        rows={3}
+                                        placeholder="Type your answer or use the microphone… (Enter to send, Shift+Enter for new line)"
+                                        className="w-full resize-none rounded-2xl bg-muted/30 focus-visible:bg-background transition-colors border-border/50 text-base py-3 px-4 shadow-sm"
+                                        value={inputValue}
+                                        onChange={(e) => setInputValue(e.target.value)}
+                                        onKeyDown={handleKeyDown}
+                                        disabled={sending || isComplete}
+                                    />
+                                </motion.div>
                             )}
-                        </Button>
+                        </AnimatePresence>
+
+                        <div className="flex flex-col gap-2 shrink-0 h-[76px] justify-end pb-1">
+                            {inputValue.trim() ? (
+                                <Button
+                                    size="icon"
+                                    className="h-full w-12"
+                                    onClick={() => handleSubmit()}
+                                    disabled={sending || isComplete}
+                                >
+                                    {sending ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Send className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            ) : (
+                                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="h-full">
+                                    <Button
+                                        size="icon"
+                                        variant={isRecording ? "destructive" : "default"}
+                                        className={cn(
+                                            "h-12 w-12 rounded-full shadow-lg transition-all",
+                                            isRecording
+                                                ? "bg-red-500 hover:bg-red-600 shadow-red-500/25"
+                                                : "bg-primary hover:bg-primary/90 shadow-primary/25"
+                                        )}
+                                        onClick={() => {
+                                            if (isRecording) {
+                                                stopRecording(true);
+                                            } else {
+                                                startRecording();
+                                            }
+                                        }}
+                                        disabled={sending || isComplete}
+                                        title={isRecording ? "Stop Recording" : "Start Voice Recording"}
+                                    >
+                                        {sending ? (
+                                            <Loader2 className="h-5 w-5 animate-spin text-white" />
+                                        ) : isRecording ? (
+                                            <Square className="h-5 w-5 fill-current text-white" />
+                                        ) : (
+                                            <Mic className="h-5 w-5 text-white" />
+                                        )}
+                                    </Button>
+                                </motion.div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
