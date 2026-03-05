@@ -16,8 +16,17 @@ import type {
 // ── Instructor-scoped Assessment endpoints ───────────────────────────────────
 
 export const instructorAssessmentsApi = {
-    listMyAssignments: async (): Promise<AssignmentResponse[]> => {
-        const { data } = await axiosInstance.get<ListAssignmentsResponse>('/instructor-assignments/me');
+    /**
+     * List assignments created by the instructor.
+     * Optionally filter by course_instance_id.
+     * Backend: GET /instructor-assignments/me?course_instance_id=:id (optional)
+     */
+    listMyAssignments: async (courseInstanceId?: string): Promise<AssignmentResponse[]> => {
+        const params = courseInstanceId ? { course_instance_id: courseInstanceId } : {};
+        const { data } = await axiosInstance.get<ListAssignmentsResponse>(
+            '/instructor-assignments/me',
+            { params }
+        );
         return data.assignments || [];
     },
 

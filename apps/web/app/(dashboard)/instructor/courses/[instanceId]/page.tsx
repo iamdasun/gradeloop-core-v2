@@ -1,24 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { useParams } from "next/navigation";
-import { instructorCoursesApi, courseInstructorsApi } from "@/lib/api/academics";
-import { instructorAssessmentsApi } from "@/lib/api/assessments";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { instructorCoursesApi } from "@/lib/api/academics";
 import type { Enrollment, CourseInstructor } from "@/types/academics.types";
 import { INSTRUCTOR_ROLES } from "@/types/academics.types";
 import { handleApiError } from "@/lib/api/axios";
-import {
-    GraduationCap,
-    Users,
-    FileText,
-    Calendar,
-    AlertCircle,
-    UserPlus,
-    Trash2,
-} from "lucide-react";
+import { instructorAssessmentsApi } from "@/lib/api/assessments";
+import { courseInstructorsApi } from "@/lib/api/academics";
+import { Loader2, GraduationCap, Users, ArrowLeft, FileText, AlertCircle, Calendar, UserPlus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
     Dialog,
@@ -140,19 +136,45 @@ export default function InstructorCourseDetailsPage() {
     }
 
     return (
-        <div className="flex flex-col gap-8 pb-8">
-            <SectionHeader
-                title="Course Overview"
-                description={`${courseCode} — General stats, assigned instructors, and enrollment for this instance.`}
-                action={
-                    isLoading ? (
-                        <Skeleton className="h-6 w-16 rounded-full" />
-                    ) : (
-                        <StatusBadge status="Active" variant="default" className="text-xs px-3 py-1" />
-                    )
-                }
-            />
+        <div className="flex flex-col gap-6 p-6">
+            <div className="flex items-start gap-4 mb-6">
+        <Button
+          variant="outline"
+          className="gap-2"
+          asChild
+        >
+          <Link href={`/instructor/courses/${instanceId}/assessments`}>
+            <FileText className="h-4 w-4" />
+            View Assessments
+          </Link>
+        </Button>
+      </div>
 
+      <Tabs defaultValue="students" className="w-full">
+        <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 mb-6">
+          <TabsTrigger
+            value="students"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 pb-3 pt-2 font-semibold"
+          >
+            <GraduationCap className="h-4 w-4 mr-2" />
+            Students
+            <Badge
+              variant="secondary"
+              className="ml-2 bg-muted-foreground/15 text-muted-foreground"
+            >
+              {enrolledStudents.length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger
+            value="team"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 pb-3 pt-2 font-semibold"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Team
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="students" className="space-y-6">
             {/* KPI Stats */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <StatsCard
@@ -213,7 +235,9 @@ export default function InstructorCourseDetailsPage() {
                     </div>
                 </CardContent>
             </Card>
+        </TabsContent>
 
+        <TabsContent value="team" className="space-y-6">
             {/* Teaching Team */}
             <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
@@ -349,6 +373,9 @@ export default function InstructorCourseDetailsPage() {
                         </DialogFooter>
                     </form>
                 </DialogContent>
-            </Dialog>        </div>
+            </Dialog>
+        </TabsContent>
+      </Tabs>
+        </div>
     );
 }
