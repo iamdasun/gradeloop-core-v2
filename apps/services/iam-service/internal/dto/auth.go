@@ -28,9 +28,7 @@ type UserWithRole struct {
 	Email                   string
 	FullName                string
 	PasswordHash            string
-	RoleID                  *uuid.UUID
-	RoleName                string
-	Permissions             []string `gorm:"-"`
+	UserType                string
 	IsActive                bool
 	IsPasswordResetRequired bool
 }
@@ -40,8 +38,7 @@ type UserWithRole struct {
 type CreateUserRequest struct {
 	FullName    string `json:"full_name" validate:"required"`
 	Email       string `json:"email" validate:"required,email"`
-	RoleID      string `json:"role_id" validate:"required"`
-	UserType    string `json:"user_type" validate:"required,oneof=student employee all"`
+	UserType    string `json:"user_type" validate:"required,oneof=student instructor admin super_admin"`
 	Department  string `json:"department"`
 	Faculty     string `json:"faculty"`
 	StudentID   string `json:"student_id"`
@@ -52,7 +49,7 @@ type CreateUserResponse struct {
 	ID        uuid.UUID `json:"id"`
 	FullName  string    `json:"full_name"`
 	Email     string    `json:"email"`
-	RoleID    uuid.UUID `json:"role_id"`
+	UserType  string    `json:"user_type"`
 	IsActive  bool      `json:"is_active"`
 	ResetLink string    `json:"reset_link"`
 	Message   string    `json:"message"`

@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SelectNative } from "@/components/ui/select-native";
-import { useAdminUsersStore } from "@/lib/stores/adminUsersStore";
 import { usersApi, handleApiError } from "@/lib/api/users";
 import { toast } from "@/lib/hooks/use-toast";
 import type {
@@ -23,6 +22,7 @@ import type {
   FormErrors,
 } from "@/types/admin.types";
 import type { UserListItem } from "@/types/auth.types";
+import { USER_TYPES } from "@/types/auth.types";
 
 interface Props {
   user: UserListItem | null;
@@ -32,16 +32,14 @@ interface Props {
 }
 
 interface FormValues {
-  role_id: string;
+  user_type: string;
   is_active: boolean;
 }
 
 export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
-  const { roles, rolesLoading, rolesError, fetchRoles, refetchRoles } =
-    useAdminUsersStore();
   const [values, setValues] = React.useState<FormValues>({
     is_active: true,
-    role_id: "",
+    user_type: "student",
   });
   const [errors, setErrors] = React.useState<FormErrors>({});
   const [submitting, setSubmitting] = React.useState(false);
@@ -51,17 +49,13 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
     if (user && open) {
       setValues({
         is_active: user.is_active,
-        role_id: user.role_id ?? "",
+        user_type: user.user_type || "student",
       });
       setErrors({});
-      fetchRoles();
     }
-  }, [user, open, fetchRoles]);
+  }, [user, open]);
 
   // User type is tied to the role, so any role can be selected.
-  const selectedRole = roles.find((r) => r.id === values.role_id);
-  const displayUserType = selectedRole?.user_type || user?.user_type || "—";
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
@@ -70,27 +64,21 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
     try {
       const payload: UpdateUserRequest = {
         is_active: values.is_active,
+        user_type: values.user_type,
       };
-      // Only include role_id if it changed
-      if (values.role_id && values.role_id !== user.role_id) {
-        payload.role_id = values.role_id;
-      }
 
       const updated: UpdateUserResponse = await usersApi.update(
         user.id,
         payload,
       );
 
-      // Merge response with original user to produce a full UserListItem
-      const resolvedRoleId = updated.role_id ?? values.role_id ?? user.role_id;
+      // Merge response with original user
       const finalUser: UserListItem = {
         ...user,
         id: updated.id,
         email: updated.email,
-        role_id: resolvedRoleId,
+        user_type: updated.user_type || values.user_type,
         is_active: updated.is_active,
-        role_name:
-          roles.find((r) => r.id === resolvedRoleId)?.name ?? user.role_name,
       };
 
       toast.success(
@@ -141,47 +129,28 @@ export function EditUserDialog({ user, open, onOpenChange, onSuccess }: Props) {
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500">User Type</span>
               <span className="font-medium capitalize">
-                {displayUserType}
+                {user.user_type}
               </span>
             </div>
           </div>
 
-          {/* Role */}
+          {/* User Type */}
           <div className="space-y-1.5">
-            <Label htmlFor="eu-role">Role</Label>
+            <Label htmlFor="eu-user-type">User Type</Label>
             <SelectNative
-              id="eu-role"
-              value={values.role_id}
+              id="eu-user-type"
+              value={values.user_type}
               onChange={(e) =>
-                setValues((v) => ({ ...v, role_id: e.target.value }))
+                setValues((v) => ({ ...v, user_type: e.target.value }))
               }
-              disabled={submitting || rolesLoading}
-              title={
-                rolesError ? `Roles unavailable: ${rolesError}` : undefined
-              }
+              disabled={submitting}
             >
-              <option value="">
-                {rolesLoading
-                  ? "Loading…"
-                  : rolesError
-                    ? "Roles unavailable"
-                    : "Select role"}
-              </option>
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
+              {USER_TYPES.map((type) => (
+                <option key={type} value={type} className="capitalize">
+                  {type.replace('_', ' ')}
                 </option>
               ))}
             </SelectNative>
-            {rolesError && (
-              <button
-                type="button"
-                className="text-xs text-red-500 hover:underline"
-                onClick={() => refetchRoles()}
-              >
-                Retry loading roles
-              </button>
-            )}
           </div>
 
           {/* Active status */}

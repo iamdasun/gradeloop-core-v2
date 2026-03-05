@@ -15,12 +15,11 @@ type UserRepository interface {
 	UpdateUser(ctx context.Context, user *domain.User) error
 	SoftDeleteUser(ctx context.Context, userID uuid.UUID) error
 	RestoreUser(ctx context.Context, userID uuid.UUID) error
-	GetUsers(ctx context.Context, offset, limit int, userType string, roleID string, search string) ([]*domain.User, error)
-	CountUsers(ctx context.Context, userType string, roleID string, search string) (int64, error)
+	GetUsers(ctx context.Context, offset, limit int, userType string, search string) ([]*domain.User, error)
+	CountUsers(ctx context.Context, userType string, search string) (int64, error)
 	GetUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]*domain.User, error)
-	RoleExists(ctx context.Context, roleID uuid.UUID) (bool, error)
 	CreateStudentProfile(ctx context.Context, profile *domain.UserProfileStudent) error
-	CreateEmployeeProfile(ctx context.Context, profile *domain.UserProfileEmployee) error
+	CreateInstructorProfile(ctx context.Context, profile *domain.UserProfileInstructor) error
 }
 
 type userRepository struct {
@@ -39,15 +38,14 @@ func (r *userRepository) CreateStudentProfile(ctx context.Context, profile *doma
 	return r.db.WithContext(ctx).Create(profile).Error
 }
 
-func (r *userRepository) CreateEmployeeProfile(ctx context.Context, profile *domain.UserProfileEmployee) error {
+func (r *userRepository) CreateInstructorProfile(ctx context.Context, profile *domain.UserProfileInstructor) error {
 	return r.db.WithContext(ctx).Create(profile).Error
 }
 
 func (r *userRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*domain.User, error) {
 	var user domain.User
 
-	query := r.db.WithContext(ctx).
-		Preload("Role")
+	query := r.db.WithContext(ctx)
 
 	// Dynamic profile preloading would be nice, but for now let's just use it in GetUsers
 	// or we can add it here if needed.
@@ -66,7 +64,6 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (*dom
 	var user domain.User
 
 	query := r.db.WithContext(ctx).
-		Preload("Role").
 		Where("email = ? AND deleted_at IS NULL", email).
 		First(&user)
 
@@ -119,87 +116,54 @@ func (r *userRepository) RestoreUser(ctx context.Context, userID uuid.UUID) erro
 		Update("deleted_at", nil).Error
 }
 
-func (r *userRepository) GetUsers(ctx context.Context, offset, limit int, userType string, roleID string, search string) ([]*domain.User, error) {
+func (r *userRepository) GetUsers(ctx context.Context, offset, limit int, userType string, search string) ([]*domain.User, error) {
 	var users []*domain.User
 
-	db := r.db.WithContext(ctx).Preload("Role")
+	db := r.db.WithContext(ctx)
 
-	if userType == "student" {
-		db = db.Joins("INNER JOIN user_profile_students ON user_profile_students.user_id = users.id")
-	} else if userType == "employee" {
-		db = db.Joins("INNER JOIN user_profile_employees ON user_profile_employees.user_id = users.id")
-	}
-
-	if roleID != "" {
-		db = db.Where("users.role_id = ?", roleID)
+	// Apply filters
+	if userType != "" {
+		db = db.Where("users.user_type = ?", userType)
 	}
 
 	if search != "" {
-		s := "%" + search + "%"
-		db = db.Where("users.email ILIKE ? OR users.full_name ILIKE ?", s, s)
-
-		// Prioritize exact matches
-		db = db.Order(gorm.Expr("CASE WHEN users.email = ? OR users.full_name = ? THEN 0 ELSE 1 END", search, search))
+		searchPattern := "%" + search + "%"
+		db = db.Where("users.full_name ILIKE ? OR users.email ILIKE ?", searchPattern, searchPattern)
 	}
 
-	db = db.Order("users.created_at DESC")
+	err := db.Where("users.deleted_at IS NULL").
+		Order("users.created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&users).Error
 
-	query := db.Limit(limit).Offset(offset).Find(&users)
-
-	if query.Error != nil {
-		return nil, query.Error
-	}
-
-	return users, nil
+	return users, err
 }
 
-func (r *userRepository) CountUsers(ctx context.Context, userType string, roleID string, search string) (int64, error) {
+func (r *userRepository) CountUsers(ctx context.Context, userType string, search string) (int64, error) {
 	var count int64
 	db := r.db.WithContext(ctx).Model(&domain.User{})
 
-	if userType == "student" {
-		db = db.Joins("INNER JOIN user_profile_students ON user_profile_students.user_id = users.id")
-	} else if userType == "employee" {
-		db = db.Joins("INNER JOIN user_profile_employees ON user_profile_employees.user_id = users.id")
-	}
-
-	if roleID != "" {
-		db = db.Where("users.role_id = ?", roleID)
+	// Apply filters
+	if userType != "" {
+		db = db.Where("users.user_type = ?", userType)
 	}
 
 	if search != "" {
-		s := "%" + search + "%"
-		db = db.Where("users.email ILIKE ? OR users.full_name ILIKE ?", s, s)
+		searchPattern := "%" + search + "%"
+		db = db.Where("users.full_name ILIKE ? OR users.email ILIKE ?", searchPattern, searchPattern)
 	}
 
-	if err := db.Count(&count).Error; err != nil {
-		return 0, err
-	}
-	return count, nil
+	err := db.Where("users.deleted_at IS NULL").Count(&count).Error
+	return count, err
 }
 
 func (r *userRepository) GetUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]*domain.User, error) {
 	var users []*domain.User
 	if err := r.db.WithContext(ctx).
-		Preload("Role").
 		Where("id IN ? AND deleted_at IS NULL", ids).
 		Find(&users).Error; err != nil {
 		return nil, err
 	}
 	return users, nil
-}
-
-func (r *userRepository) RoleExists(ctx context.Context, roleID uuid.UUID) (bool, error) {
-	var count int64
-
-	query := r.db.WithContext(ctx).
-		Model(&domain.Role{}).
-		Where("id = ? AND deleted_at IS NULL", roleID).
-		Count(&count)
-
-	if query.Error != nil {
-		return false, query.Error
-	}
-
-	return count > 0, nil
 }

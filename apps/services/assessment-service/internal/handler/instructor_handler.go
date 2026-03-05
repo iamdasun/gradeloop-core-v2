@@ -80,7 +80,7 @@ func (h *InstructorHandler) instructorCourseIDs(c fiber.Ctx) (map[uuid.UUID]bool
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GetMyAssignments lists all assignments across the instructor's assigned
-// course instances.
+// course instances. Optionally filter by ?course_instance_id=uuid.
 func (h *InstructorHandler) GetMyAssignments(c fiber.Ctx) error {
 	courseIDs, err := h.instructorCourseIDs(c)
 	if err != nil {
@@ -89,8 +89,28 @@ func (h *InstructorHandler) GetMyAssignments(c fiber.Ctx) error {
 
 	userID := requireUserID(c)
 
+	// Optional filter by course_instance_id query parameter
+	filterCourseID := c.Query("course_instance_id")
+	var targetCourseIDs map[uuid.UUID]bool
+
+	if filterCourseID != "" {
+		filterID, err := uuid.Parse(filterCourseID)
+		if err != nil {
+			return utils.ErrBadRequest("invalid course_instance_id format")
+		}
+		// Verify instructor is assigned to this course instance
+		if !courseIDs[filterID] {
+			return utils.ErrForbidden("you are not assigned to this course instance")
+		}
+		// Only query this one course instance
+		targetCourseIDs = map[uuid.UUID]bool{filterID: true}
+	} else {
+		// Query all assigned course instances
+		targetCourseIDs = courseIDs
+	}
+
 	var allAssignments []dto.AssignmentResponse
-	for ciID := range courseIDs {
+	for ciID := range targetCourseIDs {
 		assignments, err := h.assignmentService.ListAssignmentsByCourseInstance(ciID)
 		if err != nil {
 			h.logger.Warn("failed to list assignments for course instance",

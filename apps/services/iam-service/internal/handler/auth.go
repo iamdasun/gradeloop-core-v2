@@ -201,13 +201,13 @@ func (h *AuthHandler) RevokeUserSessions(c fiber.Ctx) error {
 		return fiber.ErrBadRequest
 	}
 
-	// Get actor permissions from context
-	permissions, ok := c.Locals("permissions").([]string)
-	if !ok || permissions == nil {
+	// Get actor user type from context
+	userType, ok := c.Locals("user_type").(string)
+	if !ok || userType == "" {
 		return fiber.NewError(fiber.StatusForbidden, "Permission denied")
 	}
 
-	response, err := h.authService.RevokeUserSessions(c.RequestCtx(), userID, permissions)
+	response, err := h.authService.RevokeUserSessions(c.RequestCtx(), userID, userType)
 	if err != nil {
 		return handleAuthError(err)
 	}

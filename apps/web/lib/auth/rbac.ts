@@ -1,23 +1,18 @@
 /**
- * Standalone RBAC helpers.
+ * Standalone user type helpers.
  *
- * Work directly with the flat role_name / permissions data from JWT claims.
+ * Work directly with the user_type data from JWT claims.
  * Safe to use outside React (middleware, server utilities, etc.).
  */
 
 // ---------------------------------------------------------------------------
-// Role → dashboard route mapping
+// User type → dashboard route mapping
 // ---------------------------------------------------------------------------
-export const ROLE_DASHBOARD_MAP: Record<string, string> = {
+export const USER_TYPE_DASHBOARD_MAP: Record<string, string> = {
   super_admin: '/admin',
   admin: '/admin',
-  administrator: '/admin',
-  superadmin: '/admin',
-  employee: '/admin',
   instructor: '/instructor',
-  teacher: '/instructor',
   student: '/student',
-  learner: '/student',
 };
 
 // ---------------------------------------------------------------------------
@@ -25,24 +20,29 @@ export const ROLE_DASHBOARD_MAP: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the default dashboard path for the user's role.
+ * Returns the default dashboard path for the user's type.
  * Falls back to '/admin' when no mapping exists.
  */
-export function getRoleDashboard(roleName: string): string {
-  return ROLE_DASHBOARD_MAP[roleName.toLowerCase()] ?? '/admin';
+export function getUserTypeDashboard(userType: string): string {
+  return USER_TYPE_DASHBOARD_MAP[userType.toLowerCase()] ?? '/admin';
 }
 
-/** Returns true when `roleName` matches the user's assigned role. */
-export function hasRoleIn(userRoleName: string, roleName: string): boolean {
-  return userRoleName.toLowerCase() === roleName.toLowerCase();
+/** Returns true when `userType` matches the user's assigned type. */
+export function hasUserType(userUserType: string, checkType: string): boolean {
+  return userUserType.toLowerCase() === checkType.toLowerCase();
 }
 
-/**
- * Returns true when `permissionName` is in the user's flat permissions list.
- */
-export function hasPermissionIn(
-  permissions: string[],
-  permissionName: string,
-): boolean {
-  return permissions.includes(permissionName);
+/** Returns true when user has admin access (admin or super_admin). */
+export function hasAdminAccess(userType: string): boolean {
+  return userType === 'admin' || userType === 'super_admin';
+}
+
+/** Returns true when user is super admin. */
+export function isSuperAdmin(userType: string): boolean {
+  return userType === 'super_admin';
+}
+
+/** Returns true when user has instructor access (instructor, admin, or super_admin). */
+export function hasInstructorAccess(userType: string): boolean {
+  return userType === 'instructor' || hasAdminAccess(userType);
 }

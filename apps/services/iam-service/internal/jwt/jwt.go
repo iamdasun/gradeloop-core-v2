@@ -18,11 +18,10 @@ var (
 )
 
 type Claims struct {
-	UserID      uuid.UUID `json:"user_id"`
-	Email       string    `json:"email"`
-	RoleName    string    `json:"role_name"`
-	FullName    string    `json:"full_name"`
-	Permissions []string  `json:"permissions"`
+	UserID   uuid.UUID `json:"user_id"`
+	Email    string    `json:"email"`
+	UserType string    `json:"user_type"`
+	FullName string    `json:"full_name"`
 	jwt.RegisteredClaims
 }
 
@@ -46,7 +45,7 @@ func NewJWT(secretKey string, accessTokenExpiryMinutes, refreshTokenExpiryDays i
 	}
 }
 
-func GenerateAccessToken(userID uuid.UUID, email, fullName, roleName string, permissions []string, secretKey []byte, expiry time.Duration) (string, time.Time, error) {
+func GenerateAccessToken(userID uuid.UUID, email, fullName, userType string, secretKey []byte, expiry time.Duration) (string, time.Time, error) {
 	if len(secretKey) == 0 {
 		return "", time.Time{}, errors.New("secret key cannot be empty")
 	}
@@ -54,11 +53,10 @@ func GenerateAccessToken(userID uuid.UUID, email, fullName, roleName string, per
 	expiresAt := time.Now().Add(expiry)
 
 	claims := Claims{
-		UserID:      userID,
-		Email:       email,
-		FullName:    fullName,
-		RoleName:    roleName,
-		Permissions: permissions,
+		UserID:   userID,
+		Email:    email,
+		FullName: fullName,
+		UserType: userType,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -125,13 +123,12 @@ func HashToken(token string) string {
 	return base64.URLEncoding.EncodeToString(hash[:])
 }
 
-func (j *JWT) GenerateTokenPair(userID uuid.UUID, email, fullName, roleName string, permissions []string) (*TokenPair, error) {
+func (j *JWT) GenerateTokenPair(userID uuid.UUID, email, fullName, userType string) (*TokenPair, error) {
 	accessToken, expiresAt, err := GenerateAccessToken(
 		userID,
 		email,
 		fullName,
-		roleName,
-		permissions,
+		userType,
 		j.secretKey,
 		j.accessTokenExpiry,
 	)

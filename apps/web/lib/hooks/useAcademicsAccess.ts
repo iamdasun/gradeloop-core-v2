@@ -1,13 +1,13 @@
 /**
  * useAcademicsAccess
  *
- * Derives academics RBAC from the JWT role_name stored in authStore.
- * The academic-service backend uses role-based checks (not permission strings):
+ * Derives academics access from the JWT user_type stored in authStore.
+ * The academic-service backend uses user type checks:
  *   - super_admin  → full access (including faculties management)
  *   - admin        → departments, degrees, courses read + write
  *
- * Permission gating strategy: role + action level (Option B).
- * The role_name comes from the decoded JWT, so no extra API round-trip needed.
+ * Permission gating strategy: user type + action level.
+ * The user_type comes from the decoded JWT, so no extra API round-trip needed.
  */
 import { useAuthStore } from '@/lib/stores/authStore';
 
@@ -20,16 +20,11 @@ export interface AcademicsAccess {
   isSuperAdmin: boolean;
 }
 
-function normaliseRole(raw: string): string {
-  return raw.toLowerCase().trim().replace(/\s+/g, '_');
-}
-
 export function useAcademicsAccess(): AcademicsAccess {
-  const roleName = useAuthStore((s) => s.user?.role_name ?? '');
-  const n = normaliseRole(roleName);
+  const userType = useAuthStore((s) => s.user?.user_type ?? '');
 
-  const isSuperAdmin = n === 'super_admin';
-  const isAdmin = isSuperAdmin || n === 'admin';
+  const isSuperAdmin = userType === 'super_admin';
+  const isAdmin = isSuperAdmin || userType === 'admin';
 
   return {
     canAccess: isAdmin,

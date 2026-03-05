@@ -4,18 +4,13 @@ import type { User } from "@/types/auth.types";
 import { decodeJwtPayload } from "@/lib/auth/jwt-decode";
 
 // ---------------------------------------------------------------------------
-// Role → dashboard path map
+// User type → dashboard path map
 // ---------------------------------------------------------------------------
-const ROLE_DASHBOARD_MAP: Record<string, string> = {
+const USER_TYPE_DASHBOARD_MAP: Record<string, string> = {
   super_admin: "/admin",
   admin: "/admin",
-  administrator: "/admin",
-  superadmin: "/admin",
-  employee: "/instructor",
   instructor: "/instructor",
-  teacher: "/instructor",
   student: "/student",
-  learner: "/student",
 };
 
 // ---------------------------------------------------------------------------
@@ -52,9 +47,12 @@ interface AuthState {
   hydrateSession: () => Promise<void>;
 
   // ---- RBAC helpers ------------------------------------------------------
-  hasRole: (roleName: string) => boolean;
-  hasPermission: (permissionName: string) => boolean;
-  /** Returns the default dashboard path for the user's role. */
+  hasUserType: (userType: string) => boolean;
+  hasAdminAccess: () => boolean;
+  isSuperAdmin: () => boolean;
+  isInstructor: () => boolean;
+  isStudent: () => boolean;
+  /** Returns the default dashboard path for the user's type. */
   getRedirectPath: () => string;
 }
 
@@ -80,8 +78,7 @@ export const useAuthStore = create<AuthState>()(
           id: claims.user_id,
           email: claims.email,
           full_name: claims.full_name,
-          role_name: claims.role_name ?? "",
-          permissions: claims.permissions ?? [],
+          user_type: claims.user_type ?? "student",
         };
         set({ accessToken: token, user, isAuthenticated: true });
       },
@@ -97,8 +94,7 @@ export const useAuthStore = create<AuthState>()(
           id: claims.user_id,
           email: claims.email,
           full_name: claims.full_name,
-          role_name: claims.role_name ?? "",
-          permissions: claims.permissions ?? [],
+          user_type: claims.user_type ?? "student",
         };
         set({
           accessToken: token,
@@ -154,8 +150,7 @@ export const useAuthStore = create<AuthState>()(
             id: claims.user_id,
             email: claims.email,
             full_name: claims.full_name,
-            role_name: claims.role_name ?? "",
-            permissions: claims.permissions ?? [],
+            user_type: claims.user_type ?? "student",
           };
 
           set({ accessToken: newToken, user, isAuthenticated: true });
@@ -174,19 +169,34 @@ export const useAuthStore = create<AuthState>()(
       },
 
       // ------------------------------------------------------------------ //
-      hasRole: (roleName) => {
+      hasUserType: (userType) => {
         const u = get().user;
-        return !!u && u.role_name.toLowerCase() === roleName.toLowerCase();
+        return !!u && u.user_type.toLowerCase() === userType.toLowerCase();
       },
 
-      hasPermission: (permissionName) => {
+      hasAdminAccess: () => {
         const u = get().user;
-        return !!u && u.permissions.includes(permissionName);
+        return !!u && (u.user_type === "admin" || u.user_type === "super_admin");
+      },
+
+      isSuperAdmin: () => {
+        const u = get().user;
+        return !!u && u.user_type === "super_admin";
+      },
+
+      isInstructor: () => {
+        const u = get().user;
+        return !!u && (u.user_type === "instructor" || u.user_type === "admin" || u.user_type === "super_admin");
+      },
+
+      isStudent: () => {
+        const u = get().user;
+        return !!u && u.user_type === "student";
       },
 
       getRedirectPath: () => {
-        const roleName = get().user?.role_name?.toLowerCase() ?? "";
-        return ROLE_DASHBOARD_MAP[roleName] ?? "/admin";
+        const userType = get().user?.user_type?.toLowerCase() ?? "";
+        return USER_TYPE_DASHBOARD_MAP[userType] ?? "/admin";
       },
     }),
 

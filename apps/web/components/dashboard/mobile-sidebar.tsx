@@ -139,9 +139,9 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
 
-  const isEmployee = user?.role_name?.toLowerCase().trim() === "employee";
-  const navItems = isEmployee ? instructorNavItems : adminNavItems;
-  const homeHref = isEmployee ? "/instructor" : "/admin";
+  const isInstructor = user?.user_type?.toLowerCase().trim() === "instructor";
+  const navItems = isInstructor ? instructorNavItems : adminNavItems;
+  const homeHref = isInstructor ? "/instructor" : "/admin";
 
   const displayName = user?.full_name || user?.email || "—";
   const initials = user?.full_name
@@ -293,7 +293,7 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
             </Avatar>
             <div className="flex flex-col flex-1 overflow-hidden">
               <span className="font-semibold text-sm truncate">{displayName}</span>
-              <span className="text-xs text-muted-foreground truncate">{user?.role_name || 'Member'}</span>
+              <span className="text-xs text-muted-foreground truncate capitalize">{user?.user_type || 'Member'}</span>
             </div>
           </div>
           <Button

@@ -46,8 +46,8 @@ export function ProfileCard({ initialData }: ProfileCardProps) {
             {profile.full_name || profile.email}
           </h1>
           <p className="text-zinc-500 dark:text-zinc-400 font-medium capitalize">
-            {profile.role_name} •{" "}
-            {profile.user_type === "employee" ? profile.designation : "Student"}
+            {profile.user_type} •{" "}
+            {profile.user_type === "instructor" ? profile.designation : "Student"}
           </p>
         </div>
       </div>
@@ -77,8 +77,8 @@ export function ProfileCard({ initialData }: ProfileCardProps) {
               icon={Mail}
             />
             <ProfileField
-              label="Account Role"
-              value={profile.role_name}
+              label="Account Type"
+              value={profile.user_type}
               icon={ShieldCheck}
             />
           </div>

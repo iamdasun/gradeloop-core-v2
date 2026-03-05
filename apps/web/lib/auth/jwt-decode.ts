@@ -10,11 +10,9 @@ export interface IamTokenClaims {
   /** UUID of the authenticated user */
   user_id: string;
   email: string;
-  /** Single role name assigned to the user */
-  role_name: string;
+  /** User type: 'student', 'instructor', 'admin', or 'super_admin' */
+  user_type: string;
   full_name: string;
-  /** Flat list of permission names granted through the role */
-  permissions: string[];
   /** Expiry unix timestamp */
   exp: number;
   iat: number;

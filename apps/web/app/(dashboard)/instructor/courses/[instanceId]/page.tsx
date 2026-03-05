@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { instructorCoursesApi } from "@/lib/api/academics";
 import type { Enrollment, CourseInstructor } from "@/types/academics.types";
 import { handleApiError } from "@/lib/api/axios";
-import { Loader2, GraduationCap, Users, ArrowLeft } from "lucide-react";
+import { Loader2, GraduationCap, Users, ArrowLeft, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -114,6 +115,19 @@ export default function InstructorCourseDetailsPage() {
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="flex items-start gap-4 mb-6">
+        <Button
+          variant="outline"
+          className="gap-2"
+          asChild
+        >
+          <Link href={`/instructor/courses/${instanceId}/assessments`}>
+            <FileText className="h-4 w-4" />
+            View Assessments
+          </Link>
+        </Button>
       </div>
 
       <Tabs defaultValue="students" className="w-full">

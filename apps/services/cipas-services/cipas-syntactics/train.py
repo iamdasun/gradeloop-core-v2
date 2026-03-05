@@ -68,7 +68,9 @@ Usage:
 """
 
 import argparse
+import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -328,6 +330,186 @@ def select_best_threshold(sweep_results: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Artifact persistence — metrics JSON + visualizations
+# ---------------------------------------------------------------------------
+
+def save_training_artifacts(
+    metrics: dict,
+    sweep: list[dict],
+    classifier,
+    y_test: np.ndarray,
+    y_pred: np.ndarray,
+    y_proba: np.ndarray,
+    s_test: np.ndarray,
+    output_dir: Path | None = None,
+) -> None:
+    """
+    Persist training metrics as JSON and generate visualisation plots.
+
+    Outputs (all written to *output_dir*, default ``clone_detection/models/``):
+
+    * ``training_metrics.json``     — threshold sweep table + final metrics
+    * ``visualizations/threshold_sweep.png``       — Precision / Recall / F1 vs threshold
+    * ``visualizations/feature_importances_train.png`` — top-20 XGBoost importances
+    * ``visualizations/confusion_matrix_train.png``     — confusion matrix heatmap
+    * ``visualizations/per_source_recall.png``     — per-CSV-source recall bar chart
+
+    Args:
+        metrics:    Final metrics dict (threshold, precision, recall, f1).
+        sweep:      Full threshold-sweep table from ``threshold_sweep()``.
+        classifier: Trained ``SyntacticClassifier`` instance.
+        y_test:     Ground-truth labels for the held-out test split.
+        y_pred:     Binary predictions at the selected threshold.
+        y_proba:    XGBoost clone probabilities for the test split.
+        s_test:     Source CSV filenames for each test-split row (for per-source breakdown).
+        output_dir: Directory to write files into.  Defaults to
+                    ``clone_detection/models/`` (resolved via ``get_models_dir()``).
+    """
+    from clone_detection.utils.common_setup import get_models_dir
+
+    if output_dir is None:
+        output_dir = get_models_dir()
+    output_dir = Path(output_dir)
+    viz_dir = output_dir / "visualizations"
+    viz_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── 1. Metrics JSON ─────────────────────────────────────────────────────
+    # Serialise feature importances as plain list-of-pairs for JSON.
+    top_features = [
+        {"feature": name, "importance": round(float(imp), 6)}
+        for name, imp in classifier.get_feature_importance_sorted()[:20]
+    ]
+    metrics_payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "metrics": {k: (round(float(v), 6) if isinstance(v, float) else v) for k, v in metrics.items()},
+        "threshold_sweep": sweep,
+        "top_20_features": top_features,
+    }
+    metrics_path = output_dir / "training_metrics.json"
+    with open(metrics_path, "w", encoding="utf-8") as fh:
+        json.dump(metrics_payload, fh, indent=2, default=str)
+    logger.info(f"Training metrics JSON saved → {metrics_path}")
+
+    # ── 2. Visualizations ───────────────────────────────────────────────────
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from sklearn.metrics import confusion_matrix as sk_cm
+
+        # ── 2a. Threshold sweep ─────────────────────────────────────────────
+        thresholds = [r["threshold"] for r in sweep]
+        precisions = [r["precision"] for r in sweep]
+        recalls    = [r["recall"]    for r in sweep]
+        f1s        = [r["f1"]        for r in sweep]
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.plot(thresholds, precisions, "b-o", label="Precision", markersize=3)
+        ax.plot(thresholds, recalls,    "g-o", label="Recall",    markersize=3)
+        ax.plot(thresholds, f1s,        "r-o", label="F1",        markersize=3)
+        best_t = metrics.get("threshold", 0.5)
+        ax.axvline(x=best_t, color="purple", linestyle="--",
+                   label=f"Selected threshold ({best_t:.2f})")
+        ax.set_xlabel("Threshold")
+        ax.set_ylabel("Score")
+        ax.set_title("Threshold Sweep — Precision / Recall / F1 (Training)")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+        sweep_path = viz_dir / "threshold_sweep.png"
+        fig.savefig(sweep_path, dpi=150)
+        plt.close(fig)
+        logger.info(f"Threshold sweep plot saved       → {sweep_path}")
+
+        # ── 2b. Feature importances ─────────────────────────────────────────
+        top_feats  = classifier.get_feature_importance_sorted()[:20]
+        feat_names = [f[0].replace("feat_", "") for f in top_feats]
+        feat_vals  = [f[1] for f in top_feats]
+
+        fig, ax = plt.subplots(figsize=(10, 8))
+        bars = ax.barh(feat_names[::-1], feat_vals[::-1], color="steelblue")
+        for bar, val in zip(bars, feat_vals[::-1]):
+            ax.text(
+                bar.get_width() + 0.001, bar.get_y() + bar.get_height() / 2,
+                f"{val:.4f}", va="center", fontsize=8,
+            )
+        ax.set_xlabel("Importance")
+        ax.set_title("Top-20 Feature Importances (Training)")
+        ax.grid(axis="x", alpha=0.3)
+        fig.tight_layout()
+        fi_path = viz_dir / "feature_importances_train.png"
+        fig.savefig(fi_path, dpi=150)
+        plt.close(fig)
+        logger.info(f"Feature importance plot saved    → {fi_path}")
+
+        # ── 2c. Confusion matrix ────────────────────────────────────────────
+        cm = sk_cm(y_test, y_pred)
+        fig, ax = plt.subplots(figsize=(6, 5))
+        im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
+        plt.colorbar(im, ax=ax)
+        classes    = ["Non-Clone", "Clone"]
+        tick_marks = [0, 1]
+        ax.set_xticks(tick_marks)
+        ax.set_yticks(tick_marks)
+        ax.set_xticklabels(classes)
+        ax.set_yticklabels(classes)
+        threshold_color = cm.max() / 2.0
+        for i in range(2):
+            for j in range(2):
+                ax.text(
+                    j, i, str(cm[i, j]),
+                    ha="center", va="center",
+                    color="white" if cm[i, j] > threshold_color else "black",
+                    fontsize=14, fontweight="bold",
+                )
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("Actual")
+        ax.set_title("Confusion Matrix — Training (Test Split)")
+        fig.tight_layout()
+        cm_path = viz_dir / "confusion_matrix_train.png"
+        fig.savefig(cm_path, dpi=150)
+        plt.close(fig)
+        logger.info(f"Confusion matrix plot saved      → {cm_path}")
+
+        # ── 2d. Per-source recall ───────────────────────────────────────────
+        per_src: dict[str, float] = {}
+        for src in sorted(np.unique(s_test)):
+            mask = s_test == src
+            yt   = y_test[mask]
+            yp   = y_pred[mask]
+            if np.any(yt == 1):
+                tp  = int(np.sum((yt == 1) & (yp == 1)))
+                fn  = int(np.sum((yt == 1) & (yp == 0)))
+                per_src[src] = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+
+        if per_src:
+            srcs   = list(per_src.keys())
+            recs   = [per_src[s] for s in srcs]
+            colors = ["tomato" if r < 0.5 else "steelblue" for r in recs]
+
+            fig, ax = plt.subplots(figsize=(10, 5))
+            ax.barh(srcs, recs, color=colors)
+            for i, (src, rec) in enumerate(zip(srcs, recs)):
+                ax.text(rec + 0.01, i, f"{rec:.3f}", va="center", fontsize=9)
+            ax.set_xlabel("Recall")
+            ax.set_title("Per-Source Recall (Training — Test Split)")
+            ax.axvline(x=0.5, color="gray", linestyle="--", alpha=0.5, label="0.5 line")
+            ax.set_xlim(0, 1.1)
+            ax.legend()
+            ax.grid(axis="x", alpha=0.3)
+            fig.tight_layout()
+            ps_path = viz_dir / "per_source_recall.png"
+            fig.savefig(ps_path, dpi=150)
+            plt.close(fig)
+            logger.info(f"Per-source recall plot saved     → {ps_path}")
+
+    except ImportError:
+        logger.warning("matplotlib not installed — skipping visualization plots (run: poetry add matplotlib)")
+    except Exception as exc:
+        logger.warning(f"Visualization generation failed: {exc}")
+
+
+# ---------------------------------------------------------------------------
 # Training
 # ---------------------------------------------------------------------------
 
@@ -346,6 +528,7 @@ def train(
     scale_pos_weight: float = 2.0,
     include_node_types: bool = True,
     use_gpu: bool = False,
+    output_dir: Path | None = None,
 ) -> dict:
     """
     Train the two-stage XGBoost Clone Detector (Stage 1).
@@ -626,6 +809,27 @@ def train(
     # code can apply the same boundary without extra CLI flags.
     classifier.calibrated_threshold = best["threshold"]
     saved_path = classifier.save(model_name)
+
+    # ---- Persist metrics + visualizations --------------------------------
+    final_metrics = {
+        "threshold": best["threshold"],
+        "precision": best["precision"],
+        "recall":    best["recall"],
+        "f1":        best["f1"],
+        "accuracy":  float(test_acc),
+        "roc_auc":   float(test_auc),
+    }
+    save_training_artifacts(
+        metrics=final_metrics,
+        sweep=sweep,
+        classifier=classifier,
+        y_test=y_test,
+        y_pred=y_pred_best,
+        y_proba=y_proba_test,
+        s_test=s_test,
+        output_dir=output_dir,
+    )
+
     logger.info(f"\n{'='*80}")
     logger.info(f"Model saved → {saved_path}")
     logger.info(f"Clone detector threshold: {best['threshold']:.2f}")
@@ -637,12 +841,7 @@ def train(
     logger.info("  done")
     logger.info("=" * 80)
 
-    return {
-        "threshold": best["threshold"],
-        "precision": best["precision"],
-        "recall":    best["recall"],
-        "f1":        best["f1"],
-    }
+    return final_metrics
 
 
 # ---------------------------------------------------------------------------
@@ -677,6 +876,14 @@ if __name__ == "__main__":
                         help="Disable per-node-type AST distribution features")
     parser.add_argument("--use-gpu",             action="store_true")
     parser.add_argument("--verbose",             action="store_true")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="Directory to write training_metrics.json and visualization plots "
+             "(default: clone_detection/models/)",
+    )
 
     args = parser.parse_args()
     if args.verbose:
@@ -696,4 +903,5 @@ if __name__ == "__main__":
         scale_pos_weight=args.scale_pos_weight,
         include_node_types=not args.no_node_types,
         use_gpu=args.use_gpu,
+        output_dir=args.output_dir,
     )

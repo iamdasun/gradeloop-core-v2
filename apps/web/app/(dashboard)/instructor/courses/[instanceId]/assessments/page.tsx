@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { FileText, Loader2, Plus, Calendar, Clock, Terminal } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { FileText, Loader2, Plus, Calendar, Clock, Terminal, ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { instructorAssessmentsApi } from "@/lib/api/assessments";
 import { instructorCoursesApi } from "@/lib/api/academics";
@@ -12,8 +13,6 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-
-// Dialog components
 import {
     Dialog,
     DialogContent,
@@ -34,9 +33,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
-export default function InstructorAssessmentsPage() {
+export default function CourseInstanceAssessmentsPage() {
+    const params = useParams();
+    const router = useRouter();
+    const instanceId = params.instanceId as string;
+
     const [assignments, setAssignments] = React.useState<AssignmentResponse[]>([]);
-    const [courses, setCourses] = React.useState<CourseInstructor[]>([]);
+    const [courseInfo, setCourseInfo] = React.useState<CourseInstructor | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
 
@@ -46,28 +49,36 @@ export default function InstructorAssessmentsPage() {
     const [createError, setCreateError] = React.useState<string | null>(null);
 
     // Form fields
-    const [courseInstanceId, setCourseInstanceId] = React.useState("");
     const [title, setTitle] = React.useState("");
     const [description, setDescription] = React.useState("");
     const [languageCode, setLanguageCode] = React.useState("go");
     const [allowLateSubmissions, setAllowLateSubmissions] = React.useState(false);
     const [allowGroupSubmission, setAllowGroupSubmission] = React.useState(false);
 
-    // We fetch assignments and assigned courses on mount
     React.useEffect(() => {
         let mounted = true;
 
         async function fetchData() {
+            if (!instanceId || typeof instanceId !== 'string') {
+                if (mounted) setError('Invalid course instance ID');
+                if (mounted) setIsLoading(false);
+                return;
+            }
+
             try {
                 setIsLoading(true);
+                
+                // Fetch assignments for this course instance
                 const [myAssignments, myCourses] = await Promise.all([
-                    instructorAssessmentsApi.listMyAssignments(),
+                    instructorAssessmentsApi.listMyAssignments(instanceId),
                     instructorCoursesApi.listMyCourses()
                 ]);
 
                 if (mounted) {
                     setAssignments(myAssignments);
-                    setCourses(myCourses);
+                    // Find the course info for this instance
+                    const course = myCourses.find(c => c.course_instance_id === instanceId);
+                    setCourseInfo(course || null);
                 }
             } catch (err) {
                 if (mounted) setError(handleApiError(err));
@@ -78,42 +89,21 @@ export default function InstructorAssessmentsPage() {
 
         fetchData();
         return () => { mounted = false; };
-    }, []);
-
-    // Group assignments by course
-    const assignmentsByCourse = React.useMemo(() => {
-        const grouped = new Map<string, { course: CourseInstructor | null; assignments: AssignmentResponse[] }>();
-        
-        assignments.forEach(assignment => {
-            const course = courses.find(c => c.course_instance_id === assignment.course_instance_id);
-            const key = assignment.course_instance_id;
-            
-            if (!grouped.has(key)) {
-                grouped.set(key, { course: course || null, assignments: [] });
-            }
-            grouped.get(key)!.assignments.push(assignment);
-        });
-        
-        return Array.from(grouped.entries()).map(([instanceId, data]) => ({
-            instanceId,
-            course: data.course,
-            assignments: data.assignments
-        }));
-    }, [assignments, courses]);
+    }, [instanceId]);
 
     const handleCreateAssignment = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!courseInstanceId || !title || !languageCode) return;
+        if (!instanceId || !title || !languageCode) return;
 
         try {
             setIsCreating(true);
             setCreateError(null);
 
             const created = await instructorAssessmentsApi.createAssignment({
-                course_instance_id: courseInstanceId,
+                course_instance_id: instanceId,
                 title,
                 description,
-                code: languageCode, // Backend uses "code" to mean programming language right now...
+                code: languageCode,
                 allow_late_submissions: allowLateSubmissions,
                 allow_group_submission: allowGroupSubmission,
                 enable_ai_assistant: false,
@@ -137,8 +127,21 @@ export default function InstructorAssessmentsPage() {
         }
     };
 
+    const courseName = courseInfo 
+        ? `${courseInfo.course_code} - ${courseInfo.course_title}`
+        : instanceId;
+
     return (
         <div className="flex flex-col gap-8 pb-8">
+            {/* Back Button */}
+            <Button
+                variant="ghost"
+                className="w-fit pl-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                onClick={() => router.push(`/instructor/courses/${instanceId}`)}
+            >
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Course
+            </Button>
+
             {/* Header */}
             <div className="flex flex-col gap-4 border-b border-border/40 pb-6">
                 <div className="flex items-center justify-between">
@@ -149,7 +152,7 @@ export default function InstructorAssessmentsPage() {
                         <div>
                             <h1 className="text-2xl font-black tracking-tight">Assessments</h1>
                             <p className="text-sm text-muted-foreground">
-                                Manage assignments and review student submissions.
+                                {courseName}
                             </p>
                         </div>
                     </div>
@@ -166,7 +169,7 @@ export default function InstructorAssessmentsPage() {
                                 <DialogHeader>
                                     <DialogTitle>Create Assignment</DialogTitle>
                                     <DialogDescription>
-                                        Define a new programming assignment for your course.
+                                        Define a new programming assignment for {courseInfo?.course_code || 'this course'}.
                                     </DialogDescription>
                                 </DialogHeader>
 
@@ -176,24 +179,6 @@ export default function InstructorAssessmentsPage() {
                                             {createError}
                                         </div>
                                     )}
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="course">Course Instance</Label>
-                                        <Select value={courseInstanceId} onValueChange={setCourseInstanceId} required>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select course instance" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {courses.map(c => (
-                                                    <SelectItem key={c.course_instance_id} value={c.course_instance_id}>
-                                                        {c.course_instance_id}
-                                                    </SelectItem>
-                                                ))}
-                                                {courses.length === 0 && (
-                                                    <SelectItem value="none" disabled>No courses assigned</SelectItem>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
 
                                     <div className="grid gap-2">
                                         <Label htmlFor="title">Assignment Title</Label>
@@ -262,7 +247,7 @@ export default function InstructorAssessmentsPage() {
                                     <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
                                         Cancel
                                     </Button>
-                                    <Button type="submit" disabled={isCreating || !courseInstanceId || !title}>
+                                    <Button type="submit" disabled={isCreating || !title}>
                                         {isCreating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                                         Create
                                     </Button>
@@ -292,73 +277,54 @@ export default function InstructorAssessmentsPage() {
                         <div className="text-center">
                             <p className="font-bold text-lg">No assignments found</p>
                             <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                                You have not created any assignments yet. Click &quot;Create Assignment&quot; to get started.
+                                You have not created any assignments for this course yet. Click &quot;Create Assignment&quot; to get started.
                             </p>
                         </div>
                     </CardContent>
                 </Card>
             ) : (
-                <div className="flex flex-col gap-8">
-                    {assignmentsByCourse.map(({ instanceId, course, assignments: courseAssignments }) => {
-                        const courseName = course 
-                            ? `${course.course_code} - ${course.course_title}`
-                            : `Instance ${instanceId.substring(0, 8)}...`;
-                        
-                        return (
-                            <div key={instanceId} className="flex flex-col gap-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-lg font-bold">{courseName}</h2>
-                                        <p className="text-xs text-muted-foreground font-mono">
-                                            Instance: {instanceId}
-                                        </p>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {assignments.map((assignment) => (
+                        <Link key={assignment.id} href={`/instructor/assessments/${assignment.id}`} prefetch={false} className="block group">
+                            <Card className="h-full border-border/60 hover:border-primary/30 hover:shadow-md transition-all duration-200 bg-background flex flex-col">
+                                <CardContent className="p-6 flex flex-col gap-4 flex-1">
+                                    <div className="flex items-start justify-between">
+                                        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                                            <FileText className="h-5 w-5 text-primary" />
+                                        </div>
+                                        {assignment.is_active ? (
+                                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
+                                        ) : (
+                                            <Badge variant="secondary">Draft</Badge>
+                                        )}
                                     </div>
-                                    <Link href={`/instructor/courses/${instanceId}/assessments`}>
-                                        <Button variant="ghost" size="sm">
-                                            View All →
-                                        </Button>
-                                    </Link>
-                                </div>
-                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                    {courseAssignments.map((assignment) => (
-                                        <Link key={assignment.id} href={`/instructor/assessments/${assignment.id}`} prefetch={false} className="block group">
-                                            <Card className="h-full border-border/60 hover:border-primary/30 hover:shadow-md transition-all duration-200 bg-background flex flex-col">
-                                                <CardContent className="p-6 flex flex-col gap-4 flex-1">
-                                                    <div className="flex items-start justify-between">
-                                                        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                                                            <FileText className="h-5 w-5 text-primary" />
-                                                        </div>
-                                                        {assignment.is_active ? (
-                                                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
-                                                        ) : (
-                                                            <Badge variant="secondary">Draft</Badge>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <h3 className="font-bold text-lg line-clamp-1" title={assignment.title}>{assignment.title}</h3>
-                                                        {assignment.description && (
-                                                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{assignment.description}</p>
-                                                        )}
-                                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-bold text-lg line-clamp-1" title={assignment.title}>{assignment.title}</h3>
+                                        {assignment.description && (
+                                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{assignment.description}</p>
+                                        )}
+                                    </div>
 
-                                                    <div className="flex flex-col gap-2 mt-2">
-                                                        <div className="flex items-center text-xs text-muted-foreground">
-                                                            <Terminal className="h-3 w-3 mr-1.5" />
-                                                            <span>Language: <span className="font-semibold text-foreground capitalize">{assignment.code}</span></span>
-                                                        </div>
-                                                        <div className="flex items-center text-xs text-muted-foreground">
-                                                            <Calendar className="h-3 w-3 mr-1.5" />
-                                                            <span>Created: {format(new Date(assignment.created_at), 'MMM d, yyyy')}</span>
-                                                        </div>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        </Link>
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })}
+                                    <div className="flex flex-col gap-2 mt-2">
+                                        <div className="flex items-center text-xs text-muted-foreground">
+                                            <Terminal className="h-3 w-3 mr-1.5" />
+                                            <span>Language: <span className="font-semibold text-foreground capitalize">{assignment.code}</span></span>
+                                        </div>
+                                        <div className="flex items-center text-xs text-muted-foreground">
+                                            <Calendar className="h-3 w-3 mr-1.5" />
+                                            <span>Created: {format(new Date(assignment.created_at), 'MMM d, yyyy')}</span>
+                                        </div>
+                                        {assignment.due_at && (
+                                            <div className="flex items-center text-xs text-muted-foreground">
+                                                <Clock className="h-3 w-3 mr-1.5" />
+                                                <span>Due: {format(new Date(assignment.due_at), 'MMM d, yyyy')}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
+                    ))}
                 </div>
             )}
         </div>

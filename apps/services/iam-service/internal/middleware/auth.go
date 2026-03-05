@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gradeloop/iam-service/internal/domain"
 	"github.com/gradeloop/iam-service/internal/jwt"
 )
 
@@ -36,45 +37,52 @@ func AuthMiddleware(secretKey []byte) fiber.Handler {
 		// Store claims in context for handlers to access
 		c.Locals("user_id", claims.UserID.String())
 		c.Locals("email", claims.Email)
-		c.Locals("role_name", claims.RoleName)
-		c.Locals("permissions", claims.Permissions)
+		c.Locals("user_type", claims.UserType)
+		c.Locals("full_name", claims.FullName)
 
 		return c.Next()
 	}
 }
 
-// RequirePermission creates a middleware that checks if the user has a specific permission
-func RequirePermission(requiredPermission string) fiber.Handler {
+// RequireUserType creates a middleware that checks if the user has any of the allowed user types
+func RequireUserType(allowedUserTypes ...string) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		permissions, ok := c.Locals("permissions").([]string)
-		if !ok || permissions == nil {
-			return fiber.NewError(fiber.StatusForbidden, "Permission denied")
+		userType, ok := c.Locals("user_type").(string)
+		if !ok || userType == "" {
+			return fiber.NewError(fiber.StatusForbidden, "User type required")
 		}
 
-		for _, perm := range permissions {
-			if perm == requiredPermission {
+		for _, allowedType := range allowedUserTypes {
+			if userType == allowedType {
 				return c.Next()
 			}
 		}
 
-		return fiber.NewError(fiber.StatusForbidden, "Permission denied")
+		return fiber.NewError(fiber.StatusForbidden, "Insufficient privileges")
 	}
 }
 
-// RequireRole creates a middleware that checks if the user has a specific role
-func RequireRole(allowedRoles ...string) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		roleName, ok := c.Locals("role_name").(string)
-		if !ok || roleName == "" {
-			return fiber.NewError(fiber.StatusForbidden, "Role required")
-		}
+// RequireAdmin creates a middleware that requires admin or super_admin access
+func RequireAdmin() fiber.Handler {
+	return RequireUserType(domain.UserTypeAdmin, domain.UserTypeSuperAdmin)
+}
 
-		for _, allowedRole := range allowedRoles {
-			if roleName == allowedRole {
-				return c.Next()
-			}
-		}
+// RequireSuperAdmin creates a middleware that requires super_admin access
+func RequireSuperAdmin() fiber.Handler {
+	return RequireUserType(domain.UserTypeSuperAdmin)
+}
 
-		return fiber.NewError(fiber.StatusForbidden, "Insufficient role")
-	}
+// RequireInstructor creates a middleware that requires instructor, admin or super_admin access
+func RequireInstructor() fiber.Handler {
+	return RequireUserType(domain.UserTypeInstructor, domain.UserTypeAdmin, domain.UserTypeSuperAdmin)
+}
+
+// RequireStudent creates a middleware that requires student access (or higher)
+func RequireStudent() fiber.Handler {
+	return RequireUserType(domain.UserTypeStudent, domain.UserTypeInstructor, domain.UserTypeAdmin, domain.UserTypeSuperAdmin)
+}
+
+// RequireNonStudent creates a middleware that requires instructor/admin/super_admin access (excludes students)
+func RequireNonStudent() fiber.Handler {
+	return RequireUserType(domain.UserTypeInstructor, domain.UserTypeAdmin, domain.UserTypeSuperAdmin)
 }

@@ -7,8 +7,6 @@ type UserResponse struct {
 	Email       string    `json:"email"`
 	FullName    string    `json:"full_name"`
 	AvatarURL   string    `json:"avatar_url"`
-	RoleID      uuid.UUID `json:"role_id"`
-	RoleName    string    `json:"role_name"`
 	UserType    string    `json:"user_type"`
 	Faculty     string    `json:"faculty,omitempty"`
 	Department  string    `json:"department,omitempty"`
@@ -32,14 +30,14 @@ type GetUsersResponse struct {
 }
 
 type UpdateUserRequest struct {
-	RoleID   *string `json:"role_id"`
+	UserType *string `json:"user_type" validate:"omitempty,oneof=student instructor admin super_admin"`
 	IsActive *bool   `json:"is_active"`
 }
 
 type UpdateUserResponse struct {
 	ID       uuid.UUID `json:"id"`
 	Email    string    `json:"email"`
-	RoleID   uuid.UUID `json:"role_id"`
+	UserType string    `json:"user_type"`
 	IsActive bool      `json:"is_active"`
 	Message  string    `json:"message"`
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/client"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/domain"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/dto"
@@ -14,6 +13,7 @@ import (
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/repository"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/storage"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/utils"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -388,9 +388,8 @@ func (s *submissionService) ListSubmissions(
 	if assignmentID == uuid.Nil {
 		return nil, utils.ErrBadRequest("assignment_id is required")
 	}
-	if userID == nil && groupID == nil {
-		return nil, utils.ErrBadRequest("one of user_id or group_id query parameter is required")
-	}
+	// Allow nil for both userID and groupID to list all submissions for an assignment
+	// (used by instructor queries)
 
 	submissions, err := s.submissionRepo.ListSubmissions(assignmentID, userID, groupID)
 	if err != nil {
@@ -415,9 +414,8 @@ func (s *submissionService) GetLatestSubmission(
 	if assignmentID == uuid.Nil {
 		return nil, utils.ErrBadRequest("assignment_id is required")
 	}
-	if userID == nil && groupID == nil {
-		return nil, utils.ErrBadRequest("one of user_id or group_id query parameter is required")
-	}
+	// Allow nil for both userID and groupID to get the latest submission overall
+	// (used by instructor queries)
 
 	sub, err := s.submissionRepo.GetLatestSubmission(assignmentID, userID, groupID)
 	if err != nil {

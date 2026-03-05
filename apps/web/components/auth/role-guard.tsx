@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * RoleGuard – conditionally renders children based on the user's roles.
+ * RoleGuard – conditionally renders children based on the user's type.
  *
- * By default, ANY of the provided roles is sufficient (`requireAll = false`).
- * Pass `requireAll` to enforce that ALL listed roles must be present.
+ * By default, ANY of the provided user types is sufficient (`requireAll = false`).
+ * Pass `requireAll` to enforce that ALL listed types must be present (rarely needed).
  *
  * Usage:
  *   <RoleGuard roles="admin">…admin-only UI…</RoleGuard>
@@ -14,9 +14,9 @@
 import { useAuthStore } from '@/lib/stores/authStore';
 
 interface RoleGuardProps {
-  /** One role name or an array of role names */
+  /** One user type or an array of user types */
   roles: string | string[];
-  /** Render all listed roles or only one? Default: false (any is enough) */
+  /** Render all listed types or only one? Default: false (any is enough) */
   requireAll?: boolean;
   children: React.ReactNode;
   /** Rendered when the check fails; defaults to null (nothing) */
@@ -29,12 +29,12 @@ export function RoleGuard({
   children,
   fallback = null,
 }: RoleGuardProps) {
-  const hasRole = useAuthStore((s) => s.hasRole);
+  const hasUserType = useAuthStore((s) => s.hasUserType);
   const allowed = Array.isArray(roles)
     ? requireAll
-      ? roles.every((r) => hasRole(r))
-      : roles.some((r) => hasRole(r))
-    : hasRole(roles);
+      ? roles.every((r) => hasUserType(r))
+      : roles.some((r) => hasUserType(r))
+    : hasUserType(roles);
 
   return allowed ? <>{children}</> : <>{fallback}</>;
 }

@@ -41,8 +41,14 @@ export default function InstructorAssignmentDetailsPage() {
                 if (mounted) setAssignment(found);
 
                 // Fetch submissions for this assignment
-                const subs = await instructorAssessmentsApi.listSubmissions(assignmentId);
-                if (mounted) setSubmissions(subs);
+                try {
+                    const subs = await instructorAssessmentsApi.listSubmissions(assignmentId);
+                    if (mounted) setSubmissions(subs);
+                } catch (subErr) {
+                    // Log but don't fail the whole page if submissions can't be loaded
+                    console.error('Failed to load submissions:', subErr);
+                    if (mounted) setSubmissions([]);
+                }
 
             } catch (err) {
                 if (mounted) setError(handleApiError(err));

@@ -32,6 +32,7 @@ Usage:
 import argparse
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -187,6 +188,161 @@ def extract_features(
 
 
 # ---------------------------------------------------------------------------
+# Artifact persistence — metrics JSON + visualizations
+# ---------------------------------------------------------------------------
+
+def save_evaluation_artifacts(
+    metrics: dict,
+    clone_type_metrics: dict,
+    y: np.ndarray,
+    y_pred: np.ndarray,
+    model,
+    output_dir: "Path | None" = None,
+) -> None:
+    """
+    Persist evaluation metrics as JSON and generate visualisation plots.
+
+    Outputs (all written to *output_dir*, default ``clone_detection/models/``):
+
+    * ``evaluation_metrics.json``                         — overall + per-clone-type metrics
+    * ``visualizations/confusion_matrix_eval.png``        — confusion matrix heatmap
+    * ``visualizations/per_clone_type_recall.png``        — per-clone-type recall bar chart
+    * ``visualizations/feature_importances_eval.png``     — top-20 XGBoost importances
+
+    Args:
+        metrics:            Dict with accuracy, precision, recall, f1, roc_auc, threshold.
+        clone_type_metrics: Per-clone-type breakdown dict keyed by clone type integer.
+        y:                  Ground-truth labels.
+        y_pred:             Binary predictions.
+        model:              Loaded ``SyntacticClassifier`` (for feature importances).
+        output_dir:         Directory to write files into.  Defaults to
+                            ``clone_detection/models/`` (resolved via ``get_models_dir()``).
+    """
+    from clone_detection.utils.common_setup import get_models_dir
+
+    if output_dir is None:
+        output_dir = get_models_dir()
+    output_dir = Path(output_dir)
+    viz_dir = output_dir / "visualizations"
+    viz_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── 1. Metrics JSON ─────────────────────────────────────────────────────
+    # Convert per-clone-type keys to strings for valid JSON.
+    serialisable_per_type = {
+        str(ct): {k: (round(float(v), 6) if isinstance(v, float) else v) for k, v in m.items()}
+        for ct, m in clone_type_metrics.items()
+    }
+    metrics_payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "metrics": {k: (round(float(v), 6) if isinstance(v, float) else v) for k, v in metrics.items()},
+        "per_clone_type": serialisable_per_type,
+    }
+    metrics_path = output_dir / "evaluation_metrics.json"
+    with open(metrics_path, "w", encoding="utf-8") as fh:
+        json.dump(metrics_payload, fh, indent=2, default=str)
+    logger.info(f"Evaluation metrics JSON saved  → {metrics_path}")
+
+    # ── 2. Visualizations ───────────────────────────────────────────────────
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from sklearn.metrics import confusion_matrix as sk_cm
+
+        # ── 2a. Confusion matrix ────────────────────────────────────────────
+        cm = sk_cm(y, y_pred)
+        fig, ax = plt.subplots(figsize=(6, 5))
+        im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
+        plt.colorbar(im, ax=ax)
+        classes    = ["Non-Clone", "Clone"]
+        tick_marks = [0, 1]
+        ax.set_xticks(tick_marks)
+        ax.set_yticks(tick_marks)
+        ax.set_xticklabels(classes)
+        ax.set_yticklabels(classes)
+        threshold_color = cm.max() / 2.0
+        for i in range(2):
+            for j in range(2):
+                ax.text(
+                    j, i, str(cm[i, j]),
+                    ha="center", va="center",
+                    color="white" if cm[i, j] > threshold_color else "black",
+                    fontsize=14, fontweight="bold",
+                )
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("Actual")
+        ax.set_title("Confusion Matrix — Evaluation (BigCloneBench Balanced)")
+        fig.tight_layout()
+        cm_path = viz_dir / "confusion_matrix_eval.png"
+        fig.savefig(cm_path, dpi=150)
+        plt.close(fig)
+        logger.info(f"Confusion matrix plot saved     → {cm_path}")
+
+        # ── 2b. Per-clone-type recall ───────────────────────────────────────
+        if clone_type_metrics:
+            ct_labels  = [f"Type-{ct}" for ct in sorted(clone_type_metrics)]
+            ct_recalls = [clone_type_metrics[ct]["recall"] for ct in sorted(clone_type_metrics)]
+            ct_f1s     = [clone_type_metrics[ct]["f1"]     for ct in sorted(clone_type_metrics)]
+            colors     = ["tomato" if r < 0.4 else "steelblue" for r in ct_recalls]
+
+            x = range(len(ct_labels))
+            width = 0.35
+            fig, ax = plt.subplots(figsize=(8, 5))
+            bars_r = ax.bar([i - width / 2 for i in x], ct_recalls, width,
+                            label="Recall", color=colors)
+            bars_f = ax.bar([i + width / 2 for i in x], ct_f1s, width,
+                            label="F1",     color="mediumseagreen", alpha=0.8)
+            ax.axhline(y=0.40, color="red", linestyle="--", alpha=0.7, label="Type-3 target (0.40)")
+            for bar in bars_r:
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01,
+                        f"{bar.get_height():.3f}", ha="center", va="bottom", fontsize=8)
+            for bar in bars_f:
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01,
+                        f"{bar.get_height():.3f}", ha="center", va="bottom", fontsize=8)
+            ax.set_xticks(list(x))
+            ax.set_xticklabels(ct_labels)
+            ax.set_ylim(0, 1.15)
+            ax.set_ylabel("Score")
+            ax.set_title("Per-Clone-Type Recall & F1 (BigCloneBench Balanced)")
+            ax.legend()
+            ax.grid(axis="y", alpha=0.3)
+            fig.tight_layout()
+            ctr_path = viz_dir / "per_clone_type_recall.png"
+            fig.savefig(ctr_path, dpi=150)
+            plt.close(fig)
+            logger.info(f"Per-clone-type recall plot saved → {ctr_path}")
+
+        # ── 2c. Feature importances ─────────────────────────────────────────
+        try:
+            top_feats  = model.get_feature_importance_sorted()[:20]
+            feat_names = [f[0].replace("feat_", "") for f in top_feats]
+            feat_vals  = [f[1] for f in top_feats]
+
+            fig, ax = plt.subplots(figsize=(10, 8))
+            bars = ax.barh(feat_names[::-1], feat_vals[::-1], color="darkorange")
+            for bar, val in zip(bars, feat_vals[::-1]):
+                ax.text(
+                    bar.get_width() + 0.001, bar.get_y() + bar.get_height() / 2,
+                    f"{val:.4f}", va="center", fontsize=8,
+                )
+            ax.set_xlabel("Importance")
+            ax.set_title("Top-20 Feature Importances (Evaluation — XGBoost)")
+            ax.grid(axis="x", alpha=0.3)
+            fig.tight_layout()
+            fi_path = viz_dir / "feature_importances_eval.png"
+            fig.savefig(fi_path, dpi=150)
+            plt.close(fig)
+            logger.info(f"Feature importance plot saved   → {fi_path}")
+        except Exception:
+            pass  # feature importances are optional; don't fail the whole save
+
+    except ImportError:
+        logger.warning("matplotlib not installed — skipping visualization plots (run: poetry add matplotlib)")
+    except Exception as exc:
+        logger.warning(f"Visualization generation failed: {exc}")
+
+
+# ---------------------------------------------------------------------------
 # Evaluation
 # ---------------------------------------------------------------------------
 
@@ -197,6 +353,7 @@ def evaluate(
     include_node_types: bool = True,
     threshold: float | None = None,
     log_type3_similarity: bool = False,
+    output_dir: "Path | None" = None,
 ) -> dict:
     """
     Evaluate the two-stage clone detection pipeline on BigCloneBench Balanced.
@@ -502,6 +659,16 @@ def evaluate(
     logger.info("  lev_ratio_upper  : 0.85  (above this = Type-1/2, excluded from Type-3)")
     logger.info("  ast_jaccard_upper: 0.90  (above this = Type-1/2, excluded from Type-3)")
 
+    # ---- Persist metrics + visualizations --------------------------------
+    save_evaluation_artifacts(
+        metrics=metrics,
+        clone_type_metrics=clone_type_metrics,
+        y=y,
+        y_pred=y_pred_arr,
+        model=model,
+        output_dir=output_dir,
+    )
+
     return {**metrics, "per_clone_type": clone_type_metrics}
 
 
@@ -570,6 +737,14 @@ if __name__ == "__main__":
         action="store_true",
         help="Enable DEBUG-level logging.",
     )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        metavar="DIR",
+        help="Directory to write evaluation_metrics.json and visualization plots "
+             "(default: clone_detection/models/)",
+    )
 
     args = parser.parse_args()
 
@@ -583,4 +758,5 @@ if __name__ == "__main__":
         include_node_types=not args.no_node_types,
         threshold=args.threshold,
         log_type3_similarity=args.log_type3_similarity,
+        output_dir=args.output_dir,
     )

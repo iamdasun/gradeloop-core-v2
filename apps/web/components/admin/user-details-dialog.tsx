@@ -96,8 +96,8 @@ export function UserDetailsDialog({
               <Badge variant={user.is_active ? "success" : "destructive"}>
                 {user.is_active ? "Active" : "Inactive"}
               </Badge>
-              <Badge variant={roleBadgeVariant(user.role_name)}>
-                {user.role_name}
+              <Badge variant={roleBadgeVariant(user.user_type)} className="capitalize">
+                {user.user_type}
               </Badge>
             </div>
           </div>
@@ -155,11 +155,11 @@ export function UserDetailsDialog({
               <div className="grid grid-cols-[140px_1fr] items-start gap-2">
                 <dt className="flex items-center gap-2 text-zinc-500">
                   <Shield className="h-4 w-4 shrink-0" />
-                  Role / Type
+                  User Type
                 </dt>
                 <dd className="font-medium text-zinc-900 dark:text-zinc-100 flex gap-2">
                   <span className="text-zinc-400">:</span>
-                  <span className="capitalize">{user.role_name} ({user.user_type || "N/A"})</span>
+                  <span className="capitalize">{user.user_type}</span>
                 </dd>
               </div>
 

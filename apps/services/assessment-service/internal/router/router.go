@@ -1,8 +1,6 @@
 package router
 
 import (
-	"strings"
-
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/handler"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/middleware"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/utils"
@@ -21,22 +19,19 @@ type Config struct {
 }
 
 // requireAdminRole is a route-level middleware that allows access only to
-// users whose role normalises to "super_admin" or "admin".
+// users whose user type is "super_admin" or "admin".
 func requireAdminRole() fiber.Handler {
 	return func(c fiber.Ctx) error {
-		roleName, ok := c.Locals("role_name").(string)
-		if !ok || roleName == "" {
-			return utils.ErrForbidden("no role found")
+		userType, ok := c.Locals("user_type").(string)
+		if !ok || userType == "" {
+			return utils.ErrForbidden("no user type found")
 		}
 
-		normalized := strings.ToLower(strings.TrimSpace(roleName))
-		normalized = strings.ReplaceAll(normalized, " ", "_")
-
-		if normalized == "super_admin" || normalized == "admin" {
+		if userType == "super_admin" || userType == "admin" {
 			return c.Next()
 		}
 
-		return utils.ErrForbidden("requires super_admin or admin role")
+		return utils.ErrForbidden("requires super_admin or admin user type")
 	}
 }
 
@@ -65,8 +60,7 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 		return c.JSON(fiber.Map{
 			"user_id":       c.Locals("user_id"),
 			"username":      c.Locals("username"),
-			"role_name":     c.Locals("role_name"),
-			"permissions":   c.Locals("permissions"),
+			"user_type":     c.Locals("user_type"),
 			"authenticated": true,
 		})
 	})
@@ -119,23 +113,23 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	submissions.Put("/:id", cfg.SubmissionHandler.UpdateSubmission)
 
 	// ── Instructor-scoped routes ────────────────────────────────────────────
-	// Accessible to Employee + Admin + Super Admin.
+	// Accessible to instructor + admin + super_admin.
 	// PathPrefix: /api/v1/instructor-assignments — routed by Traefik
 	// PathPrefix: /api/v1/instructor-submissions — routed by Traefik
-	requireEmployeeOrAdmin := middleware.RequireAnyRole("Employee", "Admin", "Super Admin")
+	requireInstructorOrAdmin := middleware.RequireAnyUserType("instructor", "admin", "super_admin")
 
-	instructorAssignments := protected.Group("/instructor-assignments", requireEmployeeOrAdmin)
+	instructorAssignments := protected.Group("/instructor-assignments", requireInstructorOrAdmin)
 	instructorAssignments.Get("/me", cfg.InstructorHandler.GetMyAssignments)
 	instructorAssignments.Post("/", cfg.InstructorHandler.CreateAssignment)
 
-	instructorSubmissions := protected.Group("/instructor-submissions", requireEmployeeOrAdmin)
+	instructorSubmissions := protected.Group("/instructor-submissions", requireInstructorOrAdmin)
 	instructorSubmissions.Get("/assignment/:id", cfg.InstructorHandler.GetSubmissions)
 
 	// ── Student-scoped routes ────────────────────────────────────────────────
-	// Accessible to Student + Admin + Super Admin.
+	// Accessible to student + admin + super_admin.
 	// PathPrefix: /api/v1/student-assignments — routed by Traefik
 	// PathPrefix: /api/v1/student-submissions — routed by Traefik
-	requireStudentOrAdmin := middleware.RequireAnyRole("Student", "Admin", "Super Admin")
+	requireStudentOrAdmin := middleware.RequireAnyUserType("student", "admin", "super_admin")
 
 	studentAssignments := protected.Group("/student-assignments", requireStudentOrAdmin)
 	// NOTE: GET /student-assignments/me/latest must be registered BEFORE

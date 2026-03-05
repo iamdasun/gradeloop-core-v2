@@ -496,7 +496,9 @@ export const batchMembersApi = {
 
 export const courseInstancesApi = {
   listByCourse: async (courseId: string): Promise<CourseInstance[]> => {
-    const { data } = await axiosInstance.get(`/courses/${courseId}/course-instances`);
+    const { data } = await axiosInstance.get(
+      `/courses/${courseId}/course-instances`,
+    );
     if (Array.isArray(data)) return data as CourseInstance[];
     if (Array.isArray(data?.course_instances))
       return data.course_instances as CourseInstance[];
@@ -555,6 +557,16 @@ export const courseInstancesApi = {
 // ── Course Instructors ────────────────────────────────────────────────────────
 
 export const courseInstructorsApi = {
+  getByInstance: async (instanceId: string): Promise<CourseInstructor[]> => {
+    const { data } = await axiosInstance.get(
+      `/course-instances/${instanceId}/instructors`,
+    );
+    if (Array.isArray(data)) return data as CourseInstructor[];
+    if (Array.isArray(data?.instructors))
+      return data.instructors as CourseInstructor[];
+    return [];
+  },
+
   assign: async (req: AssignInstructorRequest): Promise<CourseInstructor> => {
     const { data } = await axiosInstance.post<CourseInstructor>(
       "/course-instructors",
@@ -571,6 +583,16 @@ export const courseInstructorsApi = {
 // ── Enrollments ───────────────────────────────────────────────────────────────
 
 export const enrollmentsApi = {
+  list: async (instanceId: string): Promise<Enrollment[]> => {
+    const { data } = await axiosInstance.get(
+      `/course-instances/${instanceId}/enrollments`,
+    );
+    if (Array.isArray(data)) return data as Enrollment[];
+    if (Array.isArray(data?.enrollments))
+      return data.enrollments as Enrollment[];
+    return [];
+  },
+
   enroll: async (req: EnrollStudentRequest): Promise<Enrollment> => {
     const { data } = await axiosInstance.post<Enrollment>("/enrollments", req);
     return data;
@@ -586,6 +608,10 @@ export const enrollmentsApi = {
       req,
     );
     return data;
+  },
+
+  remove: async (instanceId: string, userId: string): Promise<void> => {
+    await axiosInstance.delete(`/enrollments/${instanceId}/${userId}`);
   },
 };
 
@@ -633,8 +659,10 @@ export const studentCoursesApi = {
   listMyEnrollments: async (): Promise<StudentCourseEnrollment[]> => {
     const { data } = await axiosInstance.get("/student-courses/me");
     if (Array.isArray(data)) return data as StudentCourseEnrollment[];
-    if (Array.isArray(data?.enrollments)) return data.enrollments as StudentCourseEnrollment[];
-    if (Array.isArray(data?.courses)) return data.courses as StudentCourseEnrollment[];
+    if (Array.isArray(data?.enrollments))
+      return data.enrollments as StudentCourseEnrollment[];
+    if (Array.isArray(data?.courses))
+      return data.courses as StudentCourseEnrollment[];
     return [];
   },
 
@@ -643,8 +671,12 @@ export const studentCoursesApi = {
    * along with the student's enrollment record.
    * Backend: GET /student-courses/:instanceId
    */
-  getCourseInstance: async (instanceId: string): Promise<StudentCourseEnrollment> => {
-    const { data } = await axiosInstance.get<StudentCourseEnrollment>(`/student-courses/${instanceId}`);
+  getCourseInstance: async (
+    instanceId: string,
+  ): Promise<StudentCourseEnrollment> => {
+    const { data } = await axiosInstance.get<StudentCourseEnrollment>(
+      `/student-courses/${instanceId}`,
+    );
     return data;
   },
 
@@ -652,12 +684,15 @@ export const studentCoursesApi = {
    * Get the instructor team for a course instance (lecturer + TAs).
    * Backend: GET /student-courses/:instanceId/instructors
    */
-  getCourseInstructors: async (instanceId: string): Promise<CourseInstructor[]> => {
+  getCourseInstructors: async (
+    instanceId: string,
+  ): Promise<CourseInstructor[]> => {
     const { data } = await axiosInstance.get(
       `/student-courses/${instanceId}/instructors`,
     );
     if (Array.isArray(data)) return data as CourseInstructor[];
-    if (Array.isArray(data?.instructors)) return data.instructors as CourseInstructor[];
+    if (Array.isArray(data?.instructors))
+      return data.instructors as CourseInstructor[];
     return [];
   },
 };

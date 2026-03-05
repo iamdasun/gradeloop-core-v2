@@ -2,36 +2,26 @@
  * Represents the authenticated user as decoded from the IAM JWT.
  *
  * The login endpoint does NOT return a user object — all user data is
- * embedded in the access token's claims (user_id, email, role_name,
- * permissions).  There is no /users/me profile endpoint.
+ * embedded in the access token's claims (user_id, email, user_type).
+ * There is no /users/me profile endpoint.
  */
 export interface User {
   id: string; // user_id claim
   email: string;
   full_name: string;
-  role_name: string; // single flat role string from JWT
-  permissions: string[]; // flat permission names from JWT
+  user_type: string; // 'student', 'instructor', 'admin', or 'super_admin'
 }
 
-// ── RBAC helpers ──────────────────────────────────────────────────────────────
+// ── User type constants ───────────────────────────────────────────────────────
 
-/** A role as returned by GET /roles/:id (admin operations). */
-export interface Role {
-  id: string;
-  name: string;
-  /** Matches backend RoleResponse.user_type: "student" | "employee" | "all" */
-  user_type: string;
-  is_system_role?: boolean;
-  description?: string;
-  permissions?: Permission[];
-}
+export const USER_TYPES = {
+  STUDENT: 'student',
+  INSTRUCTOR: 'instructor',
+  ADMIN: 'admin',
+  SUPER_ADMIN: 'super_admin',
+} as const;
 
-/** A permission as returned by GET /permissions (admin operations). */
-export interface Permission {
-  id: string;
-  name: string;
-  description?: string;
-}
+export type UserType = typeof USER_TYPES[keyof typeof USER_TYPES];
 
 // ── Auth endpoint types ───────────────────────────────────────────────────────
 
@@ -92,15 +82,15 @@ export interface ChangePasswordResponse {
 
 // ── Admin user list types ─────────────────────────────────────────────────────
 
-/** Shape returned by GET /users (requires users:read permission). */
+/** Shape returned by GET /users (requires admin access). */
 export interface UserListItem {
   id: string;
   email: string;
   full_name: string;
-  role_id: string;
-  role_name: string;
   user_type: string;
   avatar_url?: string;
+  faculty?: string;
+  department?: string;
   student_id?: string;
   designation?: string;
   is_active: boolean;
