@@ -1,56 +1,21 @@
+#!/usr/bin/env python3
 """
-evaluate.py — Evaluate the two-stage clone detection pipeline on BigCloneBench Balanced.
-
-Pipeline context:
-  Stage 0 (NiCAD-style, Phase One):
-        StructuralNormalizer CST comparison.
-        Detects Type-1  (Jaccard ≥ 0.98 AND Lev ≥ 0.98, literal comparison)
-        Detects Type-2  (max(Jaccard, Lev) ≥ 0.95, blinded comparison, token-delta ≤ 5 %)
-
-  Stage 1 (XGBoost, Phase Two):
-        Hybrid String + AST features → XGBoost classifier → clone probability in [0, 1].
-        Applied ONLY to pairs whose ground-truth clone_type is 3 (or non-clones).
-
-  Stage 2 (Type-3 Filter):
-        Applies levenshtein_ratio and ast_jaccard boundary checks to map an
-        XGBoost-confirmed clone to a Type-3 near-miss result.
-
-Evaluation split per clone type:
-  Type-1 / Type-2  → ground-truth positive = NiCAD phase must fire (label 1)
-  Type-3           → ground-truth positive = XGBoost + Type-3 Filter must fire (label 1)
-  Non-clones       → neither stage should fire (label 0); both stages are run
-
-Primary KPI:
-  Type-3 Recall ≥ 40 % via the XGBoost + Type-3 Filter path.
+Evaluate Syntactic Clone Detector on BigCloneBench Balanced.
 
 Usage:
-    poetry run python evaluate.py
-    poetry run python evaluate.py --model models/clone_detector_xgb.pkl --sample-size 2000
-    poetry run python evaluate.py --clone-types 3 --threshold 0.25
+    python evaluate.py                          # Use config.yaml defaults
+    python evaluate.py --config config.yaml     # Specify custom config
+    python evaluate.py --sample-size 2000       # Override specific values
 """
 
 import argparse
-import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,
-    confusion_matrix,
-    f1_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
-from tqdm import tqdm
+import yaml
+from evaluate_core import evaluate
 
-from clone_detection.features.syntactic_features import SyntacticFeatureExtractor
-from clone_detection.models.classifiers import SyntacticClassifier
-from clone_detection.pipelines import TieredPipeline
-from clone_detection.type3_filter import is_type3_clone
 from clone_detection.utils.common_setup import setup_logging
 
 logger = setup_logging(__name__)
@@ -678,59 +643,64 @@ def evaluate(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description=(
-            "Evaluate the two-stage clone detection pipeline on BigCloneBench Balanced.\n\n"
-            "Routing:\n"
-            "  Type-1 / Type-2 → NiCAD StructuralNormalizer (Phase One)\n"
-            "  Type-3          → XGBoost Clone Detector + Type-3 Filter (Phase Two)\n"
-            "  Non-clones      → NiCAD then XGBoost (both stages)\n\n"
-            f"Dataset: {BCB_BALANCED_PATH}"
-        ),
+        description="Evaluate Syntactic Clone Detector",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Evaluate with default config
+  python evaluate.py
+
+  # Evaluate with custom config
+  python evaluate.py --config /path/to/config.yaml
+
+  # Override specific parameters
+  python evaluate.py --sample-size 2000 --threshold 0.35
+        """,
     )
+
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
+        help="Path to YAML config file (default: config.yaml)",
+    )
+
+    # Override arguments
     parser.add_argument(
         "--model",
         type=str,
-        default=DEFAULT_MODEL_NAME,
-        metavar="MODEL_NAME",
-        help=f"Model filename inside the models/ directory (default: {DEFAULT_MODEL_NAME})",
+        default=None,
+        help="Override model path",
     )
     parser.add_argument(
         "--clone-types",
         type=int,
         nargs="+",
-        default=[1, 2, 3],
-        metavar="N",
-        help="Clone types to include as positives (default: 1 2 3). "
-             "Use '--clone-types 3' to evaluate only on Type-3 pairs.",
+        default=None,
+        help="Override clone types to evaluate",
     )
     parser.add_argument(
         "--sample-size",
         type=int,
         default=None,
-        metavar="N",
-        help="Sample at most N pairs per class for fast evaluation.",
+        help="Override sample size",
     )
     parser.add_argument(
         "--threshold",
         type=float,
         default=None,
-        metavar="T",
-        help=(
-            "XGBoost clone probability threshold for the Type-3 path "
-            "(None = use model calibrated value). "
-            "Sweep 0.10–0.30 to find the best Type-3 F1."
-        ),
+        help="Override decision threshold",
     )
     parser.add_argument(
         "--no-node-types",
         action="store_true",
-        help="Disable per-node-type AST features (must match training config).",
+        help="Disable AST node type features",
     )
     parser.add_argument(
-        "--log-type3-similarity",
-        action="store_true",
-        help="Log lev/ast/prob for every correctly detected Type-3 clone (verbose).",
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Override output directory",
     )
     parser.add_argument(
         "--verbose",
@@ -747,6 +717,37 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    # Load config
+    if not args.config.exists():
+        logger.error(f"Config file not found: {args.config}")
+        logger.info("Using default configuration")
+        config = {}
+    else:
+        config = load_config(args.config)
+
+    # Get evaluation config
+    eval_config = config.get("evaluation", {})
+    model_config = eval_config.get("model", {})
+    features_config = eval_config.get("features", {})
+
+    # Build parameters (CLI overrides config)
+    params = {
+        "model_name": args.model or model_config.get("path", "clone_detector_xgb.pkl"),
+        "clone_types": set(args.clone_types)
+        if args.clone_types
+        else set(eval_config.get("clone_types", [1, 2, 3])),
+        "sample_size": args.sample_size or eval_config.get("sample_size"),
+        "include_node_types": not args.no_node_types
+        and features_config.get("include_node_types", True),
+        "threshold": args.threshold or eval_config.get("threshold"),
+        "log_type3_similarity": eval_config.get("log_type3_similarity", False),
+        "output_dir": args.output_dir
+        or Path(model_config.get("output_dir", "./results/evaluate")),
+        "bcb_path": config.get("datasets", {})
+        .get("bigclonebench_balanced", {})
+        .get("path"),
+    }
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)

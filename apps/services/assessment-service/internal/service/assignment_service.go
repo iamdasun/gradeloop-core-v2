@@ -1,13 +1,14 @@
 package service
 
 import (
-	"github.com/google/uuid"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/client"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/domain"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/dto"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/repository"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/utils"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"gorm.io/datatypes"
 )
 
 // AssignmentService defines the business-logic contract for assignment management.
@@ -16,11 +17,17 @@ type AssignmentService interface {
 	GetAssignmentByID(id uuid.UUID) (*domain.Assignment, error)
 	UpdateAssignment(id uuid.UUID, req *dto.UpdateAssignmentRequest, username, ipAddress, userAgent string) (*domain.Assignment, error)
 	ListAssignmentsByCourseInstance(courseInstanceID uuid.UUID) ([]domain.Assignment, error)
+
+	// Content sub-resources
+	GetAssignmentRubric(assignmentID uuid.UUID) ([]domain.AssignmentRubricCriterion, error)
+	GetAssignmentTestCases(assignmentID uuid.UUID) ([]domain.AssignmentTestCase, error)
+	GetAssignmentSampleAnswer(assignmentID uuid.UUID) (*domain.AssignmentSampleAnswer, error)
 }
 
 // assignmentService is the concrete implementation.
 type assignmentService struct {
 	assignmentRepo repository.AssignmentRepository
+	contentRepo    repository.AssignmentContentRepository
 	auditClient    *client.AuditClient
 	logger         *zap.Logger
 }
@@ -28,11 +35,13 @@ type assignmentService struct {
 // NewAssignmentService wires all dependencies and returns an AssignmentService.
 func NewAssignmentService(
 	assignmentRepo repository.AssignmentRepository,
+	contentRepo repository.AssignmentContentRepository,
 	auditClient *client.AuditClient,
 	logger *zap.Logger,
 ) AssignmentService {
 	return &assignmentService{
 		assignmentRepo: assignmentRepo,
+		contentRepo:    contentRepo,
 		auditClient:    auditClient,
 		logger:         logger,
 	}
@@ -77,12 +86,19 @@ func (s *assignmentService) CreateAssignment(
 	}
 
 	// 4. Build domain model
+	assignmentType := "lab"
+	if req.AssessmentType != "" {
+		assignmentType = req.AssessmentType
+	}
+
 	assignment := &domain.Assignment{
 		CourseInstanceID: req.CourseInstanceID,
 
-		Title:       req.Title,
-		Description: req.Description,
-		Code:        req.Code,
+		Title:          req.Title,
+		Description:    req.Description,
+		Code:           req.Code,
+		AssessmentType: assignmentType,
+		Objective:      req.Objective,
 
 		ReleaseAt: req.ReleaseAt,
 		DueAt:     req.DueAt,
@@ -102,10 +118,70 @@ func (s *assignmentService) CreateAssignment(
 		CreatedBy: createdBy,
 	}
 
-	// 5. Persist
+	// 5. Persist assignment row
 	if err := s.assignmentRepo.CreateAssignment(assignment); err != nil {
 		s.logger.Error("failed to create assignment", zap.Error(err))
 		return nil, utils.ErrInternal("failed to create assignment", err)
+	}
+
+	// 5b. Persist inline content sub-resources
+	if len(req.RubricCriteria) > 0 {
+		criteria := make([]domain.AssignmentRubricCriterion, 0, len(req.RubricCriteria))
+		for i, rc := range req.RubricCriteria {
+			bandsJSON := datatypes.JSON([]byte("{}"))
+			if len(rc.Bands) > 0 {
+				bandsJSON = datatypes.JSON(rc.Bands)
+			}
+			criterion := domain.AssignmentRubricCriterion{
+				AssignmentID: assignment.ID,
+				Name:         rc.Name,
+				Description:  rc.Description,
+				GradingMode:  rc.GradingMode,
+				Weight:       rc.Weight,
+				Bands:        bandsJSON,
+				OrderIndex:   rc.OrderIndex,
+			}
+			if criterion.OrderIndex == 0 {
+				criterion.OrderIndex = i + 1
+			}
+			criteria = append(criteria, criterion)
+		}
+		if err := s.contentRepo.CreateRubricCriteria(criteria); err != nil {
+			s.logger.Warn("failed to persist rubric criteria", zap.Error(err))
+		}
+	}
+
+	if len(req.TestCases) > 0 {
+		testCases := make([]domain.AssignmentTestCase, 0, len(req.TestCases))
+		for i, tc := range req.TestCases {
+			testCase := domain.AssignmentTestCase{
+				AssignmentID:   assignment.ID,
+				Description:    tc.Description,
+				Input:          tc.Input,
+				ExpectedOutput: tc.ExpectedOutput,
+				IsHidden:       tc.IsHidden,
+				OrderIndex:     tc.OrderIndex,
+			}
+			if testCase.OrderIndex == 0 {
+				testCase.OrderIndex = i + 1
+			}
+			testCases = append(testCases, testCase)
+		}
+		if err := s.contentRepo.CreateTestCases(testCases); err != nil {
+			s.logger.Warn("failed to persist test cases", zap.Error(err))
+		}
+	}
+
+	if req.SampleAnswer != nil {
+		answer := &domain.AssignmentSampleAnswer{
+			AssignmentID: assignment.ID,
+			LanguageID:   req.SampleAnswer.LanguageID,
+			Language:     req.SampleAnswer.Language,
+			Code:         req.SampleAnswer.Code,
+		}
+		if err := s.contentRepo.UpsertSampleAnswer(answer); err != nil {
+			s.logger.Warn("failed to persist sample answer", zap.Error(err))
+		}
 	}
 
 	// 6. Audit log
@@ -341,4 +417,35 @@ func (s *assignmentService) ListAssignmentsByCourseInstance(courseInstanceID uui
 	}
 
 	return assignments, nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Content sub-resource getters
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (s *assignmentService) GetAssignmentRubric(assignmentID uuid.UUID) ([]domain.AssignmentRubricCriterion, error) {
+	criteria, err := s.contentRepo.ListRubricCriteria(assignmentID)
+	if err != nil {
+		s.logger.Error("failed to list rubric criteria", zap.String("assignment_id", assignmentID.String()), zap.Error(err))
+		return nil, utils.ErrInternal("failed to load rubric", err)
+	}
+	return criteria, nil
+}
+
+func (s *assignmentService) GetAssignmentTestCases(assignmentID uuid.UUID) ([]domain.AssignmentTestCase, error) {
+	cases, err := s.contentRepo.ListTestCases(assignmentID)
+	if err != nil {
+		s.logger.Error("failed to list test cases", zap.String("assignment_id", assignmentID.String()), zap.Error(err))
+		return nil, utils.ErrInternal("failed to load test cases", err)
+	}
+	return cases, nil
+}
+
+func (s *assignmentService) GetAssignmentSampleAnswer(assignmentID uuid.UUID) (*domain.AssignmentSampleAnswer, error) {
+	answer, err := s.contentRepo.GetSampleAnswer(assignmentID)
+	if err != nil {
+		s.logger.Error("failed to load sample answer", zap.String("assignment_id", assignmentID.String()), zap.Error(err))
+		return nil, utils.ErrInternal("failed to load sample answer", err)
+	}
+	return answer, nil
 }

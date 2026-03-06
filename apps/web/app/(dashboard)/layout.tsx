@@ -4,6 +4,7 @@ import * as React from "react";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { MobileSidebar } from "@/components/dashboard/mobile-sidebar";
+import { SecondarySidebar } from "@/components/dashboard/secondary-sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AuthGuard } from "@/components/auth/auth-guard";
 
@@ -18,13 +19,17 @@ export default function DashboardLayout({
   return (
     <AuthGuard>
       <div className="flex h-screen overflow-hidden bg-background transition-colors duration-300">
-        {/* Desktop Sidebar */}
+        {/* Desktop Primary Sidebar */}
         <aside className="hidden lg:block">
           <Sidebar
             collapsed={sidebarCollapsed}
             onCollapsedChange={setSidebarCollapsed}
           />
         </aside>
+
+        {/* Desktop Secondary Sidebar — rendered at layout level so it sits
+            flush, full-height, outside the scrollable content area */}
+        <SecondarySidebar />
 
         {/* Mobile Sidebar */}
         <MobileSidebar open={mobileMenuOpen} onOpenChange={setMobileMenuOpen} />

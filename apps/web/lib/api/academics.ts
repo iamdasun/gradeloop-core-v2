@@ -57,6 +57,8 @@ import type {
   UpdateEnrollmentRequest,
   AddPrerequisiteRequest,
   StudentCourseEnrollment,
+  EnrolledBatchStats,
+  EnrollBatchResult,
 } from "@/types/academics.types";
 
 // ── Faculties (super_admin only) ──────────────────────────────────────────────
@@ -645,6 +647,70 @@ export const instructorCoursesApi = {
     if (Array.isArray(data?.instructors))
       return data.instructors as CourseInstructor[];
     return [];
+  },
+
+  /** Enroll an individual student (instructor-initiated, skips batch check) */
+  enrollStudent: async (
+    instanceId: string,
+    userId: string,
+    status = "Enrolled",
+  ): Promise<Enrollment> => {
+    const { data } = await axiosInstance.post<Enrollment>(
+      `/instructor-courses/${instanceId}/enrollments`,
+      { user_id: userId, status },
+    );
+    return data;
+  },
+
+  /** Remove a single student's enrollment */
+  unenrollStudent: async (
+    instanceId: string,
+    userId: string,
+  ): Promise<void> => {
+    await axiosInstance.delete(
+      `/instructor-courses/${instanceId}/students/${userId}`,
+    );
+  },
+
+  /** Bulk-enroll all members of a batch; returns partial-success detail */
+  enrollBatch: async (
+    instanceId: string,
+    batchId: string,
+  ): Promise<EnrollBatchResult> => {
+    const { data } = await axiosInstance.post<EnrollBatchResult>(
+      `/instructor-courses/${instanceId}/enroll-batch`,
+      { batch_id: batchId },
+    );
+    return data;
+  },
+
+  /** List all active batches with member counts (for Add Students modal) */
+  listAvailableBatches: async (): Promise<EnrolledBatchStats[]> => {
+    const { data } = await axiosInstance.get("/instructor-courses/batches");
+    if (Array.isArray(data)) return data as EnrolledBatchStats[];
+    if (Array.isArray(data?.batches)) return data.batches as EnrolledBatchStats[];
+    return [];
+  },
+
+  /** List batches that have ≥1 member enrolled in this course instance */
+  getEnrolledBatches: async (instanceId: string): Promise<EnrolledBatchStats[]> => {
+    const { data } = await axiosInstance.get(
+      `/instructor-courses/${instanceId}/enrolled-batches`,
+    );
+    if (Array.isArray(data)) return data as EnrolledBatchStats[];
+    if (Array.isArray(data?.batches)) return data.batches as EnrolledBatchStats[];
+    return [];
+  },
+
+  /** Remove all batch members from this course instance enrollment */
+  unenrollBatch: async (
+    instanceId: string,
+    batchId: string,
+  ): Promise<{ removed: number; total: number }> => {
+    const { data } = await axiosInstance.delete(
+      `/instructor-courses/${instanceId}/enrolled-batches/${batchId}`,
+    );
+    return data;
   },
 };
 

@@ -1,0 +1,52 @@
+meta {
+  name: Get Assignment Rubric (Instructor)
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{INSTRUCTOR_ASSIGNMENTS_URL_V1}}/{{ASSIGNMENT_ID}}/rubric
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+docs {
+  # Get Assignment Rubric (Instructor)
+
+  Returns the ordered list of rubric criteria for the specified assignment.
+  The instructor must be assigned to the assignment's course instance.
+
+  ## Endpoint
+  GET /api/v1/instructor-assignments/:id/rubric
+
+  ## Authentication
+  Requires Employee, Admin, or Super Admin role.
+
+  ## Response (200 OK)
+  ```json
+  {
+    "assignment_id": "uuid",
+    "criteria": [
+      {
+        "id": "uuid",
+        "name": "Code Correctness",
+        "description": "Solution produces correct output for all test cases.",
+        "grading_mode": "deterministic",
+        "weight": 60,
+        "bands": {},
+        "order_index": 1
+      }
+    ],
+    "total_weight": 100
+  }
+  ```
+
+  ## Error Responses
+  - 401 Unauthorized — missing or invalid JWT
+  - 403 Forbidden — not assigned to the course instance
+  - 404 Not Found — assignment does not exist
+}

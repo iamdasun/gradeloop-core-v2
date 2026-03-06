@@ -173,12 +173,23 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	// ─────────────────────────────────────────────────────────────────────────
 	// Instructor-scoped routes (instructor + admin + super_admin)
 	// PathPrefix: /api/v1/instructor-courses — routed by Traefik to academic-service
-	// ─────────────────────────────────────────────────────────────────────────
+	// NOTE: static sub-paths (/me, /batches) must be registered BEFORE /:id
+	// so that Fiber doesn't interpret them as UUID parameters.
+	// ─────────────────────────────────────────────────────────────────────────────
 	instructorCourses := protected.Group("/instructor-courses",
 		middleware.RequireAnyUserType("instructor", "admin", "super_admin"))
 	instructorCourses.Get("/me", cfg.InstructorHandler.GetMyCourses)
+	// Static paths before /:id
+	instructorCourses.Get("/batches", cfg.InstructorHandler.ListAvailableBatches)
+	// Instance-scoped reads
 	instructorCourses.Get("/:id/students", cfg.InstructorHandler.GetMyStudents)
 	instructorCourses.Get("/:id/instructors", cfg.InstructorHandler.GetMyInstructors)
+	instructorCourses.Get("/:id/enrolled-batches", cfg.InstructorHandler.GetEnrolledBatches)
+	// Instance-scoped mutations
+	instructorCourses.Post("/:id/enrollments", cfg.InstructorHandler.EnrollStudent)
+	instructorCourses.Delete("/:id/students/:userID", cfg.InstructorHandler.UnenrollStudent)
+	instructorCourses.Post("/:id/enroll-batch", cfg.InstructorHandler.EnrollBatch)
+	instructorCourses.Delete("/:id/enrolled-batches/:batchID", cfg.InstructorHandler.UnenrollBatch)
 
 	// ─────────────────────────────────────────────────────────────────────────
 	// Student-scoped routes (student + admin + super_admin)

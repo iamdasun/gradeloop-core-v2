@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/domain"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/dto"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/utils"
+	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 // parseQueryUUID parses a raw UUID string from a query parameter.
@@ -54,9 +54,11 @@ func toAssignmentResponse(a *domain.Assignment) dto.AssignmentResponse {
 		ID:               a.ID,
 		CourseInstanceID: a.CourseInstanceID,
 
-		Title:       a.Title,
-		Description: a.Description,
-		Code:        a.Code,
+		Title:          a.Title,
+		Description:    a.Description,
+		Code:           a.Code,
+		AssessmentType: a.AssessmentType,
+		Objective:      a.Objective,
 
 		ReleaseAt: a.ReleaseAt,
 		DueAt:     a.DueAt,

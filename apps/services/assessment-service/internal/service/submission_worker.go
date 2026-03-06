@@ -174,11 +174,39 @@ func (w *SubmissionWorker) Process(ctx context.Context, job queue.SubmissionJob)
 			executionUpdate.Status = finalStatus
 
 			// ── Step 5: Evaluate test cases (if assignment has them) ────────────
-			assignment, err := w.assignmentRepo.GetAssignmentByID(job.AssignmentID)
-			if err == nil && assignment != nil {
-				// TODO: Load test cases from assignment when test case storage is implemented
-				// For now, skip test case evaluation
-				_ = assignment
+			// Test cases and sample answer are forwarded in the queue message so
+			// the worker does not need a second DB round-trip.
+			if len(job.TestCases) > 0 {
+				evalTestCases := make([]domain.TestCase, 0, len(job.TestCases))
+				for _, tc := range job.TestCases {
+					evalTestCases = append(evalTestCases, domain.TestCase{
+						ID:             tc.ID,
+						Input:          tc.Input,
+						ExpectedOutput: tc.ExpectedOutput,
+					})
+				}
+
+				evalResult, evalErr := w.evalService.EvaluateSubmission(
+					context.Background(),
+					job.Code,
+					job.LanguageID,
+					evalTestCases,
+				)
+				if evalErr != nil {
+					logger.Warn("worker: test case evaluation failed", zap.Error(evalErr))
+				} else {
+					executionUpdate.TestCasesPassed = evalResult.TestCasesPassed
+					executionUpdate.TotalTestCases = evalResult.TotalTestCases
+					if resultBytes, serErr := SerializeTestCaseResults(evalResult.Results); serErr == nil {
+						executionUpdate.TestCaseResults = resultBytes
+					} else {
+						logger.Warn("worker: failed to serialize test case results", zap.Error(serErr))
+					}
+					logger.Info("worker: test case evaluation complete",
+						zap.Int("passed", evalResult.TestCasesPassed),
+						zap.Int("total", evalResult.TotalTestCases),
+					)
+				}
 			}
 
 			// Update submission with execution results

@@ -1,0 +1,45 @@
+meta {
+  name: Get Assignment Sample Answer (Instructor)
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{INSTRUCTOR_ASSIGNMENTS_URL_V1}}/{{ASSIGNMENT_ID}}/sample-answer
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+docs {
+  # Get Assignment Sample Answer (Instructor)
+
+  Returns the reference implementation (sample answer) for the specified
+  assignment.  The instructor must be assigned to the assignment's course
+  instance.
+
+  ## Endpoint
+  GET /api/v1/instructor-assignments/:id/sample-answer
+
+  ## Authentication
+  Requires Employee, Admin, or Super Admin role.
+
+  ## Response (200 OK)
+  ```json
+  {
+    "id": "uuid",
+    "assignment_id": "uuid",
+    "language_id": 71,
+    "language": "Python 3",
+    "code": "..."
+  }
+  ```
+
+  ## Error Responses
+  - 401 Unauthorized — missing or invalid JWT
+  - 403 Forbidden — not assigned to the course instance
+  - 404 Not Found — assignment or sample answer does not exist
+}

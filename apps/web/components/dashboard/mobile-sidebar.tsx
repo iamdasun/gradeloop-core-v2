@@ -20,7 +20,8 @@ import {
   ChevronDown,
   ClipboardList,
   Users2,
-  Plus
+  Plus,
+  Mic2
 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { useLogoutMutation } from "@/lib/hooks/useAuthMutation";
@@ -113,18 +114,36 @@ const instructorNavItems: NavItem[] = [
     icon: BookOpen,
   },
   {
-    title: "Assessments",
-    href: "/instructor/assessments",
-    icon: FileText,
+    title: "Settings",
+    href: "/instructor/settings",
+    icon: Settings,
+  },
+];
+
+const studentNavItems: NavItem[] = [
+  {
+    title: "Dashboard",
+    href: "/student",
+    icon: LayoutDashboard,
   },
   {
-    title: "Students",
-    href: "/instructor/students",
-    icon: GraduationCap,
+    title: "My Courses",
+    href: "/student/courses",
+    icon: BookOpen,
+  },
+  {
+    title: "Submissions",
+    href: "/student/submissions",
+    icon: ClipboardList,
+  },
+  {
+    title: "Viva Assessments",
+    href: "/student/assessments/my-sessions",
+    icon: Mic2,
   },
   {
     title: "Settings",
-    href: "/instructor/settings",
+    href: "/student/settings",
     icon: Settings,
   },
 ];
@@ -139,9 +158,23 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
 
-  const isInstructor = user?.user_type?.toLowerCase().trim() === "instructor";
-  const navItems = isInstructor ? instructorNavItems : adminNavItems;
-  const homeHref = isInstructor ? "/instructor" : "/admin";
+  // Determine user role from user_type, not from pathname
+  const userType = user?.user_type?.toLowerCase().trim() ?? "";
+  const isInstructor = userType === "instructor";
+  const isStudent = userType === "student";
+  const isAdmin = userType === "admin" || userType === "super_admin";
+
+  const navItems = isInstructor
+    ? instructorNavItems
+    : isStudent
+      ? studentNavItems
+      : adminNavItems;
+
+  const homeHref = isInstructor
+    ? "/instructor"
+    : isStudent
+      ? "/student"
+      : "/admin";
 
   const displayName = user?.full_name || user?.email || "—";
   const initials = user?.full_name
@@ -293,6 +326,7 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
             </Avatar>
             <div className="flex flex-col flex-1 overflow-hidden">
               <span className="font-semibold text-sm truncate">{displayName}</span>
+              <span className="text-xs text-muted-foreground truncate capitalize">{user?.user_type || 'Member'}</span>
               <span className="text-xs text-muted-foreground truncate capitalize">{user?.user_type || 'Member'}</span>
             </div>
           </div>

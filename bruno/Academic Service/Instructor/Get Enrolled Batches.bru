@@ -1,0 +1,67 @@
+meta {
+  name: Get Enrolled Batches
+  type: http
+  seq: 8
+}
+
+docs {
+  # Get Enrolled Batches
+
+  Returns batches that have at least one member currently enrolled in the
+  course instance, along with per-batch enrollment counts.
+
+  ## Prerequisites
+  - Valid access token with Instructor, Admin, or Super Admin role
+  - The caller must be assigned as an instructor of the course instance
+  - `COURSE_INSTANCE_ID` environment variable must be set
+
+  ## Path Parameters
+  | Parameter | Description |
+  |-----------|-------------|
+  | `:id`     | Course instance UUID |
+
+  ## Response (200 OK)
+  ```json
+  {
+    "batches": [
+      {
+        "batch_id": "uuid",
+        "name": "Batch 22",
+        "code": "IT22",
+        "start_year": 2022,
+        "end_year": 2026,
+        "is_active": true,
+        "total_members": 45,
+        "enrolled_count": 38
+      }
+    ],
+    "count": 1
+  }
+  ```
+
+  ## Notes
+  - Only batches with `enrolled_count > 0` are included
+  - `enrolled_count` reflects members enrolled in **this** course instance
+}
+
+get {
+  url: {{INSTRUCTOR_COURSES_URL_V1}}/{{COURSE_INSTANCE_ID}}/enrolled-batches
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Enrolled batches fetched successfully");
+    console.log("   Count:", res.body.count);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

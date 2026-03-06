@@ -1,0 +1,123 @@
+# CIPAS Semantics Service Configuration
+# This configuration file contains all parameters for training and evaluation
+# Run scripts without arguments: `python train.py` or `python evaluate.py`
+
+# =============================================================================
+# DATASET CONFIGURATION
+# =============================================================================
+datasets:
+  # Project CodeNet for training
+  codenet:
+    path: "/home/iamdasun/Projects/4yrg/gradeloop-core-v2/datasets/project-codenet"
+
+  # GPTCloneBench for evaluation
+  gptclonebench:
+    path: "/home/iamdasun/Projects/4yrg/gradeloop-core-v2/datasets/gptclonebench/gptclonebench_dataset.jsonl"
+
+# =============================================================================
+# TRAINING CONFIGURATION
+# =============================================================================
+training:
+  # Model output settings
+  model:
+    name: "type4_xgb_codenet.pkl"
+    dir: "./models"
+    output_dir: "./results/train"
+
+  # Dataset selection
+  dataset:
+    path: null  # null = use datasets.codenet.path
+    language: "java"
+    languages: null  # null = use single language, or ["java", "python", "c", "csharp"]
+    all_languages: false
+
+  # Sample size (null = full dataset, capped at 500k)
+  sample_size: null
+  full_dataset: false
+
+  # Data composition
+  clone_ratio: 0.5            # Ratio of clone pairs
+  hard_negative_ratio: 0.20   # Ratio of hard negative pairs
+
+  # GPTCloneBench domain adaptation
+  include_gptclonebench: false
+  gptclonebench:
+    path: null  # null = use datasets.gptclonebench.path
+    ratio: 0.10  # 10% GPTCloneBench samples
+
+  # Problem limiting (for faster training)
+  max_problems: null
+
+  # Train/test split
+  test_size: 0.2
+
+  # Feature extraction
+  features:
+    # Sheneamer et al. (2021) features
+    traditional: true         # LOC, keyword categories
+    syntactic_cst: true       # Tree-sitter node frequencies
+    semantic_pdg: true        # Dependency relationships
+    structural_depth: true    # Nesting, depth, density
+    type_signatures: true     # Parameter/return type patterns
+    api_fingerprinting: true  # Library usage patterns
+
+  # Cross-validation
+  cross_validation: true
+
+  # Visualization
+  visualize: true
+
+  # XGBoost hyperparameters (optional, defaults used if not specified)
+  xgboost:
+    n_estimators: 500
+    max_depth: 6
+    learning_rate: 0.1
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 1
+    gamma: 0
+    reg_lambda: 1.0
+    scale_pos_weight: null  # auto-calculated
+
+# =============================================================================
+# EVALUATION CONFIGURATION
+# =============================================================================
+evaluation:
+  # Model to load
+  model:
+    path: "models/type4_xgb_java.pkl"
+
+  # Dataset selection
+  dataset:
+    path: null  # null = use datasets.gptclonebench.path
+    format: "gptclonebench"  # "gptclonebench", "bigclonebench", "toma", "json"
+
+  # Language selection
+  language: null  # null = all 4 languages, or "java", "python", "c", "csharp"
+  all_languages: false
+
+  # Sample size (null = full dataset)
+  sample_size: null
+
+  # Decision threshold (null = use calibrated from model)
+  threshold: null
+
+  # Threshold analysis
+  threshold_sweep: true
+
+  # Visualization
+  visualize: true
+
+  # Output
+  output_dir: "./results/evaluate"
+
+  # Logging
+  log_level: "INFO"
+
+# =============================================================================
+# SERVICE CONFIGURATION (FastAPI)
+# =============================================================================
+service:
+  host: "0.0.0.0"
+  port: 8087
+  reload: false

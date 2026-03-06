@@ -1,0 +1,66 @@
+meta {
+  name: List Available Batches
+  type: http
+  seq: 6
+}
+
+docs {
+  # List Available Batches
+
+  Returns all active batches with their member counts. Used by the
+  instructor's "Add Students" modal to let instructors enroll an
+  entire batch at once.
+
+  ## Prerequisites
+  - Valid access token with Instructor, Admin, or Super Admin role
+
+  ## Response (200 OK)
+  ```json
+  {
+    "batches": [
+      {
+        "batch_id": "uuid",
+        "name": "Batch 22",
+        "code": "IT22",
+        "start_year": 2022,
+        "end_year": 2026,
+        "is_active": true,
+        "total_members": 45,
+        "enrolled_count": 0
+      }
+    ],
+    "count": 1
+  }
+  ```
+
+  ## Notes
+  - Only active (non-deactivated) batches are returned
+  - `enrolled_count` is always `0` in this response; use
+    `GET /:id/enrolled-batches` to get per-course enrollment counts
+}
+
+get {
+  url: {{INSTRUCTOR_COURSES_URL_V1}}/batches
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    console.log("✅ Available batches fetched successfully");
+    console.log("   Count:", res.body.count);
+    if (res.body.batches && res.body.batches.length > 0) {
+      bru.setEnvVar("BATCH_ID", res.body.batches[0].batch_id);
+      console.log("   First batch_id saved:", res.body.batches[0].batch_id);
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

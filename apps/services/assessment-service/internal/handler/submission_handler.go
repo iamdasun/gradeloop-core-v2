@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/domain"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/dto"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/service"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/utils"
+	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -224,14 +224,23 @@ func (h *SubmissionHandler) RunCode(c fiber.Ctx) error {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // parseOwnerQueryParams reads the optional user_id and group_id query
-// parameters.  Exactly one must be provided; both absent or both present
-// returns a 400 error.
+// parameters.
+//
+// Rules:
+//   - If exactly one of user_id or group_id is provided, that value is used.
+//   - If neither is provided, the authenticated user's ID (from JWT locals)
+//     is used as user_id.
+//   - If both are provided, returns a 400 error.
 func parseOwnerQueryParams(c fiber.Ctx) (*uuid.UUID, *uuid.UUID, error) {
 	rawUserID := c.Query("user_id")
 	rawGroupID := c.Query("group_id")
 
 	if rawUserID == "" && rawGroupID == "" {
-		return nil, nil, utils.ErrBadRequest("one of user_id or group_id query parameter is required")
+		userID := requireUserID(c)
+		if userID == uuid.Nil {
+			return nil, nil, utils.ErrUnauthorized("user not authenticated")
+		}
+		return &userID, nil, nil
 	}
 	if rawUserID != "" && rawGroupID != "" {
 		return nil, nil, utils.ErrBadRequest("only one of user_id or group_id may be provided")

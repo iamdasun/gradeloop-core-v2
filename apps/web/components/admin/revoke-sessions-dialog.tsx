@@ -44,7 +44,7 @@ export function RevokeSessionsDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Revoke Sessions"
-      description={`This will immediately terminate all active sessions for ${user?.username ?? "this user"}. They will need to log in again on all devices.`}
+      description={`This will immediately terminate all active sessions for ${user?.full_name ?? "this user"}. They will need to log in again on all devices.`}
       confirmLabel="Revoke All Sessions"
       onConfirm={handleConfirm}
       loading={loading}

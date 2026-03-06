@@ -15,6 +15,15 @@ import (
 // Message payload
 // ─────────────────────────────────────────────────────────────────────────────
 
+// SubmissionTestCase is the lightweight test-case payload forwarded through
+// the queue. It carries only the fields the worker needs for evaluation,
+// keeping message size predictable.
+type SubmissionTestCase struct {
+	ID             string `json:"id"`
+	Input          string `json:"input"`
+	ExpectedOutput string `json:"expected_output"`
+}
+
 // SubmissionJob is the message payload written to the submission queue.
 // It carries everything the consumer worker needs to complete the submission
 // without touching the HTTP request context.
@@ -49,6 +58,26 @@ type SubmissionJob struct {
 	// EnqueuedAt is set by the publisher so queue-latency metrics can be
 	// derived without consulting the database.
 	EnqueuedAt time.Time `json:"enqueued_at"`
+
+	// ── Assignment evaluation context ───────────────────────────────────────
+	// These fields are loaded from the DB at submission-creation time and
+	// forwarded so the worker can evaluate test cases without extra DB calls.
+	// They are also forwarded to ACAFS for rubric-based LLM grading.
+
+	// AssessmentType mirrors Assignment.AssessmentType (lab | exam).
+	AssessmentType string `json:"assessment_type,omitempty"`
+
+	// Objective mirrors Assignment.Objective — the LLM context string.
+	Objective string `json:"objective,omitempty"`
+
+	// TestCases carries the assignment's persisted test cases so the worker
+	// can run deterministic Judge0 evaluation without an extra DB round-trip.
+	TestCases []SubmissionTestCase `json:"test_cases,omitempty"`
+
+	// SampleAnswerCode and SampleAnswerLanguageID are forwarded to ACAFS for
+	// LLM-based rubric evaluation that uses the reference implementation.
+	SampleAnswerCode       string `json:"sample_answer_code,omitempty"`
+	SampleAnswerLanguageID int    `json:"sample_answer_language_id,omitempty"`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

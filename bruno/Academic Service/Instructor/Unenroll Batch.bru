@@ -1,0 +1,63 @@
+meta {
+  name: Unenroll Batch
+  type: http
+  seq: 9
+}
+
+docs {
+  # Unenroll Batch
+
+  Removes all members of a batch from the course instance enrollment.
+  Members who are not currently enrolled are silently skipped.
+
+  ## Prerequisites
+  - Valid access token with Instructor, Admin, or Super Admin role
+  - The caller must be assigned as an instructor of the course instance
+  - `COURSE_INSTANCE_ID` and `BATCH_ID` environment variables must be set
+
+  ## Path Parameters
+  | Parameter   | Description |
+  |-------------|-------------|
+  | `:id`       | Course instance UUID |
+  | `:batchID`  | Batch UUID to unenroll |
+
+  ## Response (200 OK)
+  ```json
+  {
+    "removed": 38,
+    "total": 45
+  }
+  ```
+
+  | Field     | Description |
+  |-----------|-------------|
+  | `removed` | Number of students successfully unenrolled |
+  | `total`   | Total batch members processed |
+
+  ## Notes
+  - Students not enrolled in the course instance are silently skipped
+    (not counted in `removed`)
+  - The batch itself is not deleted or modified
+
+  ## Error Responses
+  | Status | Description |
+  |--------|-------------|
+  | 401    | Missing or invalid authorization |
+  | 403    | Caller not assigned to this course instance |
+  | 404    | Course instance or batch not found |
+}
+
+delete {
+  url: {{INSTRUCTOR_COURSES_URL_V1}}/{{COURSE_INSTANCE_ID}}/enrolled-batches/{{BATCH_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

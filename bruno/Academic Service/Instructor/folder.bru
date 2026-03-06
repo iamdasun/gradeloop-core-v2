@@ -6,15 +6,31 @@ docs {
   # Instructor-Scoped Academic Endpoints
 
   These endpoints allow instructors (Employee role) to access their assigned
-  course instances, enrolled students, and co-instructors.
+  course instances, manage student enrollments, and enroll batches.
 
   ## Authentication
-  Requires a valid Bearer token. Caller must have Employee, Admin, or Super Admin role.
+  Requires a valid Bearer token. Caller must have Instructor, Admin, or Super Admin role.
 
-  ## Available Endpoints
-  | Method | Path                                       | Description                    |
-  |--------|--------------------------------------------|--------------------------------|
-  | GET    | /api/v1/instructor-courses/me              | My assigned course instances   |
-  | GET    | /api/v1/instructor-courses/:id/students    | Enrolled students for a course |
-  | GET    | /api/v1/instructor-courses/:id/instructors | Co-instructors for a course    |
+  ## Read Endpoints
+  | Method | Path                                          | Description                              |
+  |--------|-----------------------------------------------|------------------------------------------|
+  | GET    | /api/v1/instructor-courses/me                 | My assigned course instances             |
+  | GET    | /api/v1/instructor-courses/batches            | All active batches (with member counts)  |
+  | GET    | /api/v1/instructor-courses/:id/students       | Enrolled students for a course           |
+  | GET    | /api/v1/instructor-courses/:id/instructors    | Co-instructors for a course              |
+  | GET    | /api/v1/instructor-courses/:id/enrolled-batches | Batches with enrollments in a course   |
+
+  ## Enrollment Mutation Endpoints
+  | Method | Path                                                   | Description                      |
+  |--------|--------------------------------------------------------|----------------------------------|
+  | POST   | /api/v1/instructor-courses/:id/enrollments             | Enroll an individual student     |
+  | DELETE | /api/v1/instructor-courses/:id/students/:userID        | Unenroll an individual student   |
+  | POST   | /api/v1/instructor-courses/:id/enroll-batch            | Enroll all members of a batch    |
+  | DELETE | /api/v1/instructor-courses/:id/enrolled-batches/:batchID | Unenroll all members of a batch |
+
+  ## Notes
+  - For individual enrollment, the student's user UUID must be provided.
+    Use `GET /api/v1/users/students` (IAM service) to look up student UUIDs.
+  - Batch enrollment is idempotent: already-enrolled students are skipped.
+  - Batch unenrollment is also idempotent: non-enrolled members are skipped.
 }

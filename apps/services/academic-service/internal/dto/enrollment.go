@@ -114,6 +114,19 @@ type UpdateEnrollmentRequest struct {
 	FinalGrade string `json:"final_grade"`
 }
 
+// EnrollBatchRequest is the payload for POST /instructor-courses/:id/enroll-batch
+type EnrollBatchRequest struct {
+	BatchID uuid.UUID `json:"batch_id"`
+}
+
+// EnrollBatchResponse summarises the result of a bulk batch enrollment
+type EnrollBatchResponse struct {
+	Enrolled     int         `json:"enrolled"`
+	Skipped      int         `json:"skipped"`
+	Total        int         `json:"total"`
+	SkippedUsers []uuid.UUID `json:"skipped_users,omitempty"`
+}
+
 // EnrollmentResponse is returned for enrollment endpoints
 type EnrollmentResponse struct {
 	CourseInstanceID uuid.UUID `json:"course_instance_id"`

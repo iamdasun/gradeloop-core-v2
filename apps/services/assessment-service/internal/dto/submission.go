@@ -24,24 +24,26 @@ type CreateSubmissionRequest struct {
 
 // RunCodeRequest is the payload for POST /run-code.
 // Executes code without creating a persistent submission.
+// AssignmentID is optional — if omitted the enrollment check is skipped.
+// This allows instructors to test sample answers before an assignment exists.
 type RunCodeRequest struct {
-	AssignmentID uuid.UUID `json:"assignment_id"`
-	LanguageID   int       `json:"language_id"`
-	SourceCode   string    `json:"source_code"`
-	Stdin        string    `json:"stdin,omitempty"`
+	AssignmentID *uuid.UUID `json:"assignment_id,omitempty"`
+	LanguageID   int        `json:"language_id"`
+	SourceCode   string     `json:"source_code"`
+	Stdin        string     `json:"stdin,omitempty"`
 }
 
 // RunCodeResponse is the response for POST /run-code.
 // Contains the execution result from Judge0.
 type RunCodeResponse struct {
-	Stdout         string `json:"stdout"`
-	Stderr         string `json:"stderr"`
-	CompileOutput  string `json:"compile_output"`
-	ExecutionTime  string `json:"execution_time"`
-	MemoryUsed     int    `json:"memory_used"`
-	Status         string `json:"status"`
-	StatusID       int    `json:"status_id"`
-	Message        string `json:"message,omitempty"`
+	Stdout        string `json:"stdout"`
+	Stderr        string `json:"stderr"`
+	CompileOutput string `json:"compile_output"`
+	ExecutionTime string `json:"execution_time"`
+	MemoryUsed    int    `json:"memory_used"`
+	Status        string `json:"status"`
+	StatusID      int    `json:"status_id"`
+	Message       string `json:"message,omitempty"`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,15 +74,15 @@ type SubmissionResponse struct {
 	Code string `json:"code,omitempty"`
 
 	// Judge0 execution results
-	ExecutionStdout   string                 `json:"execution_stdout,omitempty"`
-	ExecutionStderr   string                 `json:"execution_stderr,omitempty"`
-	CompileOutput     string                 `json:"compile_output,omitempty"`
-	ExecutionStatus   string                 `json:"execution_status,omitempty"`
-	ExecutionStatusID int                    `json:"execution_status_id,omitempty"`
-	ExecutionTime     string                 `json:"execution_time,omitempty"`
-	MemoryUsed        int                    `json:"memory_used,omitempty"`
-	TestCasesPassed   int                    `json:"test_cases_passed,omitempty"`
-	TotalTestCases    int                    `json:"total_test_cases,omitempty"`
+	ExecutionStdout   string                  `json:"execution_stdout,omitempty"`
+	ExecutionStderr   string                  `json:"execution_stderr,omitempty"`
+	CompileOutput     string                  `json:"compile_output,omitempty"`
+	ExecutionStatus   string                  `json:"execution_status,omitempty"`
+	ExecutionStatusID int                     `json:"execution_status_id,omitempty"`
+	ExecutionTime     string                  `json:"execution_time,omitempty"`
+	MemoryUsed        int                     `json:"memory_used,omitempty"`
+	TestCasesPassed   int                     `json:"test_cases_passed,omitempty"`
+	TotalTestCases    int                     `json:"total_test_cases,omitempty"`
 	TestCaseResults   []domain.TestCaseResult `json:"test_case_results,omitempty"`
 }
 

@@ -72,7 +72,7 @@ import numpy as np
 from sklearn.metrics import adjusted_rand_score
 from tqdm import tqdm
 
-from clone_detection.cascade_worker import CascadeWorker, InMemoryDB, IngestionResult
+from clone_detection.cascade_worker import CascadeWorker, IngestionResult, InMemoryDB
 from clone_detection.collusion_graph import CollusionGraph, CollusionGroup
 from clone_detection.lsh_index import MinHashIndexer
 from clone_detection.pipelines import TieredPipeline
@@ -93,15 +93,15 @@ CODENET_META = CODENET_ROOT / "metadata"
 
 # Language → file extension map (matching CodeNet directory names)
 LANG_DIR: dict[str, str] = {
-    "java":   "Java",
+    "java": "Java",
     "python": "Python",
-    "c":      "C",
+    "c": "C",
     "csharp": "C#",
 }
 LANG_EXT: dict[str, str] = {
-    "java":   ".java",
+    "java": ".java",
     "python": ".py",
-    "c":      ".c",
+    "c": ".c",
     "csharp": ".cs",
 }
 
@@ -109,6 +109,7 @@ LANG_EXT: dict[str, str] = {
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Submission:
@@ -142,8 +143,8 @@ class ProblemResult:
 
     # Phase 4 — cluster quality
     n_collusion_groups: int
-    cluster_purity: float          # macro-averaged purity across groups
-    adjusted_rand_index: float     # ARI vs GT clusters (−1 to 1; 1 = perfect)
+    cluster_purity: float  # macro-averaged purity across groups
+    adjusted_rand_index: float  # ARI vs GT clusters (−1 to 1; 1 = perfect)
 
     elapsed_brute_force_s: float
     elapsed_pipeline_s: float
@@ -152,6 +153,7 @@ class ProblemResult:
 # ---------------------------------------------------------------------------
 # Dataset loading
 # ---------------------------------------------------------------------------
+
 
 def list_problems(n: int | None = None, seed: int = 42) -> list[str]:
     """Return a (possibly sampled) list of problem IDs present in the dataset."""
@@ -224,7 +226,11 @@ def load_submissions(
             if not source:
                 continue
             if max_source_bytes and len(source.encode()) > max_source_bytes:
-                logger.debug("Skipping %s: source too large (%d bytes)", path.name, len(source.encode()))
+                logger.debug(
+                    "Skipping %s: source too large (%d bytes)",
+                    path.name,
+                    len(source.encode()),
+                )
                 continue
             submissions.append(
                 Submission(
@@ -244,6 +250,7 @@ def load_submissions(
 # ---------------------------------------------------------------------------
 # Brute-force ground truth
 # ---------------------------------------------------------------------------
+
 
 def _pair_key(a: str, b: str) -> tuple[str, str]:
     return (a, b) if a < b else (b, a)
@@ -283,7 +290,9 @@ def compute_brute_force_ground_truth(
         try:
             if phase1_only:
                 # Use only Phase 1 (NiCAD-style normalizer) — fast, no tree-sitter tokenizer
-                result = pipeline._phase_one_nicad(sub_a.source_code, sub_b.source_code, language)
+                result = pipeline._phase_one_nicad(
+                    sub_a.source_code, sub_b.source_code, language
+                )
                 if result.clone_type in ("Type-1", "Type-2"):
                     gt_pairs.add(_pair_key(sub_a.submission_id, sub_b.submission_id))
             else:
@@ -291,7 +300,12 @@ def compute_brute_force_ground_truth(
                 if result.clone_type not in ("Non-Syntactic", "Non-Clone", None, ""):
                     gt_pairs.add(_pair_key(sub_a.submission_id, sub_b.submission_id))
         except Exception as exc:
-            logger.debug("Brute-force pair failed %s/%s: %s", sub_a.submission_id, sub_b.submission_id, exc)
+            logger.debug(
+                "Brute-force pair failed %s/%s: %s",
+                sub_a.submission_id,
+                sub_b.submission_id,
+                exc,
+            )
 
     return gt_pairs
 
@@ -300,15 +314,17 @@ def compute_brute_force_ground_truth(
 # Clustering pipeline run
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PipelineRun:
     """All artefacts produced by one clustering pipeline run on a problem."""
+
     db: InMemoryDB
     indexer: MinHashIndexer
     graph: CollusionGraph
     results: list[IngestionResult]
     candidate_pairs: set[tuple[str, str]]  # from LSH (Phase 2)
-    detected_pairs: set[tuple[str, str]]   # confirmed clones (Phase 3-4)
+    detected_pairs: set[tuple[str, str]]  # confirmed clones (Phase 3-4)
     # submission_id → student_id (in our case they're the same)
     submission_map: dict[str, str] = field(default_factory=dict)
 
@@ -340,13 +356,14 @@ def run_clustering_pipeline(
 
     Returns PipelineRun with all DB, indexer, graph, and metric artefacts.
     """
-    db      = InMemoryDB()
+    db = InMemoryDB()
     indexer = MinHashIndexer(num_perm=lsh_num_perm, threshold=lsh_threshold)
-    graph   = CollusionGraph()
+    graph = CollusionGraph()
 
     if lsh_only:
         # Phase 1-2 only: fragment + index, no cascade
         from clone_detection.preprocessor import Fragmenter
+
         fragmenter = Fragmenter(language=language)
         results: list[IngestionResult] = []
         for sub in submissions:
@@ -358,7 +375,7 @@ def run_clustering_pipeline(
                     assignment_id=assignment_id,
                 )
                 for frag in frags:
-                    db.save_fragment(frag)          # assigns fragment_id
+                    db.save_fragment(frag)  # assigns fragment_id
                     sig_bytes = indexer.index(frag)
                     frag.lsh_signature = sig_bytes
                 results.append(
@@ -370,7 +387,9 @@ def run_clustering_pipeline(
                     )
                 )
             except Exception as exc:
-                logger.warning("LSH-only indexing failed for %s: %s", sub.submission_id, exc)
+                logger.warning(
+                    "LSH-only indexing failed for %s: %s", sub.submission_id, exc
+                )
 
         # Collect candidate pairs: query each fragment against the index.
         # We use the internal MinHash store to skip re-building hashes.
@@ -403,12 +422,16 @@ def run_clustering_pipeline(
                 pass
 
         return PipelineRun(
-            db=db, indexer=indexer, graph=graph, results=results,
-            candidate_pairs=candidate_pairs, detected_pairs=set(),
+            db=db,
+            indexer=indexer,
+            graph=graph,
+            results=results,
+            candidate_pairs=candidate_pairs,
+            detected_pairs=set(),
             submission_map={s.submission_id: s.submission_id for s in submissions},
         )
 
-    worker  = CascadeWorker(db=db, indexer=indexer, graph=graph)
+    worker = CascadeWorker(db=db, indexer=indexer, graph=graph)
 
     results: list[IngestionResult] = []
     candidate_pairs: set[tuple[str, str]] = set()
@@ -418,7 +441,10 @@ def run_clustering_pipeline(
     for sub in submissions:
         if max_cascade_pairs is not None and total_cascade_calls >= max_cascade_pairs:
             if not cascade_cap_hit:
-                logger.debug("max_cascade_pairs=%d reached — remaining submissions skipped", max_cascade_pairs)
+                logger.debug(
+                    "max_cascade_pairs=%d reached — remaining submissions skipped",
+                    max_cascade_pairs,
+                )
                 cascade_cap_hit = True
             break
         try:
@@ -426,7 +452,7 @@ def run_clustering_pipeline(
                 source_code=sub.source_code,
                 language=language,
                 submission_id=sub.submission_id,
-                student_id=sub.submission_id,       # use submission_id as student proxy
+                student_id=sub.submission_id,  # use submission_id as student proxy
                 assignment_id=assignment_id,
             )
             results.append(result)
@@ -477,6 +503,7 @@ def run_clustering_pipeline(
 # Metric helpers
 # ---------------------------------------------------------------------------
 
+
 def _safe_div(num: float, den: float, default: float = 0.0) -> float:
     return num / den if den > 0 else default
 
@@ -488,11 +515,15 @@ def compute_lsh_metrics(
 ) -> dict[str, float]:
     true_positives_hit = candidate_pairs & gt_clone_pairs
     return {
-        "lsh_candidate_recall":    _safe_div(len(true_positives_hit), len(gt_clone_pairs)),
-        "lsh_candidate_precision": _safe_div(len(true_positives_hit), len(candidate_pairs)),
-        "workload_reduction":      _safe_div(n_total_pairs - len(candidate_pairs), n_total_pairs),
-        "n_lsh_candidates":        len(candidate_pairs),
-        "n_lsh_tp_covered":        len(true_positives_hit),
+        "lsh_candidate_recall": _safe_div(len(true_positives_hit), len(gt_clone_pairs)),
+        "lsh_candidate_precision": _safe_div(
+            len(true_positives_hit), len(candidate_pairs)
+        ),
+        "workload_reduction": _safe_div(
+            n_total_pairs - len(candidate_pairs), n_total_pairs
+        ),
+        "n_lsh_candidates": len(candidate_pairs),
+        "n_lsh_tp_covered": len(true_positives_hit),
     }
 
 
@@ -504,16 +535,16 @@ def compute_e2e_metrics(
     fp = len(detected_pairs - gt_clone_pairs)
     fn = len(gt_clone_pairs - detected_pairs)
 
-    recall    = _safe_div(tp, tp + fn)
+    recall = _safe_div(tp, tp + fn)
     precision = _safe_div(tp, tp + fp)
-    f1        = _safe_div(2 * precision * recall, precision + recall)
+    f1 = _safe_div(2 * precision * recall, precision + recall)
     return {
-        "e2e_recall":    recall,
+        "e2e_recall": recall,
         "e2e_precision": precision,
-        "e2e_f1":        f1,
-        "e2e_tp":        tp,
-        "e2e_fp":        fp,
-        "e2e_fn":        fn,
+        "e2e_f1": f1,
+        "e2e_tp": tp,
+        "e2e_fp": fp,
+        "e2e_fn": fn,
     }
 
 
@@ -574,6 +605,7 @@ def compute_cluster_quality(
 
     # Purity: for each predicted cluster, find the most common GT label
     from collections import Counter
+
     cluster_members: dict[int, list[int]] = {}
     for idx, lbl in enumerate(pred_labels):
         cluster_members.setdefault(lbl, []).append(idx)
@@ -586,15 +618,16 @@ def compute_cluster_quality(
     purity = _safe_div(total_correct, n)
 
     return {
-        "cluster_purity":        purity,
-        "adjusted_rand_index":   ari,
-        "n_groups":              len(groups),
+        "cluster_purity": purity,
+        "adjusted_rand_index": ari,
+        "n_groups": len(groups),
     }
 
 
 # ---------------------------------------------------------------------------
 # Single-problem evaluation
 # ---------------------------------------------------------------------------
+
 
 def evaluate_problem(
     problem_id: str,
@@ -633,7 +666,9 @@ def evaluate_problem(
     n_total_pairs = n * (n - 1) // 2
     sub_ids = [s.submission_id for s in submissions]
 
-    logger.debug("%s/%s: %d submissions → %d total pairs", problem_id, language, n, n_total_pairs)
+    logger.debug(
+        "%s/%s: %d submissions → %d total pairs", problem_id, language, n, n_total_pairs
+    )
 
     # ── Brute-force ground truth ──────────────────────────────────────────
     gt_clone_pairs: set[tuple[str, str]] = set()
@@ -649,7 +684,10 @@ def evaluate_problem(
         elapsed_bf = time.perf_counter() - t0
         logger.debug(
             "%s/%s: brute-force found %d clone pairs in %.1fs",
-            problem_id, language, len(gt_clone_pairs), elapsed_bf,
+            problem_id,
+            language,
+            len(gt_clone_pairs),
+            elapsed_bf,
         )
 
     # ── Clustering pipeline ───────────────────────────────────────────────
@@ -712,6 +750,7 @@ def evaluate_problem(
 # Aggregate evaluation
 # ---------------------------------------------------------------------------
 
+
 def evaluate(
     n_problems: int = 20,
     languages: list[str] | None = None,
@@ -738,8 +777,12 @@ def evaluate(
     logger.info(f"Max submissions : {max_submissions} per problem/language")
     logger.info(f"LSH perm        : {lsh_num_perm}   threshold: {lsh_threshold}")
     logger.info(f"Accepted only   : {accepted_only}")
-    logger.info(f"Ground truth    : {'SKIPPED' if skip_brute_force else ('PHASE-1 ONLY (Type-1/2)' if phase1_only_gt else 'FULL TieredPipeline (Type-1/2/3)')}")
-    logger.info(f"Mode            : {'LSH Phase 2 only (no cascade)' if lsh_only else f'full cascade (cap={max_cascade_pairs})'  }")
+    logger.info(
+        f"Ground truth    : {'SKIPPED' if skip_brute_force else ('PHASE-1 ONLY (Type-1/2)' if phase1_only_gt else 'FULL TieredPipeline (Type-1/2/3)')}"
+    )
+    logger.info(
+        f"Mode            : {'LSH Phase 2 only (no cascade)' if lsh_only else f'full cascade (cap={max_cascade_pairs})'}"
+    )
     logger.info("=" * 80)
 
     problems = list_problems(n=n_problems, seed=seed)
@@ -784,7 +827,9 @@ def evaluate(
                 pbar.update(1)
 
     if not all_results:
-        logger.error("No problems produced results — check dataset path and language selection.")
+        logger.error(
+            "No problems produced results — check dataset path and language selection."
+        )
         return {}
 
     # ── Aggregate ─────────────────────────────────────────────────────────
@@ -796,26 +841,34 @@ def evaluate(
 
     summary = {
         "n_problems_evaluated": len(all_results),
-        "total_submissions":    sum(r.n_submissions for r in all_results),
-        "total_pairs":          sum(r.n_total_pairs for r in all_results),
-        "total_gt_clones":      sum(r.n_gt_clone_pairs for r in all_results),
-        "total_candidates":     sum(r.n_lsh_candidates for r in all_results),
-        "total_detected":       sum(r.n_detected_clone_pairs for r in all_results),
+        "total_submissions": sum(r.n_submissions for r in all_results),
+        "total_pairs": sum(r.n_total_pairs for r in all_results),
+        "total_gt_clones": sum(r.n_gt_clone_pairs for r in all_results),
+        "total_candidates": sum(r.n_lsh_candidates for r in all_results),
+        "total_detected": sum(r.n_detected_clone_pairs for r in all_results),
         # LSH Phase 2
-        "mean_lsh_candidate_recall":    _mean([r.lsh_candidate_recall for r in all_results]),
-        "median_lsh_candidate_recall":  _median([r.lsh_candidate_recall for r in all_results]),
-        "mean_lsh_candidate_precision": _mean([r.lsh_candidate_precision for r in all_results]),
-        "mean_workload_reduction":      _mean([r.workload_reduction for r in all_results]),
+        "mean_lsh_candidate_recall": _mean(
+            [r.lsh_candidate_recall for r in all_results]
+        ),
+        "median_lsh_candidate_recall": _median(
+            [r.lsh_candidate_recall for r in all_results]
+        ),
+        "mean_lsh_candidate_precision": _mean(
+            [r.lsh_candidate_precision for r in all_results]
+        ),
+        "mean_workload_reduction": _mean([r.workload_reduction for r in all_results]),
         # End-to-end Phase 3-4
-        "mean_e2e_recall":    _mean([r.e2e_recall for r in all_results]),
+        "mean_e2e_recall": _mean([r.e2e_recall for r in all_results]),
         "mean_e2e_precision": _mean([r.e2e_precision for r in all_results]),
-        "mean_e2e_f1":        _mean([r.e2e_f1 for r in all_results]),
+        "mean_e2e_f1": _mean([r.e2e_f1 for r in all_results]),
         # Cluster quality
-        "mean_cluster_purity":       _mean([r.cluster_purity for r in all_results]),
-        "mean_adjusted_rand_index":  _mean([r.adjusted_rand_index for r in all_results]),
+        "mean_cluster_purity": _mean([r.cluster_purity for r in all_results]),
+        "mean_adjusted_rand_index": _mean([r.adjusted_rand_index for r in all_results]),
         # Efficiency
-        "total_elapsed_pipeline_s":    sum(r.elapsed_pipeline_s for r in all_results),
-        "total_elapsed_brute_force_s": sum(r.elapsed_brute_force_s for r in all_results),
+        "total_elapsed_pipeline_s": sum(r.elapsed_pipeline_s for r in all_results),
+        "total_elapsed_brute_force_s": sum(
+            r.elapsed_brute_force_s for r in all_results
+        ),
     }
 
     # ── Print report ───────────────────────────────────────────────────────
@@ -830,10 +883,18 @@ def evaluate(
 
     logger.info("\nPhase 2 — LSH Candidate Retrieval")
     logger.info(f"  Total candidates           : {summary['total_candidates']:,}")
-    logger.info(f"  Mean candidate recall      : {summary['mean_lsh_candidate_recall']:.4f}   (target ≥ 0.90)")
-    logger.info(f"  Median candidate recall    : {summary['median_lsh_candidate_recall']:.4f}")
-    logger.info(f"  Mean candidate precision   : {summary['mean_lsh_candidate_precision']:.4f}")
-    logger.info(f"  Mean workload reduction    : {summary['mean_workload_reduction']:.4f}   (target ≥ 0.90)")
+    logger.info(
+        f"  Mean candidate recall      : {summary['mean_lsh_candidate_recall']:.4f}   (target ≥ 0.90)"
+    )
+    logger.info(
+        f"  Median candidate recall    : {summary['median_lsh_candidate_recall']:.4f}"
+    )
+    logger.info(
+        f"  Mean candidate precision   : {summary['mean_lsh_candidate_precision']:.4f}"
+    )
+    logger.info(
+        f"  Mean workload reduction    : {summary['mean_workload_reduction']:.4f}   (target ≥ 0.90)"
+    )
 
     logger.info("\nPhase 3-4 — End-to-End Clone Detection")
     logger.info(f"  Mean recall    : {summary['mean_e2e_recall']:.4f}")
@@ -842,13 +903,21 @@ def evaluate(
 
     logger.info("\nPhase 4 — Cluster Quality")
     logger.info(f"  Mean cluster purity       : {summary['mean_cluster_purity']:.4f}")
-    logger.info(f"  Mean Adjusted Rand Index  : {summary['mean_adjusted_rand_index']:.4f}")
+    logger.info(
+        f"  Mean Adjusted Rand Index  : {summary['mean_adjusted_rand_index']:.4f}"
+    )
 
     logger.info("\nEfficiency")
-    logger.info(f"  Pipeline elapsed          : {summary['total_elapsed_pipeline_s']:.1f}s")
+    logger.info(
+        f"  Pipeline elapsed          : {summary['total_elapsed_pipeline_s']:.1f}s"
+    )
     if not skip_brute_force:
-        speedup = _safe_div(summary["total_elapsed_brute_force_s"], summary["total_elapsed_pipeline_s"])
-        logger.info(f"  Brute-force elapsed       : {summary['total_elapsed_brute_force_s']:.1f}s")
+        speedup = _safe_div(
+            summary["total_elapsed_brute_force_s"], summary["total_elapsed_pipeline_s"]
+        )
+        logger.info(
+            f"  Brute-force elapsed       : {summary['total_elapsed_brute_force_s']:.1f}s"
+        )
         logger.info(f"  Speed-up factor           : {speedup:.1f}×")
 
     # Per-problem breakdown (show every problem if n ≤ 20, else sample)
@@ -869,29 +938,32 @@ def evaluate(
             )
 
     # ── JSON output ────────────────────────────────────────────────────────
+    if output_json is None:
+        output_json = Path("./results/evaluate/clustering_results.json")
+
     if output_json:
         payload = {
             "summary": summary,
             "per_problem": [
                 {
-                    "problem_id":              r.problem_id,
-                    "language":                r.language,
-                    "n_submissions":           r.n_submissions,
-                    "n_total_pairs":           r.n_total_pairs,
-                    "n_gt_clone_pairs":        r.n_gt_clone_pairs,
-                    "n_lsh_candidates":        r.n_lsh_candidates,
-                    "lsh_candidate_recall":    r.lsh_candidate_recall,
+                    "problem_id": r.problem_id,
+                    "language": r.language,
+                    "n_submissions": r.n_submissions,
+                    "n_total_pairs": r.n_total_pairs,
+                    "n_gt_clone_pairs": r.n_gt_clone_pairs,
+                    "n_lsh_candidates": r.n_lsh_candidates,
+                    "lsh_candidate_recall": r.lsh_candidate_recall,
                     "lsh_candidate_precision": r.lsh_candidate_precision,
-                    "workload_reduction":      r.workload_reduction,
-                    "n_detected_clone_pairs":  r.n_detected_clone_pairs,
-                    "e2e_recall":              r.e2e_recall,
-                    "e2e_precision":           r.e2e_precision,
-                    "e2e_f1":                  r.e2e_f1,
-                    "n_collusion_groups":      r.n_collusion_groups,
-                    "cluster_purity":          r.cluster_purity,
-                    "adjusted_rand_index":     r.adjusted_rand_index,
-                    "elapsed_brute_force_s":   r.elapsed_brute_force_s,
-                    "elapsed_pipeline_s":      r.elapsed_pipeline_s,
+                    "workload_reduction": r.workload_reduction,
+                    "n_detected_clone_pairs": r.n_detected_clone_pairs,
+                    "e2e_recall": r.e2e_recall,
+                    "e2e_precision": r.e2e_precision,
+                    "e2e_f1": r.e2e_f1,
+                    "n_collusion_groups": r.n_collusion_groups,
+                    "cluster_purity": r.cluster_purity,
+                    "adjusted_rand_index": r.adjusted_rand_index,
+                    "elapsed_brute_force_s": r.elapsed_brute_force_s,
+                    "elapsed_pipeline_s": r.elapsed_pipeline_s,
                 }
                 for r in all_results
             ],
@@ -1007,7 +1079,7 @@ if __name__ == "__main__":
         type=Path,
         default=None,
         metavar="PATH",
-        help="Write per-problem + summary results to a JSON file.",
+        help="Write per-problem + summary results to a JSON file (default: ./results/evaluate/clustering_results.json).",
     )
     parser.add_argument(
         "--max-source-kb",

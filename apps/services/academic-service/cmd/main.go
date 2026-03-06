@@ -134,7 +134,7 @@ func run() error {
 	semesterHandler := handler.NewSemesterHandler(semesterService, logger)
 
 	// Initialize handler for instructor-scoped endpoints
-	instructorHandler := handler.NewInstructorHandler(courseInstructorService, enrollmentService, courseService, iamClient, logger)
+	instructorHandler := handler.NewInstructorHandler(courseInstructorService, enrollmentService, courseService, batchService, batchMemberService, iamClient, logger)
 
 	// Initialize handler for student-scoped endpoints
 	studentHandler := handler.NewStudentHandler(enrollmentService, courseInstructorService, courseService, semesterService, batchService, iamClient, logger)

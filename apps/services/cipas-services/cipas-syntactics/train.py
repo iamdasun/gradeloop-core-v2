@@ -1,70 +1,11 @@
+#!/usr/bin/env python3
 """
-train.py — Clone Detection Model Training (Two-Stage Pipeline).
-
-Pipeline context:
-  Stage 0: NiCAD-style normalizer detects Type-1 and Type-2 clones.
-           (Handled separately in the normalizer module.)
-
-  Stage 1 (this model): XGBoost Clone Detector
-           Trained on the full clone spectrum:
-             Type-1 + Type-2 + Type-3 → label = 1 (Clone)
-             NonClone                 → label = 0 (NonClone)
-           Learns what ANY syntactic clone looks like, not just Type-3.
-
-  Stage 2: Type-3 Filter (clone_detection/type3_filter.py)
-           Takes the clone probability and structural features, then
-           applies the near-miss corridor to isolate Type-3 clones:
-             levenshtein_ratio ≤ 0.85 AND
-             ast_jaccard       ≤ 0.90 AND
-             clone_probability ≥ 0.35
-
-Training data (TOMA dataset — TOMA label semantics):
-  Positives (label = 1):
-    type-1.csv  — exact clones                            (Type-1/2)
-    type-2.csv  — renamed / parameterized clones          (Type-1/2)
-    type-3.csv  — STRONG near-miss clones                 (Type-3)
-    type-4.csv  — MODERATE near-miss / heavy modification (Type-3)
-    type-5.csv  — WEAK near-miss / borderline semantic    (Type-3 / boundary of Type-4)
-  Negatives (label = 0):
-    nonclone.csv — confirmed non-clone pairs
-
-  ┌────────────────┬───────────┬─────────┬────────┬───────────────────────────────────────┐
-  │ CSV            │ TOMA type │  Target │ Weight │ Rationale                             │
-  ├────────────────┼───────────┼─────────┼────────┼───────────────────────────────────────┤
-  │ type-1.csv     │ Exact     │  8,000  │  1.5×  │ Easy positives — shape the boundary   │
-  │ type-2.csv     │ Renamed   │  8,000  │  1.5×  │ Easy positives — shape the boundary   │
-  │ type-3.csv     │ Strong T3 │ 20,000  │  2.0×  │ Hard near-miss — most important       │
-  │ type-4.csv     │ Moderate  │ 15,000  │  1.5×  │ Mid-difficulty — broadens T3 spectrum │
-  │ type-5.csv     │ Weak/T4   │ 10,000  │  1.0×  │ Noisy/borderline — gentle signal      │
-  │ nonclone.csv   │ NonClone  │ 25,000  │  1.0×  │ Balanced against larger positive set  │
-  └────────────────┴───────────┴─────────┴────────┴───────────────────────────────────────┘
-
-Optimization Strategy:
-  Objective  : Maximize Type-3 Recall (target: ≥ 40%) at Precision ≥ 80%.
-  After the clone detector is trained, the Type-3 Filter provides
-  additional precision control without retraining.
-
-XGBoost Hyperparameters:
-  n_estimators     = 500
-  max_depth        = 8
-  learning_rate    = 0.05
-  subsample        = 0.9
-  colsample_bytree = 0.8   (relaxed from 0.6; richer positive set makes
-                             forced AST splits unnecessary)
-  min_child_weight = 2
-  gamma            = 0.1   (conservative pruning)
-  reg_lambda       = 1.0
-  eval_metric      = "auc"
-  scale_pos_weight = 2.0   (reduced from 5.0; larger positive class)
-  sample_weight    : type-3 → 2.0×, type-4 → 1.5×, type-1/2 → 1.5×,
-                     type-5 → 1.0×, nonclone → 1.0×
-
-Output model:
-  clone_detector_xgb.pkl
+Train Syntactic Clone Detector (Type-1/2/3).
 
 Usage:
-    poetry run python train.py
-    poetry run python train.py --scale-pos-weight 2.0 --no-node-types
+    python train.py                          # Use config.yaml defaults
+    python train.py --config config.yaml     # Specify custom config
+    python train.py --sample-size 10000      # Override specific values
 """
 
 import argparse
@@ -73,20 +14,10 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
-from sklearn.metrics import (
-    f1_score,
-    precision_score,
-    recall_score,
-    precision_recall_curve,
-)
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
+import yaml
 
-from clone_detection.features.syntactic_features import SyntacticFeatureExtractor
-from clone_detection.models.classifiers import SyntacticClassifier
 from clone_detection.utils.common_setup import setup_logging
+from train_core import train
 
 logger = setup_logging(__name__)
 
@@ -886,6 +817,49 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    # Load config
+    if not args.config.exists():
+        logger.error(f"Config file not found: {args.config}")
+        logger.info("Using default configuration")
+        config = {}
+    else:
+        config = load_config(args.config)
+
+    # Get training config with defaults
+    training_config = config.get("training", {})
+    model_config = training_config.get("model", {})
+    xgboost_config = training_config.get("xgboost", {})
+    features_config = training_config.get("features", {})
+
+    # Build parameters (CLI overrides config)
+    params = {
+        "model_name": args.model_name
+        or model_config.get("name", "clone_detector_xgb.pkl"),
+        "sample_size": args.sample_size or training_config.get("sample_size"),
+        "n_estimators": args.n_estimators or xgboost_config.get("n_estimators", 500),
+        "max_depth": args.max_depth or xgboost_config.get("max_depth", 8),
+        "learning_rate": args.learning_rate
+        or xgboost_config.get("learning_rate", 0.05),
+        "subsample": xgboost_config.get("subsample", 0.9),
+        "colsample_bytree": xgboost_config.get("colsample_bytree", 0.8),
+        "min_child_weight": xgboost_config.get("min_child_weight", 2),
+        "gamma": xgboost_config.get("gamma", 0.1),
+        "reg_lambda": xgboost_config.get("reg_lambda", 1.0),
+        "scale_pos_weight": (
+            args.scale_pos_weight or xgboost_config.get("scale_pos_weight", 2.0)
+        ),
+        "include_node_types": not args.no_node_types
+        and features_config.get("include_node_types", True),
+        "use_gpu": args.use_gpu or xgboost_config.get("use_gpu", False),
+        "output_dir": args.output_dir
+        or Path(model_config.get("output_dir", "./results/train")),
+        "test_size": training_config.get("test_size", 0.2),
+        "dataset_config": training_config.get("dataset_config"),
+        "toma_path": config.get("datasets", {}).get("toma", {}).get("path"),
+        "visualize": not args.no_visualize and training_config.get("visualize", True),
+    }
+
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 

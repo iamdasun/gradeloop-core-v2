@@ -26,7 +26,46 @@ body:json {
     "allow_group_submission": false,
     "enable_ai_assistant": true,
     "enable_socratic_feedback": true,
-    "allow_regenerate": false
+    "allow_regenerate": false,
+    "assessment_type": "lab",
+    "objective": "Students will implement a binary search tree and demonstrate understanding of recursive algorithms.",
+    "rubric_criteria": [
+      {
+        "name": "Code Correctness",
+        "description": "Solution produces correct output for all test cases.",
+        "grading_mode": "deterministic",
+        "weight": 60,
+        "order_index": 1
+      },
+      {
+        "name": "Code Quality",
+        "description": "Clean, readable code following best practices.",
+        "grading_mode": "llm",
+        "weight": 40,
+        "order_index": 2
+      }
+    ],
+    "test_cases": [
+      {
+        "description": "Insert and search basic values",
+        "input": "insert 5\ninsert 3\ninsert 7\nsearch 3",
+        "expected_output": "true",
+        "is_hidden": false,
+        "order_index": 1
+      },
+      {
+        "description": "Search for missing value",
+        "input": "insert 5\nsearch 10",
+        "expected_output": "false",
+        "is_hidden": true,
+        "order_index": 2
+      }
+    ],
+    "sample_answer": {
+      "language_id": 71,
+      "language": "Python 3",
+      "code": "class Node:\n    def __init__(self, val):\n        self.val = val\n        self.left = self.right = None\n\nclass BST:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        self.root = self._insert(self.root, val)\n    def _insert(self, node, val):\n        if not node:\n            return Node(val)\n        if val < node.val:\n            node.left = self._insert(node.left, val)\n        else:\n            node.right = self._insert(node.right, val)\n        return node\n    def search(self, val):\n        return self._search(self.root, val)\n    def _search(self, node, val):\n        if not node:\n            return False\n        if node.val == val:\n            return True\n        return self._search(node.left if val < node.val else node.right, val)\n"
+    }
   }
 }
 

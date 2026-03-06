@@ -31,6 +31,9 @@ func (m *Migrator) Run() error {
 		&domain.Assignment{},
 		&domain.Submission{},
 		&domain.SubmissionGroup{},
+		&domain.AssignmentRubricCriterion{},
+		&domain.AssignmentTestCase{},
+		&domain.AssignmentSampleAnswer{},
 	); err != nil {
 		return fmt.Errorf("auto migrate tables: %w", err)
 	}

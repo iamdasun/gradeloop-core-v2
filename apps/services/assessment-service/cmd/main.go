@@ -126,12 +126,15 @@ func run() error {
 	)
 
 	// ── Services ─────────────────────────────────────────────────────────────
-	assignmentService := service.NewAssignmentService(assignmentRepo, auditClient, logger)
+	contentRepo := repository.NewAssignmentContentRepository(db.DB)
+
+	assignmentService := service.NewAssignmentService(assignmentRepo, contentRepo, auditClient, logger)
 
 	submissionService := service.NewSubmissionService(
 		submissionRepo,
 		groupRepo,
 		assignmentRepo,
+		contentRepo,
 		minioStorage,
 		submissionPublisher,
 		auditClient,

@@ -57,6 +57,23 @@ class SubmissionEvent(BaseModel):
     user_agent: str
     enqueued_at: datetime
 
+    # -------------------------------------------------------------------------
+    # Evaluation context – forwarded from assessment-service via RabbitMQ.
+    # All fields are optional so existing messages without them remain valid.
+    # -------------------------------------------------------------------------
+
+    # Assignment metadata (used as LLM prompt context):
+    assessment_type: Optional[str] = None        # "lab" | "exam"
+    objective: Optional[str] = None              # free-text learning objective
+
+    # Test cases that were used for deterministic evaluation in the worker.
+    # Structure: [{id, input, expected_output}]
+    test_cases: Optional[list[dict[str, Any]]] = None
+
+    # Reference implementation / sample answer for similarity comparison.
+    # Structure: {language_id: int, code: str}
+    sample_answer: Optional[dict[str, Any]] = None
+
     class Config:
         """Pydantic config."""
         json_encoders = {

@@ -39,6 +39,17 @@ export const instructorAssessmentsApi = {
         const { data } = await axiosInstance.get<ListSubmissionsResponse>(`/instructor-submissions/assignment/${assignmentId}`);
         return data.submissions || [];
     },
+
+    // TODO: Add when backend endpoint is available
+    getRubric: async (_assignmentId: string): Promise<{ criteria: { name: string; weight: number; description?: string }[] }> => {
+        // Mock for now — returns empty or sample rubric
+        return Promise.resolve({
+            criteria: [
+                { name: "Correctness", weight: 60, description: "Accuracy of the solution." },
+                { name: "Code Quality", weight: 40, description: "Readability and structure." },
+            ],
+        });
+    },
 };
 
 // ── General Assessment endpoints ─────────────────────────────────────────────

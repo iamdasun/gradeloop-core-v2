@@ -193,7 +193,14 @@ Created from environment variables at application startup:
 
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
-| POST | `/users` | Create new user (admin only) | Yes (`users:write`) |
+| GET | `/users` | List all users with filtering | Yes (Admin / Super Admin) |
+| GET | `/users/students` | List student accounts | Yes (Instructor / Admin / Super Admin) |
+| POST | `/users/bulk` | Get multiple users by IDs | Yes |
+| GET | `/users/:id` | Get user by ID | Yes |
+| POST | `/users` | Create new user | Yes (`users:write`) |
+| PUT | `/users/:id` | Update user | Yes (`users:write`) |
+| DELETE | `/users/:id` | Soft-delete user | Yes (`users:delete`) |
+| POST | `/users/:id/restore` | Restore soft-deleted user | Yes (`users:write`) |
 | POST | `/auth/activate` | Activate account with password | No |
 
 ### Role & Permission Management
@@ -319,6 +326,55 @@ Revoke a refresh token, effectively logging out the user.
 - Idempotent: calling with already-revoked token returns success
 - Only invalidates the specified refresh token
 - Access tokens remain valid until expiration
+
+---
+
+### GET `/users/students`
+
+Returns a paginated list of student accounts. The `user_type` filter is **locked server-side** to `student` — callers cannot retrieve other roles through this endpoint.
+
+**Access:** Instructor, Admin, or Super Admin.
+
+**Query Parameters:**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `page` | 1 | Page number |
+| `limit` | 500 | Results per page (max 500) |
+| `search` | — | Optional name / email search string |
+
+**Success Response (200 OK):**
+```json
+{
+  "users": [
+    {
+      "id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+      "email": "alice@gradeloop.com",
+      "full_name": "Alice Smith",
+      "avatar_url": "",
+      "user_type": "student",
+      "student_id": "IT22204202",
+      "is_active": true
+    }
+  ],
+  "total_count": 1,
+  "page": 1,
+  "limit": 500
+}
+```
+
+**Notes:**
+- Unlike `GET /users`, this endpoint is accessible to instructors
+- Results only include active, non-deleted student records
+- Use `search` to filter by name or email when the list is large
+- Used by the instructor "Add Students" modal in the frontend
+
+**Error Responses:**
+
+| Status | Message |
+|--------|---------|
+| 401 | Missing or invalid authorization |
+| 403 | Insufficient privileges (not instructor / admin / super_admin) |
 
 ---
 

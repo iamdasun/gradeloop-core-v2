@@ -15,8 +15,11 @@ poetry run python train.py --sample-size 10000 --visualize
 |----------|------|-------------|
 | `models/` | `type4_xgb_java.pkl` | Trained model |
 | `models/` | `type4_xgb_java.pkl.features.json` | Feature names (437) |
-| `models/` | `type4_xgb_java.pkl.metrics.json` | Training metrics |
-| `metrics_output/reports/` | `training_report_*.html` | Visualization report |
+| `results/train/` | `training_metrics.json` | Training metrics |
+| `results/train/visualizations/` | `confusion_matrix_train.png` | Confusion matrix |
+| `results/train/visualizations/` | `feature_importances_train.png` | Feature importance |
+| `results/train/visualizations/` | `threshold_sweep.png` | Threshold sweep plot |
+| `results/train/visualizations/` | `per_source_recall.png` | Per-source recall |
 
 ### Evaluation Outputs
 
@@ -29,18 +32,20 @@ poetry run python evaluate.py --model models/type4_xgb_java.pkl
 
 | Location | File | Description |
 |----------|------|-------------|
-| `evaluation_output/` | `metrics_java.json` | Java evaluation metrics |
-| `evaluation_output/` | `metrics_python.json` | Python evaluation metrics |
-| `evaluation_output/` | `metrics_c.json` | C evaluation metrics |
-| `evaluation_output/` | `metrics_csharp.json` | C# evaluation metrics |
-| `evaluation_output/` | `threshold_sweep_results.csv` | Threshold analysis |
-| `evaluation_output/reports/` | `evaluation_report_*.html` | Visualization reports |
+| `results/evaluate/` | `metrics_gptclonebench_java.json` | Java evaluation metrics |
+| `results/evaluate/` | `metrics_gptclonebench_python.json` | Python evaluation metrics |
+| `results/evaluate/` | `metrics_gptclonebench_c.json` | C evaluation metrics |
+| `results/evaluate/` | `metrics_gptclonebench_csharp.json` | C# evaluation metrics |
+| `results/evaluate/` | `threshold_sweep_results.csv` | Threshold analysis |
+| `results/evaluate/visualizations/` | `confusion_matrix_eval.png` | Confusion matrix |
+| `results/evaluate/visualizations/` | `feature_importances_eval.png` | Feature importance |
+| `results/evaluate/` | `evaluation_report_*.html` | HTML visualization report |
 
 ---
 
 ## Training Metrics (JSON)
 
-**File:** `models/type4_xgb_*.pkl.metrics.json`
+**File:** `results/train/training_metrics.json`
 
 ```json
 {
@@ -80,7 +85,7 @@ poetry run python evaluate.py --model models/type4_xgb_java.pkl
 
 ## Evaluation Metrics (JSON)
 
-**File:** `evaluation_output/metrics_*.json`
+**File:** `results/evaluate/metrics_*.json`
 
 ```json
 {
@@ -123,7 +128,7 @@ poetry run python evaluate.py --model models/type4_xgb_java.pkl
 
 ## Threshold Sweep (CSV)
 
-**File:** `evaluation_output/threshold_sweep_results.csv`
+**File:** `results/evaluate/threshold_sweep_results.csv`
 
 ```csv
 threshold,accuracy,precision,recall,f1,macro_f1,f1_class0,f1_class1,positive_predictions,negative_predictions
@@ -156,7 +161,7 @@ threshold,accuracy,precision,recall,f1,macro_f1,f1_class0,f1_class1,positive_pre
 
 ### Training Report
 
-**File:** `metrics_output/reports/training_report_*.html`
+**File:** `results/evaluate/evaluation_report_*.html`
 
 **Sections:**
 1. **Training Overview** - Dataset info, parameters
@@ -168,7 +173,7 @@ threshold,accuracy,precision,recall,f1,macro_f1,f1_class0,f1_class1,positive_pre
 
 ### Evaluation Report
 
-**File:** `evaluation_output/reports/evaluation_report_*.html`
+**File:** `results/evaluate/evaluation_report_*.html`
 
 **Sections:**
 1. **Evaluation Overview** - Dataset info, model info
@@ -187,23 +192,23 @@ threshold,accuracy,precision,recall,f1,macro_f1,f1_class0,f1_class1,positive_pre
 
 ```bash
 # Training metrics
-cat models/type4_xgb_java.pkl.metrics.json | python -m json.tool
+cat results/train/training_metrics.json | python -m json.tool
 
 # Evaluation metrics
-cat evaluation_output/metrics_java.json | python -m json.tool
+cat results/evaluate/metrics_java.json | python -m json.tool
 
 # Threshold sweep
-cat evaluation_output/threshold_sweep_results.csv
+cat results/evaluate/threshold_sweep_results.csv
 ```
 
 ### View Visualizations
 
 ```bash
 # Training report
-open metrics_output/reports/training_report_java.html
+open results/train/visualizations/confusion_matrix_train.png
 
 # Evaluation report
-open evaluation_output/reports/evaluation_report_java.html
+open results/evaluate/evaluation_report_java.html
 ```
 
 ### Compare Languages
@@ -212,11 +217,11 @@ open evaluation_output/reports/evaluation_report_java.html
 import json
 from pathlib import Path
 
-output_dir = Path("evaluation_output")
+output_dir = Path("results/evaluate")
 results = {}
 
 for lang in ["java", "python", "c", "csharp"]:
-    metrics_file = output_dir / f"metrics_{lang}.json"
+    metrics_file = output_dir / f"metrics_gptclonebench_{lang}.json"
     if metrics_file.exists():
         with open(metrics_file) as f:
             results[lang] = json.load(f)
@@ -235,24 +240,27 @@ for lang, metrics in results.items():
 cipas-semantics/
 ├── models/
 │   ├── type4_xgb_java.pkl              # Model file
-│   ├── type4_xgb_java.pkl.features.json # Feature names
-│   └── type4_xgb_java.pkl.metrics.json  # Training metrics
+│   └── type4_xgb_java.pkl.features.json # Feature names
 │
-├── metrics_output/
-│   └── reports/
-│       └── training_report_java.html   # Training visualization
-│
-└── evaluation_output/
-    ├── metrics_java.json               # Java evaluation metrics
-    ├── metrics_python.json             # Python evaluation metrics
-    ├── metrics_c.json                  # C evaluation metrics
-    ├── metrics_csharp.json             # C# evaluation metrics
-    ├── threshold_sweep_results.csv     # Threshold analysis
-    └── reports/
-        ├── evaluation_report_java.html     # Java visualization
-        ├── evaluation_report_python.html   # Python visualization
-        ├── evaluation_report_c.html        # C visualization
-        └── evaluation_report_csharp.html   # C# visualization
+├── results/
+│   ├── train/
+│   │   ├── training_metrics.json       # Training metrics
+│   │   └── visualizations/
+│   │       ├── confusion_matrix_train.png
+│   │       ├── feature_importances_train.png
+│   │       ├── per_source_recall.png
+│   │       └── threshold_sweep.png
+│   │
+│   └── evaluate/
+│       ├── metrics_gptclonebench_java.json
+│       ├── metrics_gptclonebench_python.json
+│       ├── metrics_gptclonebench_c.json
+│       ├── metrics_gptclonebench_csharp.json
+│       ├── threshold_sweep_results.csv
+│       └── visualizations/
+│           ├── confusion_matrix_eval.png
+│           ├── feature_importances_eval.png
+│           └── evaluation_report_*.html
 ```
 
 ---

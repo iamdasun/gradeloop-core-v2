@@ -5,6 +5,49 @@
  * Source of truth: apps/services/assessment-service/internal/dto/
  */
 
+// ─── Supporting types for rubric & test cases ─────────────────────────────────
+
+/** A single performance band within a rubric criterion. */
+export interface RubricBand {
+    level: string;
+    description: string;
+    min_score: number;
+    max_score: number;
+}
+
+/** One rubric criterion sent when creating/updating an assignment. */
+export interface RubricCriterionDto {
+    name: string;
+    description?: string;
+    /**
+     * Evaluation pipeline for this criterion.
+     * "deterministic" | "llm" | "llm_ast" (extensible — kept as string).
+     */
+    grading_mode: string;
+    weight: number;  // must sum to 100 across all criteria
+    bands?: RubricBand[];
+    order_index?: number;
+}
+
+/** One test case sent when creating an assignment. */
+export interface TestCaseDto {
+    description?: string;
+    /** stdin passed to Judge0 */
+    input: string;
+    /** expected stdout from Judge0 */
+    expected_output: string;
+    is_hidden?: boolean;
+    order_index?: number;
+}
+
+/** Reference implementation sent when creating an assignment. */
+export interface SampleAnswerDto {
+    language_id: number;
+    language: string;
+    code: string;
+}
+
+
 export interface CreateAssignmentRequest {
     course_instance_id: string;
     title: string;
@@ -20,6 +63,11 @@ export interface CreateAssignmentRequest {
     enable_ai_assistant: boolean;
     enable_socratic_feedback: boolean;
     allow_regenerate: boolean;
+    assessment_type?: "lab" | "exam";
+    objective?: string;
+    rubric_criteria?: RubricCriterionDto[];
+    test_cases?: TestCaseDto[];
+    sample_answer?: SampleAnswerDto;
 }
 
 export interface AssignmentResponse {
@@ -28,6 +76,7 @@ export interface AssignmentResponse {
     title: string;
     description: string;
     code: string;
+    assessment_type?: string;
     release_at?: string;
     due_at?: string;
     late_due_at?: string;
@@ -42,6 +91,14 @@ export interface AssignmentResponse {
     created_by: string;
     created_at: string;
     updated_at: string;
+    total_marks?: number;
+    submission_config?: {
+        submission_allowed: boolean;
+        max_attempts?: number;
+    };
+    ai_grading_config?: {
+        plagiarism_check_enabled: boolean;
+    };
 }
 
 export interface ListAssignmentsResponse {
@@ -107,12 +164,10 @@ export interface RunCodeResponse {
     stdout: string | null;
     stderr: string | null;
     compile_output: string | null;
-    status: {
-        id: number;
-        description: string;
-    };
-    time: string | null;
-    memory: number | null;
-    exit_code: number | null;
-    exit_signal: number | null;
+    /** Human-readable status from Judge0 (e.g. "Accepted", "Runtime Error") */
+    status: string;
+    status_id: number;
+    execution_time: string | null;
+    memory_used: number | null;
+    message: string | null;
 }

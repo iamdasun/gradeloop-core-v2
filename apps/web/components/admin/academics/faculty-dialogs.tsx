@@ -5,7 +5,7 @@
  *
  * Backend contract (dto/faculty.go):
  *   CreateFacultyRequest.leaders  required, min=1 — each needs user_id (UUID) + role string
- *   Leaders must be employees — fetched from IAM GET /users?user_type=employee
+ *   Leaders must be instructors — fetched from IAM GET /users?user_type=instructor
  */
 import * as React from "react";
 import { Landmark, UserPlus, Trash2, ChevronDown } from "lucide-react";

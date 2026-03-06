@@ -1,0 +1,80 @@
+meta {
+  name: Enroll Student
+  type: http
+  seq: 4
+}
+
+docs {
+  # Enroll Student
+
+  Enrolls an individual registered student into the course instance.
+
+  ## Prerequisites
+  - Valid access token with Instructor, Admin, or Super Admin role
+  - The caller must be assigned as an instructor of the course instance
+  - The student must already have a registered account in the IAM service
+  - `COURSE_INSTANCE_ID` environment variable must be set
+
+  ## Path Parameters
+  | Parameter | Description |
+  |-----------|-------------|
+  | `:id`     | Course instance UUID |
+
+  ## Request Body
+  ```json
+  {
+    "user_id": "<student-uuid>",
+    "status": "Enrolled"
+  }
+  ```
+
+  | Field     | Required | Description |
+  |-----------|----------|-------------|
+  | `user_id` | Yes      | UUID of the student to enroll |
+  | `status`  | No       | Enrollment status (default: `"Enrolled"`) |
+
+  ## Response (201 Created)
+  ```json
+  {
+    "course_instance_id": "uuid",
+    "user_id": "uuid",
+    "status": "Enrolled",
+    "final_grade": null,
+    "enrolled_at": "2026-03-06T10:00:00Z",
+    "student_id": "IT22204202",
+    "full_name": "Alice Smith",
+    "email": "alice@example.com"
+  }
+  ```
+
+  ## Error Responses
+  | Status | Description |
+  |--------|-------------|
+  | 400    | Invalid request body or user_id |
+  | 401    | Missing or invalid authorization |
+  | 403    | Caller not assigned to this course instance |
+  | 404    | Course instance not found |
+  | 409    | Student already enrolled |
+}
+
+post {
+  url: {{INSTRUCTOR_COURSES_URL_V1}}/{{COURSE_INSTANCE_ID}}/enrollments
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "user_id": "{{ENROLLMENT_USER_ID}}",
+    "status": "Enrolled"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

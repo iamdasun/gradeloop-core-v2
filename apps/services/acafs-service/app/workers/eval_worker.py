@@ -62,7 +62,65 @@ class EvaluationWorker:
 
             # Parse AST
             blueprint = await self._parse_ast(event, code)
-            
+
+            # ----------------------------------------------------------------
+            # TODO [ACAFS – Rubric-Based Grading Pipeline]
+            #
+            # Once assessment-service stores rubric + test_cases + sample_answer,
+            # the SubmissionEvent (or a supplementary RabbitMQ message) will carry:
+            #
+            #   event.rubric         → list[RubricCriterion] with name, description,
+            #                          grading_mode ("llm" | "llm_ast" | "deterministic"),
+            #                          weight (0-100, sums to 100), and bands:
+            #                          {excellent/good/satisfactory/unsatisfactory}
+            #                          each with description + mark_range.
+            #
+            #   event.test_cases     → list[TestCase] with test_case_id, description,
+            #                          test_case_input (stdin), expected_output (stdout).
+            #
+            #   event.sample_answer  → {language_id: int, code: str}  (reference impl).
+            #
+            # Evaluation steps to implement:
+            #
+            # Step A — Deterministic test-case runner:
+            #   For each criterion where grading_mode == "deterministic":
+            #     1. Submit student code to Judge0 for each test_case.
+            #     2. Compare actual stdout vs expected_output (trimEnd).
+            #     3. Score = (passed_tests / total_tests) mapped to band mark_range.
+            #     4. Store per-test result in TestCaseResult (already defined in schemas).
+            #
+            # Step B — LLM evaluation:
+            #   For each criterion where grading_mode == "llm":
+            #     1. Build a prompt containing:
+            #        - assignment.description + assignment.objective
+            #        - criterion.name + criterion.description
+            #        - band descriptions (excellent → unsatisfactory)
+            #        - student code (from event.code)
+            #        - (optional) sample_answer.code for reference comparison
+            #     2. Call LLM API, receive band classification + justification.
+            #     3. Map band to mark_range to get numeric score.
+            #
+            # Step C — LLM + AST evaluation:
+            #   For each criterion where grading_mode == "llm_ast":
+            #     1. Use ASTBlueprint (already produced in this worker) to enrich prompt.
+            #        Inject: function signatures, complexity indicators, control flow.
+            #     2. Same LLM evaluation as Step B but with AST context.
+            #
+            # Step D — Aggregate score:
+            #   total_score = sum(criterion.weight * band_score_ratio for each criterion)
+            #   Store breakdown in postgres: submission_grades table.
+            #
+            # Step E — Socratic feedback (requires enable_socratic_feedback=True):
+            #   TODO [ACAFS – Socratic Feedback]:
+            #   For each failed/partial criterion, generate targeted Socratic hints:
+            #     - Do NOT reveal the solution directly.
+            #     - Ask guiding questions based on the criterion description.
+            #     - Reference specific line numbers from the AST blueprint.
+            #   Store hints in postgres: submission_feedback table.
+            #   The assessment-service API endpoint /student-submissions/:id/feedback
+            #   should serve these hints to students.
+            # ----------------------------------------------------------------
+
             # Store blueprint
             await self.postgres.store_ast_blueprint(
                 submission_id=event.submission_id,

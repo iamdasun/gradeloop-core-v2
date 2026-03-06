@@ -74,6 +74,24 @@ export const usersApi = {
     return normalizePaginated(data, params);
   },
 
+  /**
+   * GET /users/students — instructor-accessible endpoint.
+   * Returns only student accounts. Locked server-side to user_type=student.
+   */
+  listStudents: async (
+    params: { page?: number; limit?: number; search?: string } = {}
+  ): Promise<PaginatedUsers> => {
+    const cleanParams: Record<string, unknown> = {};
+    if (params.page !== undefined) cleanParams.page = params.page;
+    if (params.limit !== undefined) cleanParams.limit = params.limit;
+    if (params.search) cleanParams.search = params.search;
+
+    const { data } = await axiosInstance.get("/users/students", {
+      params: cleanParams,
+    });
+    return normalizePaginated(data, { page: params.page, limit: params.limit });
+  },
+
   /** GET /users/:id */
   get: async (id: string): Promise<UserListItem> => {
     const { data } = await axiosInstance.get<UserListItem>(`/users/${id}`);

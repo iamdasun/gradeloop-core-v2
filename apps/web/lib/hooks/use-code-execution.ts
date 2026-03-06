@@ -61,27 +61,32 @@ export function useCodeExecution({
 
         const response: RunCodeResponse = await assessmentsApi.runCode(request);
 
+        // Adapt the flat backend response to the nested ExecutionResult shape
+        // used by IDE components.
         const executionResult: ExecutionResult = {
           stdout: response.stdout,
           stderr: response.stderr,
           compile_output: response.compile_output,
-          status: response.status,
-          time: response.time,
-          memory: response.memory,
-          exit_code: response.exit_code,
-          exit_signal: response.exit_signal,
+          status: {
+            id: response.status_id,
+            description: response.status ?? "",
+          },
+          time: response.execution_time,
+          memory: response.memory_used,
+          exit_code: null,
+          exit_signal: null,
         };
 
         setResult(executionResult);
 
         // Show success toast if execution completed
-        if (response.status.id === 3) {
+        if (response.status_id === 3) {
           toast.success("Code executed successfully");
-        } else if (response.status.id === 6) {
+        } else if (response.status_id === 6) {
           toast.error("Compilation failed");
-        } else if (response.status.id >= 7 && response.status.id <= 12) {
+        } else if (response.status_id >= 7 && response.status_id <= 12) {
           toast.error("Runtime error occurred");
-        } else if (response.status.id === 5) {
+        } else if (response.status_id === 5) {
           toast.error("Time limit exceeded");
         }
 

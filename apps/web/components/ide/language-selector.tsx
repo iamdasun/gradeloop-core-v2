@@ -21,6 +21,8 @@ interface LanguageSelectorProps {
   disabled?: boolean;
   /** Renders a compact version for use in the status bar */
   compact?: boolean;
+  /** When provided, only these Judge0 language IDs are shown in the list */
+  allowedIds?: number[];
 }
 
 export function LanguageSelector({
@@ -28,6 +30,7 @@ export function LanguageSelector({
   onChange,
   disabled = false,
   compact = false,
+  allowedIds,
 }: LanguageSelectorProps) {
   const [languages, setLanguages] = useState<LanguageOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -129,6 +132,7 @@ export function LanguageSelector({
           <SelectLabel>Programming Languages</SelectLabel>
           {languages
             .filter((lang) => !lang.is_archived)
+            .filter((lang) => !allowedIds || allowedIds.includes(lang.id))
             .map((lang) => (
               <SelectItem key={lang.id} value={lang.id.toString()}>
                 <div className="flex items-center gap-2">

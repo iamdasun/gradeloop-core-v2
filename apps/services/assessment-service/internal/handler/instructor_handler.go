@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/client"
@@ -204,8 +205,8 @@ func (h *InstructorHandler) GetSubmissions(c fiber.Ctx) error {
 		return utils.ErrForbidden("you are not assigned to this course instance")
 	}
 
-	// List all submissions (nil user/group = all submissions)
-	submissions, err := h.submissionService.ListSubmissions(assignmentID, nil, nil)
+	// List all submissions across all owners (instructor-scoped: no user/group filter).
+	submissions, err := h.submissionService.ListAllSubmissionsForAssignment(assignmentID)
 	if err != nil {
 		return err
 	}
@@ -241,4 +242,135 @@ func toInstructorSubmissionResponse(s *domain.Submission) dto.SubmissionResponse
 		resp.GroupID = s.GroupID
 	}
 	return resp
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/instructor-assignments/:id/rubric
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (h *InstructorHandler) GetAssignmentRubric(c fiber.Ctx) error {
+	assignmentID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	assignment, err := h.assignmentService.GetAssignmentByID(assignmentID)
+	if err != nil {
+		return err
+	}
+	courseIDs, err := h.instructorCourseIDs(c)
+	if err != nil {
+		return err
+	}
+	if !courseIDs[assignment.CourseInstanceID] {
+		return utils.ErrForbidden("you are not assigned to this course instance")
+	}
+
+	criteria, err := h.assignmentService.GetAssignmentRubric(assignmentID)
+	if err != nil {
+		return err
+	}
+
+	items := make([]dto.RubricCriterionResponse, 0, len(criteria))
+	totalWeight := 0
+	for _, cr := range criteria {
+		totalWeight += cr.Weight
+		items = append(items, dto.RubricCriterionResponse{
+			ID:          cr.ID.String(),
+			Name:        cr.Name,
+			Description: cr.Description,
+			GradingMode: cr.GradingMode,
+			Weight:      cr.Weight,
+			Bands:       json.RawMessage(cr.Bands),
+			OrderIndex:  cr.OrderIndex,
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(dto.ListRubricResponse{
+		AssignmentID: assignmentID.String(),
+		Criteria:     items,
+		TotalWeight:  totalWeight,
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/instructor-assignments/:id/test-cases
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (h *InstructorHandler) GetAssignmentTestCases(c fiber.Ctx) error {
+	assignmentID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	assignment, err := h.assignmentService.GetAssignmentByID(assignmentID)
+	if err != nil {
+		return err
+	}
+	courseIDs, err := h.instructorCourseIDs(c)
+	if err != nil {
+		return err
+	}
+	if !courseIDs[assignment.CourseInstanceID] {
+		return utils.ErrForbidden("you are not assigned to this course instance")
+	}
+
+	testCases, err := h.assignmentService.GetAssignmentTestCases(assignmentID)
+	if err != nil {
+		return err
+	}
+
+	items := make([]dto.TestCaseResponse, 0, len(testCases))
+	for _, tc := range testCases {
+		items = append(items, dto.TestCaseResponse{
+			ID:             tc.ID.String(),
+			Description:    tc.Description,
+			Input:          tc.Input,
+			ExpectedOutput: tc.ExpectedOutput,
+			IsHidden:       tc.IsHidden,
+			OrderIndex:     tc.OrderIndex,
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(dto.ListTestCasesResponse{
+		AssignmentID: assignmentID.String(),
+		TestCases:    items,
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/instructor-assignments/:id/sample-answer
+// ─────────────────────────────────────────────────────────────────────────────
+
+func (h *InstructorHandler) GetAssignmentSampleAnswer(c fiber.Ctx) error {
+	assignmentID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	assignment, err := h.assignmentService.GetAssignmentByID(assignmentID)
+	if err != nil {
+		return err
+	}
+	courseIDs, err := h.instructorCourseIDs(c)
+	if err != nil {
+		return err
+	}
+	if !courseIDs[assignment.CourseInstanceID] {
+		return utils.ErrForbidden("you are not assigned to this course instance")
+	}
+
+	answer, err := h.assignmentService.GetAssignmentSampleAnswer(assignmentID)
+	if err != nil {
+		return err
+	}
+	if answer == nil {
+		return utils.ErrNotFound("no sample answer for this assignment")
+	}
+
+	return c.Status(fiber.StatusOK).JSON(dto.SampleAnswerResponse{
+		ID:           answer.ID.String(),
+		AssignmentID: assignmentID.String(),
+		LanguageID:   answer.LanguageID,
+		Language:     answer.Language,
+		Code:         answer.Code,
+	})
 }

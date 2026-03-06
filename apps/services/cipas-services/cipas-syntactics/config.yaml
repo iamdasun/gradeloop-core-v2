@@ -1,0 +1,232 @@
+# CIPAS Syntactics Service Configuration
+# This configuration file contains all parameters for training and evaluation
+# Run scripts without arguments: `python train.py` or `python evaluate.py`
+
+# =============================================================================
+# DATASET CONFIGURATION
+# =============================================================================
+datasets:
+  # TOMA dataset for training (syntactic clone pairs)
+  toma:
+    path: "/home/iamdasun/Projects/4yrg/gradeloop-core-v2/datasets/toma-dataset"
+
+  # BigCloneBench Balanced for evaluation
+  bigclonebench_balanced:
+    path: "/home/iamdasun/Projects/4yrg/gradeloop-core-v2/datasets/bigclonebench/bigclonebench_balanced.json"
+
+  # BigCloneBench Full dataset (JSONL format)
+  bigclonebench_full:
+    path: "/home/iamdasun/Projects/4yrg/gradeloop-core-v2/datasets/bigclonebench/bigclonebench.jsonl"
+
+  # BigCloneBench 100K subset
+  bigclonebench_100k:
+    path: "/home/iamdasun/Projects/4yrg/gradeloop-core-v2/datasets/bigclonebench/bigclonebench_100k.jsonl"
+
+  # Project CodeNet for clustering evaluation
+  codenet:
+    path: "/home/iamdasun/Projects/4yrg/gradeloop-core-v2/datasets/project-codenet"
+
+# =============================================================================
+# TRAINING CONFIGURATION
+# =============================================================================
+training:
+  # Model output settings
+  model:
+    name: "clone_detector_xgb.pkl"
+    output_dir: "./results/train"
+
+  # XGBoost hyperparameters
+  xgboost:
+    n_estimators: 500
+    max_depth: 8
+    learning_rate: 0.05
+    subsample: 0.9
+    colsample_bytree: 0.8
+    min_child_weight: 2
+    gamma: 0.1
+    reg_lambda: 1.0
+    scale_pos_weight: 2.0
+
+  # Dataset sampling (per source type)
+  # Format: (csv_filename, label, target_count, sample_weight)
+  dataset_config:
+    - ["type-1.csv", 1, 8000, 1.5]    # Exact clones - easy positive
+    - ["type-2.csv", 1, 8000, 1.5]    # Renamed clones - easy positive
+    - ["type-3.csv", 1, 20000, 2.0]   # Strong near-miss - hard positive
+    - ["type-4.csv", 1, 15000, 1.5]   # Moderate near-miss
+    - ["type-5.csv", 1, 10000, 1.0]   # Weak / borderline
+    - ["nonclone.csv", 0, 20000, 1.0] # Negative class
+
+  # Feature extraction
+  features:
+    include_node_types: true
+    language: "java"
+
+  # Train/test split
+  test_size: 0.2
+
+  # Sample size override (None = use full dataset_config)
+  sample_size: null
+
+  # GPU acceleration
+  use_gpu: false
+
+  # Visualization
+  visualize: true
+
+# =============================================================================
+# EVALUATION CONFIGURATION (BigCloneBench Balanced)
+# =============================================================================
+evaluation:
+  # Model to load
+  model:
+    path: "clone_detector_xgb.pkl"
+    output_dir: "./results/evaluate"
+
+  # Clone types to evaluate
+  clone_types: [1, 2, 3]
+
+  # Sample size (None = full dataset)
+  sample_size: null
+
+  # Decision threshold (None = use calibrated from model)
+  threshold: null
+
+  # Feature extraction
+  features:
+    include_node_types: true
+    language: "java"
+
+  # Logging
+  log_type3_similarity: false
+  verbose: false
+
+# =============================================================================
+# PARALLEL EVALUATION CONFIGURATION (Full BigCloneBench)
+# =============================================================================
+parallel_evaluation:
+  # Dataset selection: "balanced", "100k", "full"
+  dataset: "balanced"
+
+  # Model to load
+  model:
+    path: "clone_detector_xgb.pkl"
+    output_dir: "./results/evaluate"
+
+  # Clone types to evaluate
+  clone_types: [1, 2, 3]
+
+  # Sample size (None = full dataset)
+  sample_size: null
+
+  # Parallel processing
+  workers: null  # null = auto-detect CPU count
+  batch_size: 5000
+
+  # Decision threshold (None = use calibrated from model)
+  threshold: null
+
+  # Feature extraction
+  features:
+    include_node_types: true
+
+  # Verbose logging
+  verbose: false
+
+# =============================================================================
+# CLUSTERING EVALUATION CONFIGURATION (Project CodeNet)
+# =============================================================================
+clustering_evaluation:
+  # Number of problems to evaluate
+  n_problems: 20
+
+  # Languages to evaluate
+  languages: ["java"]
+
+  # Maximum submissions per problem
+  max_submissions: 100
+
+  # LSH index parameters
+  lsh:
+    threshold: 0.3
+    num_perm: 128
+
+  # Evaluation modes
+  lsh_only: false           # Skip cascade, measure LSH only
+  skip_brute_force: false   # Skip O(N²) ground truth
+  full_gt: false            # Use full TieredPipeline for GT
+  all_statuses: false       # Include non-Accepted submissions
+
+  # Source code filtering
+  max_source_kb: 16         # Skip files > this size
+
+  # Cascade parameters
+  max_cascade_pairs: null
+
+  # Output
+  output_json: null         # Path to save JSON results
+  seed: 42
+
+  # Verbose logging
+  verbose: false
+
+# =============================================================================
+# PIPELINE CONFIGURATION (Train + Evaluate)
+# =============================================================================
+pipeline:
+  # Modes
+  quick: false              # Quick test mode
+  full: false               # Full evaluation mode
+
+  # Training sample size
+  train_sample: 20000       # 5000 in quick mode
+
+  # Evaluation sample size
+  eval_sample: null
+
+  # Decision threshold
+  threshold: null
+
+  # Parallel workers
+  workers: 8                # 4 in quick mode
+
+  # Output directory
+  output_dir: null
+
+# =============================================================================
+# DETECTION THRESHOLDS (Clone Detection Pipeline)
+# =============================================================================
+thresholds:
+  # Type-1 detection (NiCAD-style)
+  type1:
+    jaccard: 0.98
+    levenshtein: 0.98
+
+  # Type-2 detection (NiCAD-style)
+  type2:
+    threshold: 0.95
+    token_delta_pct: 0.05
+
+  # Type-3 detection (XGBoost + Filter)
+  type3:
+    prob_floor: 0.35        # Minimum XGBoost probability
+    lev_upper: 0.85         # Max Levenshtein for Type-3
+    ast_upper: 0.90         # Max AST Jaccard for Type-3
+
+  # Template filtering
+  template:
+    jaccard: 0.90
+
+  # Preprocessing
+  preprocessor:
+    sliding_window_min_tokens: 50
+    window_size: 40
+    window_stride: 10
+
+# =============================================================================
+# SERVICE CONFIGURATION (FastAPI)
+# =============================================================================
+service:
+  host: "0.0.0.0"
+  port: 8086
+  reload: false
