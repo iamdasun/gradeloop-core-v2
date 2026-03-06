@@ -20,7 +20,8 @@ import {
   ChevronDown,
   ClipboardList,
   Users2,
-  Plus
+  Plus,
+  Mic2
 } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { useLogoutMutation } from "@/lib/hooks/useAuthMutation";
@@ -119,6 +120,34 @@ const instructorNavItems: NavItem[] = [
   },
 ];
 
+const studentNavItems: NavItem[] = [
+  {
+    title: "Dashboard",
+    href: "/student",
+    icon: LayoutDashboard,
+  },
+  {
+    title: "My Courses",
+    href: "/student/courses",
+    icon: BookOpen,
+  },
+  {
+    title: "Submissions",
+    href: "/student/submissions",
+    icon: ClipboardList,
+  },
+  {
+    title: "Viva Assessments",
+    href: "/student/assessments/my-sessions",
+    icon: Mic2,
+  },
+  {
+    title: "Settings",
+    href: "/student/settings",
+    icon: Settings,
+  },
+];
+
 interface MobileSidebarProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -129,9 +158,23 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
   const user = useAuthStore((s) => s.user);
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
 
-  const isInstructor = user?.user_type?.toLowerCase().trim() === "instructor";
-  const navItems = isInstructor ? instructorNavItems : adminNavItems;
-  const homeHref = isInstructor ? "/instructor" : "/admin";
+  // Determine user role from user_type, not from pathname
+  const userType = user?.user_type?.toLowerCase().trim() ?? "";
+  const isInstructor = userType === "instructor";
+  const isStudent = userType === "student";
+  const isAdmin = userType === "admin" || userType === "super_admin";
+
+  const navItems = isInstructor
+    ? instructorNavItems
+    : isStudent
+      ? studentNavItems
+      : adminNavItems;
+
+  const homeHref = isInstructor
+    ? "/instructor"
+    : isStudent
+      ? "/student"
+      : "/admin";
 
   const displayName = user?.full_name || user?.email || "—";
   const initials = user?.full_name

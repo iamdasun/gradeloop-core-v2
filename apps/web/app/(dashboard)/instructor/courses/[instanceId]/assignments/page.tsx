@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { instructorAssessmentsApi } from "@/lib/api/assessments";
 import type { AssignmentResponse } from "@/types/assessments.types";
 import { handleApiError } from "@/lib/api/axios";
-import { Plus, AlertCircle, Filter } from "lucide-react";
+import { Plus, AlertCircle, Filter, FileText } from "lucide-react";
 import { SectionHeader } from "@/components/instructor/section-header";
 import { DataTable, type ColumnDef } from "@/components/instructor/data-table";
 import { StatusBadge } from "@/components/instructor/status-badge";

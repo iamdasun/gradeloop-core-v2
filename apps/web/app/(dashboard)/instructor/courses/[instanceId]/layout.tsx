@@ -7,13 +7,6 @@ import { ArrowLeft, LayoutDashboard, FileText, Users } from "lucide-react";
 import { instructorCoursesApi } from "@/lib/api/academics";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useUIStore } from "@/lib/stores/uiStore";
-
-const NAV_ITEMS = [
-    { name: "Overview",    href: "",             icon: LayoutDashboard },
-    { name: "Assignments", href: "/assignments",  icon: FileText },
-    { name: "Students",    href: "/students",     icon: Users },
-];
 
 export default function CourseInstanceLayout({
     children,
@@ -25,10 +18,16 @@ export default function CourseInstanceLayout({
     const { instanceId } = React.use(params);
     const pathname = usePathname();
 
-    const setPageTitle       = useUIStore((s) => s.setPageTitle);
-    const setSecondarySidebar = useUIStore((s) => s.setSecondarySidebar);
-
     const basePath = `/instructor/courses/${instanceId}`;
+    const tabs = [
+        { name: "Overview", href: basePath, icon: LayoutDashboard },
+        { name: "Assignments", href: `${basePath}/assignments`, icon: FileText },
+        { name: "Students", href: `${basePath}/students`, icon: Users },
+    ];
+
+    // Track course data for display
+    const [courseCode, setCourseCode] = React.useState("");
+    const [courseTitle, setCourseTitle] = React.useState("Course Details");
 
     React.useEffect(() => {
         let mounted = true;
@@ -36,48 +35,17 @@ export default function CourseInstanceLayout({
             try {
                 const courses = await instructorCoursesApi.listMyCourses();
                 const found = courses.find((c) => c.course_instance_id === instanceId);
-                if (mounted) {
-                    const title = found?.course_title ?? "Course Details";
-                    const code  = found?.course_code  ?? "";
-                    setPageTitle(title);
-                    setSecondarySidebar({
-                        title,
-                        subtitle:  code || undefined,
-                        backHref:  "/instructor/courses",
-                        backLabel: "My Courses",
-                        basePath,
-                        items: NAV_ITEMS.map((item) => ({
-                            name: item.name,
-                            href: `${basePath}${item.href}`,
-                        })),
-                    });
+                if (mounted && found) {
+                    setCourseTitle(found.course_title ?? "Course Details");
+                    setCourseCode(found.course_code ?? "");
                 }
             } catch {
-                if (mounted) {
-                    setPageTitle("Course");
-                    setSecondarySidebar({
-                        title:     "Course",
-                        backHref:  "/instructor/courses",
-                        backLabel: "My Courses",
-                        basePath,
-                        items: NAV_ITEMS.map((item) => ({
-                            name: item.name,
-                            href: `${basePath}${item.href}`,
-                        })),
-                    });
-                }
+                // Use defaults
             }
         }
         fetchCourseData();
         return () => { mounted = false; };
     }, [instanceId]);
-
-    const basePath = `/instructor/courses/${instanceId}`;
-    const tabs = [
-        { name: "Overview", href: basePath, icon: LayoutDashboard },
-        { name: "Assignments", href: `${basePath}/assignments`, icon: FileText },
-        { name: "Students", href: `${basePath}/students`, icon: Users },
-    ];
 
     // Hide the course-level tab bar when inside an assignment detail page —
     // the assignment layout renders its own secondary bar there.
@@ -131,7 +99,7 @@ export default function CourseInstanceLayout({
             )}
 
             {children}
-        </>
+        </div>
     );
 }
 

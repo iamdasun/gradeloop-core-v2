@@ -159,22 +159,25 @@ export function Sidebar({ collapsed, onCollapsedChange }: SidebarProps) {
   const { currentStep, steps, setStep, highestStepVisited } = useAssignmentCreateStore();
   const { mutate: logout, isLoading: isLoggingOut } = useLogoutMutation();
 
-  const isStudent = pathname.startsWith("/student");
-  const isEmployee = pathname.startsWith("/instructor");
+  // Determine user role from user_type, not from pathname
+  const userType = user?.user_type?.toLowerCase().trim() ?? "";
+  const isInstructor = userType === "instructor";
+  const isStudent = userType === "student";
+  const isAdmin = userType === "admin" || userType === "super_admin";
 
-  const navItems = isEmployee
+  const navItems = isInstructor
     ? instructorNavItems
     : isStudent
       ? studentNavItems
       : adminNavItems;
 
-  const homeHref = isEmployee
+  const homeHref = isInstructor
     ? "/instructor"
     : isStudent
       ? "/student"
       : "/admin";
 
-  const roleLabel = isEmployee ? "Instructor" : isStudent ? "Student" : "Admin";
+  const roleLabel = isInstructor ? "Instructor" : isStudent ? "Student" : "Admin";
 
   const displayName = user?.full_name || user?.email || "—";
   const initials = user?.full_name

@@ -186,7 +186,7 @@ export const useAuthStore = create<AuthState>()(
 
       isInstructor: () => {
         const u = get().user;
-        return !!u && (u.user_type === "instructor" || u.user_type === "admin" || u.user_type === "super_admin");
+        return !!u && u.user_type === "instructor";
       },
 
       isStudent: () => {

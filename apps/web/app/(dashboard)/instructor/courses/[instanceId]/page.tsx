@@ -24,8 +24,6 @@ import { StatusBadge } from "@/components/instructor/status-badge";
 export default function InstructorCourseDetailsPage() {
     const params = useParams();
     const instanceId = params.instanceId as string;
-    const params = useParams();
-    const instanceId = params.instanceId as string;
 
     const [students, setStudents] = React.useState<Enrollment[]>([]);
     const [instructors, setInstructors] = React.useState<CourseInstructor[]>([]);
@@ -35,17 +33,7 @@ export default function InstructorCourseDetailsPage() {
 
     React.useEffect(() => {
         let mounted = true;
-    React.useEffect(() => {
-        let mounted = true;
 
-        async function fetchData() {
-            try {
-                setIsLoading(true);
-                const [studs, insts, assignments] = await Promise.all([
-                    instructorCoursesApi.listMyStudents(instanceId),
-                    instructorCoursesApi.listMyInstructors(instanceId),
-                    instructorAssessmentsApi.listMyAssignments(),
-                ]);
         async function fetchData() {
             try {
                 setIsLoading(true);
@@ -68,27 +56,9 @@ export default function InstructorCourseDetailsPage() {
                 if (mounted) setIsLoading(false);
             }
         }
-                if (mounted) {
-                    setStudents(studs);
-                    setInstructors(insts);
-                    setAssignmentCount(
-                        assignments.filter((a) => a.course_instance_id === instanceId).length
-                    );
-                }
-            } catch (err) {
-                if (mounted) setError(handleApiError(err));
-            } finally {
-                if (mounted) setIsLoading(false);
-            }
-        }
 
         if (instanceId) fetchData();
-        if (instanceId) fetchData();
 
-        return () => {
-            mounted = false;
-        };
-    }, [instanceId]);
         return () => {
             mounted = false;
         };
@@ -100,14 +70,6 @@ export default function InstructorCourseDetailsPage() {
 
     const courseCode = instructors.length > 0 ? instructors[0].course_code : instanceId;
 
-    if (error) {
-        return (
-            <div className="flex gap-3 p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-destructive text-sm">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{error}</span>
-            </div>
-        );
-    }
     if (error) {
         return (
             <div className="flex gap-3 p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-destructive text-sm">
