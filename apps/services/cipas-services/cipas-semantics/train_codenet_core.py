@@ -7,7 +7,9 @@ Supports: Java, C, C#, Python
 
 import json
 import logging
+import multiprocessing as mp
 import random
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
@@ -28,6 +30,97 @@ from clone_detection.models.classifiers import SemanticClassifier
 from clone_detection.utils.common_setup import setup_logging
 
 logger = setup_logging(__name__)
+
+
+# =============================================================================
+# Parallel Feature Extraction Worker
+# =============================================================================
+
+def extract_features_worker(args):
+    """
+    Worker function for parallel feature extraction.
+    
+    Args:
+        args: Tuple of (code1, code2, language, index)
+        
+    Returns:
+        Tuple of (index, features_array) or (index, None) on error
+    """
+    code1, code2, language, idx = args
+    try:
+        extractor = SheneamerFeatureExtractor()
+        fused = extractor.extract_fused_features(code1, code2, language)
+        return (idx, fused)
+    except Exception as e:
+        # Return None for failed extractions - will be handled by caller
+        return (idx, None)
+
+
+def extract_features_parallel(
+    code1_list: list[str],
+    code2_list: list[str],
+    language: str = "java",
+    workers: Optional[int] = None,
+    batch_size: int = 1000,
+) -> np.ndarray:
+    """
+    Extract features in parallel using multiprocessing.
+    
+    Args:
+        code1_list: List of first code samples
+        code2_list: List of second code samples
+        language: Programming language
+        workers: Number of worker processes (default: CPU count)
+        batch_size: Number of samples per progress update
+        
+    Returns:
+        Feature matrix as numpy array
+    """
+    if workers is None:
+        workers = mp.cpu_count()
+    
+    logger.info(f"Extracting features with {workers} workers...")
+    
+    # Prepare work items
+    work_items = [
+        (code1, code2, language, idx)
+        for idx, (code1, code2) in enumerate(zip(code1_list, code2_list))
+    ]
+    
+    features = [None] * len(work_items)
+    failed_count = 0
+    
+    # Process in parallel with progress bar
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        # Submit all tasks
+        futures = {
+            executor.submit(extract_features_worker, item): item
+            for item in work_items
+        }
+        
+        # Collect results with progress bar
+        with tqdm(total=len(futures), desc="Extracting features") as pbar:
+            for future in as_completed(futures):
+                idx, result = future.result()
+                if result is not None:
+                    features[idx] = result
+                else:
+                    failed_count += 1
+                    # Use zero vector for failed extractions
+                    if features[0] is not None:
+                        features[idx] = np.zeros_like(features[0])
+                    else:
+                        # Will be filled after first successful extraction
+                        features[idx] = None
+                pbar.update(1)
+    
+    # Fill any remaining None values with zeros
+    if failed_count > 0:
+        logger.warning(f"Failed to extract features for {failed_count} pairs, using zero vectors")
+        feature_dim = next((f.shape[0] for f in features if f is not None), 0)
+        features = [f if f is not None else np.zeros(feature_dim) for f in features]
+    
+    return np.array(features)
 
 
 class CodeNetDataLoader:
@@ -452,17 +545,17 @@ def train_codenet(
         )
         return {}
 
-    # Extract features
-    logger.info("\nExtracting Sheneamer features...")
-    extractor = SheneamerFeatureExtractor()
-    features = []
-    for c1, c2 in tqdm(
-        zip(all_code1, all_code2), total=len(all_code1), desc="Extracting features"
-    ):
-        fused = extractor.extract_fused_features(c1, c2, "java")
-        features.append(fused)
-
-    X = np.array(features)
+    # Extract features in parallel
+    logger.info("\nExtracting Sheneamer features in parallel...")
+    n_workers = min(mp.cpu_count(), 16)  # Cap at 16 workers
+    logger.info(f"Using {n_workers} parallel workers for feature extraction")
+    
+    X = extract_features_parallel(
+        code1_list=all_code1,
+        code2_list=all_code2,
+        language="java",  # Use primary language
+        workers=n_workers,
+    )
     y = np.array(all_labels)
     logger.info(f"Feature matrix: {X.shape}")
 
@@ -471,6 +564,10 @@ def train_codenet(
         X, y, test_size=test_size, random_state=42, stratify=y
     )
     logger.info(f"Train: {len(y_train):,} | Test: {len(y_test):,}")
+
+    # Get feature names (create extractor instance for metadata)
+    extractor = SheneamerFeatureExtractor()
+    feature_names = extractor.get_feature_names(fused=True)
 
     # Train classifier
     logger.info("\nTraining XGBoost classifier...")
@@ -490,7 +587,7 @@ def train_codenet(
         reg_lambda=xgboost_params.get("reg_lambda", 1.0) if xgboost_params else 1.0,
         reg_alpha=xgboost_params.get("reg_alpha", 0.1) if xgboost_params else 0.1,
     )
-    classifier.feature_names = extractor.get_feature_names(fused=True)
+    classifier.feature_names = feature_names
 
     classifier.fit(X_train, y_train, X_test, y_test, cv=cross_validation)
     classifier.is_trained = True

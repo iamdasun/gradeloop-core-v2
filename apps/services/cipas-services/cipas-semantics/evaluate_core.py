@@ -7,6 +7,8 @@ This module contains the actual evaluation implementation.
 
 import json
 import logging
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional
 
@@ -20,12 +22,95 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from tqdm import tqdm
 
 from clone_detection.features.sheneamer_features import SheneamerFeatureExtractor
 from clone_detection.models.classifiers import SemanticClassifier
 from clone_detection.utils.common_setup import setup_logging
 
 logger = setup_logging(__name__)
+
+
+# =============================================================================
+# Parallel Feature Extraction Worker
+# =============================================================================
+
+def extract_features_worker(args):
+    """
+    Worker function for parallel feature extraction.
+    
+    Args:
+        args: Tuple of (code1, code2, language, index)
+        
+    Returns:
+        Tuple of (index, features_array) or (index, None) on error
+    """
+    code1, code2, language, idx = args
+    try:
+        extractor = SheneamerFeatureExtractor()
+        fused = extractor.extract_fused_features(code1, code2, language)
+        return (idx, fused)
+    except Exception as e:
+        # Return None for failed extractions
+        return (idx, None)
+
+
+def extract_features_parallel(
+    code1_list: list[str],
+    code2_list: list[str],
+    language: str = "java",
+    workers: Optional[int] = None,
+) -> np.ndarray:
+    """
+    Extract features in parallel using multiprocessing.
+    
+    Args:
+        code1_list: List of first code samples
+        code2_list: List of second code samples
+        language: Programming language
+        workers: Number of worker processes (default: CPU count)
+        
+    Returns:
+        Feature matrix as numpy array
+    """
+    if workers is None:
+        workers = min(mp.cpu_count(), 16)
+    
+    logger.info(f"Extracting features with {workers} workers...")
+    
+    # Prepare work items
+    work_items = [
+        (code1, code2, language, idx)
+        for idx, (code1, code2) in enumerate(zip(code1_list, code2_list))
+    ]
+    
+    features = [None] * len(work_items)
+    failed_count = 0
+    
+    # Process in parallel with progress bar
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(extract_features_worker, item): item
+            for item in work_items
+        }
+        
+        with tqdm(total=len(futures), desc="Extracting features") as pbar:
+            for future in as_completed(futures):
+                idx, result = future.result()
+                if result is not None:
+                    features[idx] = result
+                else:
+                    failed_count += 1
+                    features[idx] = None
+                pbar.update(1)
+    
+    # Fill None values with zeros
+    if failed_count > 0:
+        logger.warning(f"Failed to extract features for {failed_count} pairs")
+        feature_dim = next((f.shape[0] for f in features if f is not None), 0)
+        features = [f if f is not None else np.zeros(feature_dim) for f in features]
+    
+    return np.array(features)
 
 
 def load_gptclonebench_dataset(
@@ -108,15 +193,17 @@ def evaluate_model(
     )
     logger.info(f"Loaded {len(code1_list)} code pairs")
 
-    # Extract features
-    logger.info("Extracting features...")
-    extractor = SheneamerFeatureExtractor()
-    features = []
-    for code1, code2 in zip(code1_list, code2_list):
-        fused = extractor.extract_fused_features(code1, code2, language)
-        features.append(fused)
-
-    X_test = np.array(features)
+    # Extract features in parallel
+    logger.info("Extracting features in parallel...")
+    n_workers = min(mp.cpu_count(), 16)  # Cap at 16 workers
+    logger.info(f"Using {n_workers} parallel workers")
+    
+    X_test = extract_features_parallel(
+        code1_list=code1_list,
+        code2_list=code2_list,
+        language=language,
+        workers=n_workers,
+    )
     y_test = np.array(labels)
     logger.info(f"Feature matrix shape: {X_test.shape}")
 
@@ -202,6 +289,8 @@ def evaluate_model(
 
             visualizer = MetricsVisualizer(output_dir=output_dir)
 
+            # Get feature names (create extractor instance for metadata)
+            extractor = SheneamerFeatureExtractor()
             feature_names = extractor.get_feature_names(fused=True)
             if hasattr(model, "feature_names") and model.feature_names:
                 feature_names = model.feature_names
