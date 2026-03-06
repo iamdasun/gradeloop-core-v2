@@ -62,3 +62,16 @@ type BatchTreeResponse struct {
 type ListBatchesQuery struct {
 	IncludeInactive bool `query:"include_inactive"`
 }
+
+// BatchEnrollmentStats combines batch metadata with computed enrollment counts
+// for a specific course instance. Used by instructor-scoped endpoints.
+type BatchEnrollmentStats struct {
+	BatchID       uuid.UUID `json:"batch_id"`
+	Name          string    `json:"name"`
+	Code          string    `json:"code"`
+	StartYear     int       `json:"start_year"`
+	EndYear       int       `json:"end_year"`
+	IsActive      bool      `json:"is_active"`
+	TotalMembers  int       `json:"total_members"`
+	EnrolledCount int       `json:"enrolled_count"`
+}

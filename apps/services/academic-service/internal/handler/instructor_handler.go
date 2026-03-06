@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"errors"
+	"net/http"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -18,6 +20,8 @@ type InstructorHandler struct {
 	courseInstructorService service.CourseInstructorService
 	enrollmentService       service.EnrollmentService
 	courseService           service.CourseService
+	batchService            service.BatchService
+	batchMemberService      service.BatchMemberService
 	iamClient               *client.IAMClient
 	logger                  *zap.Logger
 }
@@ -27,6 +31,8 @@ func NewInstructorHandler(
 	courseInstructorService service.CourseInstructorService,
 	enrollmentService service.EnrollmentService,
 	courseService service.CourseService,
+	batchService service.BatchService,
+	batchMemberService service.BatchMemberService,
 	iamClient *client.IAMClient,
 	logger *zap.Logger,
 ) *InstructorHandler {
@@ -34,6 +40,8 @@ func NewInstructorHandler(
 		courseInstructorService: courseInstructorService,
 		enrollmentService:       enrollmentService,
 		courseService:           courseService,
+		batchService:            batchService,
+		batchMemberService:      batchMemberService,
 		iamClient:               iamClient,
 		logger:                  logger,
 	}
@@ -50,6 +58,20 @@ func instructorUserID(c fiber.Ctx) (uuid.UUID, error) {
 		return uuid.Nil, utils.ErrUnauthorized("user not authenticated")
 	}
 	return id, nil
+}
+
+// verifyInstructorAssignment checks the instructor is assigned to the course instance.
+func (h *InstructorHandler) verifyInstructorAssignment(instanceID, userID uuid.UUID) error {
+	instructors, err := h.courseInstructorService.GetInstructors(instanceID)
+	if err != nil {
+		return err
+	}
+	for _, inst := range instructors {
+		if inst.UserID == userID {
+			return nil
+		}
+	}
+	return utils.ErrForbidden("you are not assigned to this course instance")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -278,5 +300,343 @@ func (h *InstructorHandler) GetMyInstructors(c fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"instructors": responses,
 		"count":       len(responses),
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/v1/instructor-courses/:id/enrollments
+// ─────────────────────────────────────────────────────────────────────────────
+
+// EnrollStudent enrolls an individual student in the course instance.
+func (h *InstructorHandler) EnrollStudent(c fiber.Ctx) error {
+	userID, err := instructorUserID(c)
+	if err != nil {
+		return err
+	}
+
+	instanceID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	if err := h.verifyInstructorAssignment(instanceID, userID); err != nil {
+		return err
+	}
+
+	var body struct {
+		UserID string `json:"user_id"`
+		Status string `json:"status"`
+	}
+	if err := c.Bind().JSON(&body); err != nil {
+		return utils.ErrBadRequest("invalid request body")
+	}
+
+	enrollUserID, err := uuid.Parse(body.UserID)
+	if err != nil {
+		return utils.ErrBadRequest("invalid user_id")
+	}
+
+	status := body.Status
+	if status == "" {
+		status = "Enrolled"
+	}
+
+	username := requireUsername(c)
+
+	enrollment, err := h.enrollmentService.EnrollStudent(&dto.EnrollmentRequest{
+		CourseInstanceID: instanceID,
+		UserID:           enrollUserID,
+		Status:           status,
+		AllowIndividual:  true,
+	}, username, c.IP(), c.Get("User-Agent"))
+	if err != nil {
+		return err
+	}
+
+	resp := dto.EnrollmentResponse{
+		CourseInstanceID: enrollment.CourseInstanceID,
+		UserID:           enrollment.UserID,
+		Status:           enrollment.Status,
+		FinalGrade:       enrollment.FinalGrade,
+		EnrolledAt:       enrollment.EnrolledAt,
+	}
+
+	token := c.Get("Authorization")
+	userInfo, iamErr := h.iamClient.GetUserInfo(context.Background(), token, enrollUserID.String())
+	if iamErr == nil && userInfo != nil {
+		resp.StudentID = userInfo.StudentID
+		resp.FullName = userInfo.FullName
+		resp.Email = userInfo.Email
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(resp)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/v1/instructor-courses/:id/students/:userID
+// ─────────────────────────────────────────────────────────────────────────────
+
+// UnenrollStudent removes a student's enrollment from the course instance.
+func (h *InstructorHandler) UnenrollStudent(c fiber.Ctx) error {
+	userID, err := instructorUserID(c)
+	if err != nil {
+		return err
+	}
+
+	instanceID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	targetUserID, err := parseUUID(c, "userID")
+	if err != nil {
+		return err
+	}
+
+	if err := h.verifyInstructorAssignment(instanceID, userID); err != nil {
+		return err
+	}
+
+	username := requireUsername(c)
+
+	if err := h.enrollmentService.RemoveEnrollment(instanceID, targetUserID, username, c.IP(), c.Get("User-Agent")); err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusNoContent).Send(nil)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/v1/instructor-courses/:id/enroll-batch
+// ─────────────────────────────────────────────────────────────────────────────
+
+// EnrollBatch enrolls all members of a batch. Already-enrolled students are
+// skipped; partial success details are returned in the response.
+func (h *InstructorHandler) EnrollBatch(c fiber.Ctx) error {
+	userID, err := instructorUserID(c)
+	if err != nil {
+		return err
+	}
+
+	instanceID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	if err := h.verifyInstructorAssignment(instanceID, userID); err != nil {
+		return err
+	}
+
+	var req dto.EnrollBatchRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return utils.ErrBadRequest("invalid request body")
+	}
+	if req.BatchID == uuid.Nil {
+		return utils.ErrBadRequest("batch_id is required")
+	}
+
+	members, err := h.batchMemberService.GetBatchMembers(req.BatchID)
+	if err != nil {
+		return err
+	}
+
+	if len(members) == 0 {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"enrolled": 0, "skipped": 0, "total": 0, "skipped_users": []interface{}{},
+		})
+	}
+
+	username := requireUsername(c)
+	enrolled := 0
+	skipped := 0
+	skippedUsers := make([]uuid.UUID, 0)
+
+	for _, member := range members {
+		_, enrollErr := h.enrollmentService.EnrollStudent(&dto.EnrollmentRequest{
+			CourseInstanceID: instanceID,
+			UserID:           member.UserID,
+			Status:           "Enrolled",
+			AllowIndividual:  true,
+		}, username, c.IP(), c.Get("User-Agent"))
+		if enrollErr != nil {
+			var appErr *utils.AppError
+			if errors.As(enrollErr, &appErr) && appErr.Code == http.StatusConflict {
+				skipped++
+				skippedUsers = append(skippedUsers, member.UserID)
+			} else {
+				return enrollErr
+			}
+		} else {
+			enrolled++
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"enrolled":      enrolled,
+		"skipped":       skipped,
+		"total":         len(members),
+		"skipped_users": skippedUsers,
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/instructor-courses/batches
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ListAvailableBatches returns all active batches with member counts.
+// Used by the Add Students modal so instructors can enroll an entire batch.
+func (h *InstructorHandler) ListAvailableBatches(c fiber.Ctx) error {
+	if _, err := instructorUserID(c); err != nil {
+		return err
+	}
+
+	batches, err := h.batchService.ListBatches(false)
+	if err != nil {
+		return err
+	}
+
+	results := make([]dto.BatchEnrollmentStats, 0, len(batches))
+	for _, b := range batches {
+		members, memberErr := h.batchMemberService.GetBatchMembers(b.ID)
+		memberCount := 0
+		if memberErr == nil {
+			memberCount = len(members)
+		}
+		results = append(results, dto.BatchEnrollmentStats{
+			BatchID:      b.ID,
+			Name:         b.Name,
+			Code:         b.Code,
+			StartYear:    b.StartYear,
+			EndYear:      b.EndYear,
+			IsActive:     b.IsActive,
+			TotalMembers: memberCount,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"batches": results,
+		"count":   len(results),
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/instructor-courses/:id/enrolled-batches
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GetEnrolledBatches returns active batches that have ≥1 member enrolled in
+// the given course instance, with per-batch enrollment counts.
+func (h *InstructorHandler) GetEnrolledBatches(c fiber.Ctx) error {
+	userID, err := instructorUserID(c)
+	if err != nil {
+		return err
+	}
+
+	instanceID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	if err := h.verifyInstructorAssignment(instanceID, userID); err != nil {
+		return err
+	}
+
+	enrollments, err := h.enrollmentService.GetEnrollments(instanceID)
+	if err != nil {
+		return err
+	}
+
+	enrolledSet := make(map[uuid.UUID]struct{}, len(enrollments))
+	for _, e := range enrollments {
+		enrolledSet[e.UserID] = struct{}{}
+	}
+
+	batches, err := h.batchService.ListBatches(false)
+	if err != nil {
+		return err
+	}
+
+	results := make([]dto.BatchEnrollmentStats, 0)
+	for _, b := range batches {
+		members, memberErr := h.batchMemberService.GetBatchMembers(b.ID)
+		if memberErr != nil {
+			h.logger.Warn("failed to get batch members", zap.Error(memberErr), zap.String("batch_id", b.ID.String()))
+			continue
+		}
+
+		enrolledCount := 0
+		for _, m := range members {
+			if _, ok := enrolledSet[m.UserID]; ok {
+				enrolledCount++
+			}
+		}
+
+		if enrolledCount > 0 {
+			results = append(results, dto.BatchEnrollmentStats{
+				BatchID:       b.ID,
+				Name:          b.Name,
+				Code:          b.Code,
+				StartYear:     b.StartYear,
+				EndYear:       b.EndYear,
+				IsActive:      b.IsActive,
+				TotalMembers:  len(members),
+				EnrolledCount: enrolledCount,
+			})
+		}
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"batches": results,
+		"count":   len(results),
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE /api/v1/instructor-courses/:id/enrolled-batches/:batchID
+// ─────────────────────────────────────────────────────────────────────────────
+
+// UnenrollBatch removes all batch members from the course instance enrollment.
+// Members who are not enrolled are silently skipped.
+func (h *InstructorHandler) UnenrollBatch(c fiber.Ctx) error {
+	userID, err := instructorUserID(c)
+	if err != nil {
+		return err
+	}
+
+	instanceID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	batchID, err := parseUUID(c, "batchID")
+	if err != nil {
+		return err
+	}
+
+	if err := h.verifyInstructorAssignment(instanceID, userID); err != nil {
+		return err
+	}
+
+	members, err := h.batchMemberService.GetBatchMembers(batchID)
+	if err != nil {
+		return err
+	}
+
+	username := requireUsername(c)
+	removed := 0
+
+	for _, member := range members {
+		if removeErr := h.enrollmentService.RemoveEnrollment(instanceID, member.UserID, username, c.IP(), c.Get("User-Agent")); removeErr != nil {
+			var appErr *utils.AppError
+			if errors.As(removeErr, &appErr) && appErr.Code == http.StatusNotFound {
+				continue // not enrolled — skip silently
+			}
+			return removeErr
+		}
+		removed++
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"removed": removed,
+		"total":   len(members),
 	})
 }
