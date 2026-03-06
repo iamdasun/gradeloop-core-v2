@@ -334,6 +334,10 @@ def evaluate_gptclonebench(
         metrics["optimal_threshold_recall"] = optimal_recall
 
         # Save sweep results
+        results_dir = (
+            Path(output_dir) if output_dir else Path("results/evaluate/gptclonebench")
+        )
+        results_dir.mkdir(parents=True, exist_ok=True)
         sweep_csv = results_dir / "threshold_sweep_results.csv"
         sweep_results.to_csv(sweep_csv, index=False)
         logger.info(f"Threshold sweep results saved to: {sweep_csv}")
@@ -388,7 +392,9 @@ def evaluate_gptclonebench(
         logger.info("\n" + type_analysis.to_string(index=False))
 
     # Save detailed results
-    results_dir = Path(output_dir) if output_dir else Path("gptclonebench_results")
+    results_dir = (
+        Path(output_dir) if output_dir else Path("results/evaluate/gptclonebench")
+    )
     results_dir.mkdir(parents=True, exist_ok=True)
 
     # Save prompt analysis
@@ -495,7 +501,7 @@ def main():
         "--output-dir",
         type=str,
         default=None,
-        help="Directory for output files (default: ./gptclonebench_results)",
+        help="Directory for output files (default: ./results/evaluate/gptclonebench)",
     )
     parser.add_argument(
         "--threshold",

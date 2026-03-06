@@ -162,8 +162,8 @@ Examples:
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="./metrics_output",
-        help="Directory for visualization output (default: ./metrics_output)",
+        default="./results/train",
+        help="Directory for visualization output (default: ./results/train)",
     )
     parser.add_argument(
         "--no-visualize",

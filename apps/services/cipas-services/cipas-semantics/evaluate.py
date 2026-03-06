@@ -346,8 +346,8 @@ Examples:
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="./evaluation_output",
-        help="Output directory (default: ./evaluation_output)",
+        default="./results/evaluate",
+        help="Output directory (default: ./results/evaluate)",
     )
 
     # Logging

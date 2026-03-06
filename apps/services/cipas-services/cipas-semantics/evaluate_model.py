@@ -392,7 +392,7 @@ def evaluate_model(
         metrics["optimal_threshold_recall"] = optimal_recall
 
         # Save sweep results
-        results_dir = Path(output_dir) if output_dir else Path("./metrics_output")
+        results_dir = Path(output_dir) if output_dir else Path("./results/evaluate")
         results_dir.mkdir(parents=True, exist_ok=True)
         sweep_csv = results_dir / "threshold_sweep_results.csv"
         sweep_results.to_csv(sweep_csv, index=False)
@@ -474,6 +474,14 @@ def evaluate_model(
         logger.info(f"Visualizations saved to: {report_files['html_report']}")
         metrics["visualization_path"] = str(report_files["html_report"])
 
+    # Save metrics to results/evaluate directory
+    results_dir = Path(output_dir) if output_dir else Path("./results/evaluate")
+    results_dir.mkdir(parents=True, exist_ok=True)
+    metrics_file = results_dir / f"metrics_{dataset_format}_{language}.json"
+    with open(metrics_file, "w") as f:
+        json.dump(metrics, f, indent=2, default=str)
+    logger.info(f"Metrics saved to: {metrics_file}")
+
     return metrics
 
 
@@ -542,7 +550,7 @@ if __name__ == "__main__":
         "--output-dir",
         type=str,
         default=None,
-        help="Directory for visualization output (default: ./metrics_output)",
+        help="Directory for visualization output (default: ./results/evaluate)",
     )
 
     args = parser.parse_args()
