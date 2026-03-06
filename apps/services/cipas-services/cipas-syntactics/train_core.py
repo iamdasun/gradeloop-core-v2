@@ -199,10 +199,9 @@ def save_training_artifacts(
     y_proba: np.ndarray,
     s_test: np.ndarray,
     output_dir: Path | None = None,
+    visualize: bool = True,
 ) -> None:
     """Persist training metrics as JSON and generate visualisation plots."""
-    from clone_detection.utils.common_setup import get_models_dir
-
     if output_dir is None:
         output_dir = Path("./results/train")
     output_dir = Path(output_dir)
@@ -229,134 +228,137 @@ def save_training_artifacts(
     logger.info(f"Training metrics JSON saved → {metrics_path}")
 
     # Visualizations (optional, requires matplotlib)
-    try:
-        import matplotlib
+    if visualize:
+        try:
+            import matplotlib
 
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from sklearn.metrics import confusion_matrix as sk_cm
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
+            from sklearn.metrics import confusion_matrix as sk_cm
 
-        # Threshold sweep plot
-        thresholds = [r["threshold"] for r in sweep]
-        precisions = [r["precision"] for r in sweep]
-        recalls = [r["recall"] for r in sweep]
-        f1s = [r["f1"] for r in sweep]
+            # Threshold sweep plot
+            thresholds = [r["threshold"] for r in sweep]
+            precisions = [r["precision"] for r in sweep]
+            recalls = [r["recall"] for r in sweep]
+            f1s = [r["f1"] for r in sweep]
 
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.plot(thresholds, precisions, "b-o", label="Precision", markersize=3)
-        ax.plot(thresholds, recalls, "g-o", label="Recall", markersize=3)
-        ax.plot(thresholds, f1s, "r-o", label="F1", markersize=3)
-        best_t = metrics.get("threshold", 0.5)
-        ax.axvline(
-            x=best_t,
-            color="purple",
-            linestyle="--",
-            label=f"Selected threshold ({best_t:.2f})",
-        )
-        ax.set_xlabel("Threshold")
-        ax.set_ylabel("Score")
-        ax.set_title("Threshold Sweep — Precision / Recall / F1 (Training)")
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        fig.tight_layout()
-        sweep_path = viz_dir / "threshold_sweep.png"
-        fig.savefig(sweep_path, dpi=150)
-        plt.close(fig)
-        logger.info(f"Threshold sweep plot saved       → {sweep_path}")
-
-        # Feature importances
-        top_feats = classifier.get_feature_importance_sorted()[:20]
-        feat_names = [f[0].replace("feat_", "") for f in top_feats]
-        feat_vals = [f[1] for f in top_feats]
-
-        fig, ax = plt.subplots(figsize=(10, 8))
-        bars = ax.barh(feat_names[::-1], feat_vals[::-1], color="steelblue")
-        for bar, val in zip(bars, feat_vals[::-1]):
-            ax.text(
-                bar.get_width() + 0.001,
-                bar.get_y() + bar.get_height() / 2,
-                f"{val:.4f}",
-                va="center",
-                fontsize=8,
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.plot(thresholds, precisions, "b-o", label="Precision", markersize=3)
+            ax.plot(thresholds, recalls, "g-o", label="Recall", markersize=3)
+            ax.plot(thresholds, f1s, "r-o", label="F1", markersize=3)
+            best_t = metrics.get("threshold", 0.5)
+            ax.axvline(
+                x=best_t,
+                color="purple",
+                linestyle="--",
+                label=f"Selected threshold ({best_t:.2f})",
             )
-        ax.set_xlabel("Importance")
-        ax.set_title("Top-20 Feature Importances (Training)")
-        ax.grid(axis="x", alpha=0.3)
-        fig.tight_layout()
-        fi_path = viz_dir / "feature_importances_train.png"
-        fig.savefig(fi_path, dpi=150)
-        plt.close(fig)
-        logger.info(f"Feature importance plot saved    → {fi_path}")
-
-        # Confusion matrix
-        cm = sk_cm(y_test, y_pred)
-        fig, ax = plt.subplots(figsize=(6, 5))
-        im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
-        plt.colorbar(im, ax=ax)
-        classes = ["Non-Clone", "Clone"]
-        tick_marks = [0, 1]
-        ax.set_xticks(tick_marks)
-        ax.set_yticks(tick_marks)
-        ax.set_xticklabels(classes)
-        ax.set_yticklabels(classes)
-        threshold_color = cm.max() / 2.0
-        for i in range(2):
-            for j in range(2):
-                ax.text(
-                    j,
-                    i,
-                    str(cm[i, j]),
-                    ha="center",
-                    va="center",
-                    color="white" if cm[i, j] > threshold_color else "black",
-                    fontsize=14,
-                    fontweight="bold",
-                )
-        ax.set_xlabel("Predicted")
-        ax.set_ylabel("Actual")
-        ax.set_title("Confusion Matrix — Training (Test Split)")
-        fig.tight_layout()
-        cm_path = viz_dir / "confusion_matrix_train.png"
-        fig.savefig(cm_path, dpi=150)
-        plt.close(fig)
-        logger.info(f"Confusion matrix plot saved      → {cm_path}")
-
-        # Per-source recall
-        per_src: dict[str, float] = {}
-        for src in sorted(np.unique(s_test)):
-            mask = s_test == src
-            yt = y_test[mask]
-            yp = y_pred[mask]
-            if np.any(yt == 1):
-                tp = int(np.sum((yt == 1) & (yp == 1)))
-                fn = int(np.sum((yt == 1) & (yp == 0)))
-                per_src[src] = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-
-        if per_src:
-            srcs = list(per_src.keys())
-            recs = [per_src[s] for s in srcs]
-            colors = ["tomato" if r < 0.5 else "steelblue" for r in recs]
-
-            fig, ax = plt.subplots(figsize=(10, 5))
-            ax.barh(srcs, recs, color=colors)
-            for i, (src, rec) in enumerate(zip(srcs, recs)):
-                ax.text(rec + 0.01, i, f"{rec:.3f}", va="center", fontsize=9)
-            ax.set_xlabel("Recall")
-            ax.set_title("Per-Source Recall (Training — Test Split)")
-            ax.axvline(x=0.5, color="gray", linestyle="--", alpha=0.5, label="0.5 line")
-            ax.set_xlim(0, 1.1)
+            ax.set_xlabel("Threshold")
+            ax.set_ylabel("Score")
+            ax.set_title("Threshold Sweep — Precision / Recall / F1 (Training)")
             ax.legend()
+            ax.grid(True, alpha=0.3)
+            fig.tight_layout()
+            sweep_path = viz_dir / "threshold_sweep.png"
+            fig.savefig(sweep_path, dpi=150)
+            plt.close(fig)
+            logger.info(f"Threshold sweep plot saved       → {sweep_path}")
+
+            # Feature importances
+            top_feats = classifier.get_feature_importance_sorted()[:20]
+            feat_names = [f[0].replace("feat_", "") for f in top_feats]
+            feat_vals = [f[1] for f in top_feats]
+
+            fig, ax = plt.subplots(figsize=(10, 8))
+            bars = ax.barh(feat_names[::-1], feat_vals[::-1], color="steelblue")
+            for bar, val in zip(bars, feat_vals[::-1]):
+                ax.text(
+                    bar.get_width() + 0.001,
+                    bar.get_y() + bar.get_height() / 2,
+                    f"{val:.4f}",
+                    va="center",
+                    fontsize=8,
+                )
+            ax.set_xlabel("Importance")
+            ax.set_title("Top-20 Feature Importances (Training)")
             ax.grid(axis="x", alpha=0.3)
             fig.tight_layout()
-            ps_path = viz_dir / "per_source_recall.png"
-            fig.savefig(ps_path, dpi=150)
+            fi_path = viz_dir / "feature_importances_train.png"
+            fig.savefig(fi_path, dpi=150)
             plt.close(fig)
-            logger.info(f"Per-source recall plot saved     → {ps_path}")
+            logger.info(f"Feature importance plot saved    → {fi_path}")
 
-    except ImportError:
-        logger.warning("matplotlib not installed — skipping visualization plots")
-    except Exception as exc:
-        logger.warning(f"Visualization generation failed: {exc}")
+            # Confusion matrix
+            cm = sk_cm(y_test, y_pred)
+            fig, ax = plt.subplots(figsize=(6, 5))
+            im = ax.imshow(cm, interpolation="nearest", cmap="Blues")
+            plt.colorbar(im, ax=ax)
+            classes = ["Non-Clone", "Clone"]
+            tick_marks = [0, 1]
+            ax.set_xticks(tick_marks)
+            ax.set_yticks(tick_marks)
+            ax.set_xticklabels(classes)
+            ax.set_yticklabels(classes)
+            threshold_color = cm.max() / 2.0
+            for i in range(2):
+                for j in range(2):
+                    ax.text(
+                        j,
+                        i,
+                        str(cm[i, j]),
+                        ha="center",
+                        va="center",
+                        color="white" if cm[i, j] > threshold_color else "black",
+                        fontsize=14,
+                        fontweight="bold",
+                    )
+            ax.set_xlabel("Predicted")
+            ax.set_ylabel("Actual")
+            ax.set_title("Confusion Matrix — Training (Test Split)")
+            fig.tight_layout()
+            cm_path = viz_dir / "confusion_matrix_train.png"
+            fig.savefig(cm_path, dpi=150)
+            plt.close(fig)
+            logger.info(f"Confusion matrix plot saved      → {cm_path}")
+
+            # Per-source recall
+            per_src: dict[str, float] = {}
+            for src in sorted(np.unique(s_test)):
+                mask = s_test == src
+                yt = y_test[mask]
+                yp = y_pred[mask]
+                if np.any(yt == 1):
+                    tp = int(np.sum((yt == 1) & (yp == 1)))
+                    fn = int(np.sum((yt == 1) & (yp == 0)))
+                    per_src[src] = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+
+            if per_src:
+                srcs = list(per_src.keys())
+                recs = [per_src[s] for s in srcs]
+                colors = ["tomato" if r < 0.5 else "steelblue" for r in recs]
+
+                fig, ax = plt.subplots(figsize=(10, 5))
+                ax.barh(srcs, recs, color=colors)
+                for i, (src, rec) in enumerate(zip(srcs, recs)):
+                    ax.text(rec + 0.01, i, f"{rec:.3f}", va="center", fontsize=9)
+                ax.set_xlabel("Recall")
+                ax.set_title("Per-Source Recall (Training — Test Split)")
+                ax.axvline(
+                    x=0.5, color="gray", linestyle="--", alpha=0.5, label="0.5 line"
+                )
+                ax.set_xlim(0, 1.1)
+                ax.legend()
+                ax.grid(axis="x", alpha=0.3)
+                fig.tight_layout()
+                ps_path = viz_dir / "per_source_recall.png"
+                fig.savefig(ps_path, dpi=150)
+                plt.close(fig)
+                logger.info(f"Per-source recall plot saved     → {ps_path}")
+
+        except ImportError:
+            logger.warning("matplotlib not installed — skipping visualization plots")
+        except Exception as exc:
+            logger.warning(f"Visualization generation failed: {exc}")
 
 
 def train(
@@ -377,6 +379,7 @@ def train(
     output_dir: Path | None = None,
     dataset_config: Optional[list[tuple[str, int, int, float]]] = None,
     toma_path: Optional[str] = None,
+    visualize: bool = True,
 ) -> dict:
     """
     Train the two-stage XGBoost Clone Detector (Stage 1).
@@ -414,6 +417,7 @@ def train(
 
     logger.info(f"Dataset: {toma_dir}")
     logger.info(f"Output: {output_dir or './results/train'}")
+    logger.info(f"Visualizations: {'Enabled' if visualize else 'Disabled'}")
     logger.info("=" * 80)
 
     # Load dataset
@@ -585,6 +589,7 @@ def train(
         y_proba=y_proba_test,
         s_test=s_test,
         output_dir=output_dir,
+        visualize=visualize,
     )
 
     logger.info(f"\n{'=' * 80}")

@@ -111,6 +111,11 @@ Examples:
         action="store_true",
         help="Enable verbose logging",
     )
+    parser.add_argument(
+        "--no-visualize",
+        action="store_true",
+        help="Disable visualization generation (faster)",
+    )
 
     args = parser.parse_args()
 
@@ -130,11 +135,13 @@ Examples:
 
     # Build parameters (CLI overrides config)
     params = {
-        "model_name": args.model_name or model_config.get("name", "clone_detector_xgb.pkl"),
+        "model_name": args.model_name
+        or model_config.get("name", "clone_detector_xgb.pkl"),
         "sample_size": args.sample_size or training_config.get("sample_size"),
         "n_estimators": args.n_estimators or xgboost_config.get("n_estimators", 500),
         "max_depth": args.max_depth or xgboost_config.get("max_depth", 8),
-        "learning_rate": args.learning_rate or xgboost_config.get("learning_rate", 0.05),
+        "learning_rate": args.learning_rate
+        or xgboost_config.get("learning_rate", 0.05),
         "subsample": xgboost_config.get("subsample", 0.9),
         "colsample_bytree": xgboost_config.get("colsample_bytree", 0.8),
         "min_child_weight": xgboost_config.get("min_child_weight", 2),
@@ -144,12 +151,14 @@ Examples:
             args.scale_pos_weight or xgboost_config.get("scale_pos_weight", 2.0)
         ),
         "include_node_types": not args.no_node_types
-                              and features_config.get("include_node_types", True),
+        and features_config.get("include_node_types", True),
         "use_gpu": args.use_gpu or xgboost_config.get("use_gpu", False),
-        "output_dir": args.output_dir or Path(model_config.get("output_dir", "./results/train")),
+        "output_dir": args.output_dir
+        or Path(model_config.get("output_dir", "./results/train")),
         "test_size": training_config.get("test_size", 0.2),
         "dataset_config": training_config.get("dataset_config"),
         "toma_path": config.get("datasets", {}).get("toma", {}).get("path"),
+        "visualize": not args.no_visualize and training_config.get("visualize", True),
     }
 
     if args.verbose:
