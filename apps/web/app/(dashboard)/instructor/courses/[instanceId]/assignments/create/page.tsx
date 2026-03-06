@@ -2,62 +2,112 @@
 
 import * as React from "react";
 import { useRouter, useParams } from "next/navigation";
-import Link from "next/link";
-import { useAssignmentCreateStore } from "@/lib/stores/assignmentCreateStore";
+import { useTheme } from "next-themes";
+import { toast } from "sonner";
+import {
+    useAssignmentCreateStore,
+    DEFAULT_CRITERIA,
+    type RubricCriterion,
+    type TestCase,
+} from "@/lib/stores/assignmentCreateStore";
 import { useUIStore } from "@/lib/stores/uiStore";
-import { instructorAssessmentsApi } from "@/lib/api/assessments";
+import { instructorAssessmentsApi, assessmentsApi } from "@/lib/api/assessments";
 import { handleApiError } from "@/lib/api/axios";
 import { cn } from "@/lib/utils";
-import { MultiSelectTagInput } from "@/components/instructor/multi-select-tag-input";
+import { RubricCriterionBlock } from "@/components/instructor/rubric-criterion-block";
+import { TestCaseBlock, type TestCaseRunResult } from "@/components/instructor/test-case-block";
+import { EditorPanel } from "@/components/ide/editor-panel";
+import { LanguageSelector } from "@/components/ide/language-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import { Loader2, Plus, Trash2, CheckCircle2, Eye, AlertCircle } from "lucide-react";
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+    Loader2,
+    Plus,
+    Info,
+    AlertCircle,
+    CheckCircle2,
+    FlaskConical,
+    BookOpen,
+    Play,
+    Pencil,
+    Save,
+} from "lucide-react";
 
-const ASSESSMENT_TYPES = ["Homework", "Quiz", "Midterm", "Final Exam", "Lab", "Project", "Assignment"];
+// ─── Assessment type grid options ─────────────────────────────────────────────
 
-interface RubricCriterion {
-    id: string;
-    name: string;
-    description: string;
-    weight: number;
+const ASSIGNMENT_TYPES = [
+    {
+        id: "lab" as const,
+        label: "Lab",
+        description: "Practical programming exercise with hands-on coding",
+        icon: FlaskConical,
+    },
+    {
+        id: "exam" as const,
+        label: "Exam",
+        description: "Formal timed assessment with structured questions",
+        icon: BookOpen,
+    },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function makeSlug(name: string) {
+    return name
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/-+/g, "-")
+        .slice(0, 80);
 }
 
-interface ToolConfig {
-    acafs: boolean;
-    cipas: boolean;
-    blaim: boolean;
-    vivaVoce: boolean;
+function makeId() {
+    return Math.random().toString(36).slice(2, 10);
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CreateAssignmentPage() {
     const router = useRouter();
     const params = useParams();
     const instanceId = params.instanceId as string;
+    const { theme: systemTheme } = useTheme();
+    const editorTheme = (systemTheme === "dark" ? "dark" : "light") as "dark" | "light";
 
-    const { currentStep, steps, setStep, setHighestStepVisited, reset } = useAssignmentCreateStore();
+    // ── Store ──────────────────────────────────────────────────────────────────
+    const {
+        currentStep,
+        steps,
+        setStep,
+        assignment,
+        settings,
+        criteria,
+        testCases,
+        sampleAnswer,
+        updateAssignment,
+        updateSettings,
+        setCriteria,
+        setTestCases,
+        updateSampleAnswer,
+        reset,
+    } = useAssignmentCreateStore();
+
     const pushSecondarySidebar = useUIStore((s) => s.pushSecondarySidebar);
     const popSecondarySidebar = useUIStore((s) => s.popSecondarySidebar);
     const setPageTitle = useUIStore((s) => s.setPageTitle);
 
-    // On mount, ensure we start at step 1
-    React.useEffect(() => {
-        reset();
-        return () => reset(); // Cleanup on unmount
-    }, [reset]);
-
-    // Override the course sidebar with steps progress sidebar
+    // ── Mount ──────────────────────────────────────────────────────────────────
     React.useEffect(() => {
         setPageTitle("Create Assignment");
         pushSecondarySidebar({
@@ -76,90 +126,183 @@ export default function CreateAssignmentPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [instanceId]);
 
+    // ── Local UI state ─────────────────────────────────────────────────────────
+    const [expandedCriterionId, setExpandedCriterionId] = React.useState<string | null>(
+        criteria[0]?.id ?? null,
+    );
+    const [expandedTestCaseId, setExpandedTestCaseId] = React.useState<number | null>(null);
+    const [testResults, setTestResults] = React.useState<TestCaseRunResult[]>([]);
+    const [isRunning, setIsRunning] = React.useState(false);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [submitError, setSubmitError] = React.useState<string | null>(null);
-    const [confirmed, setConfirmed] = React.useState(false);
 
-    // Step 1: Basic Info
-    const [title, setTitle] = React.useState("");
-    const [assessmentType, setAssessmentType] = React.useState("Homework");
-    const [description, setDescription] = React.useState("");
-
-    // Step 2: Configuration
-    const [deadline, setDeadline] = React.useState("");
-    const [timeLimitMinutes, setTimeLimitMinutes] = React.useState<number | "">("");
-    const [groupSubmission, setGroupSubmission] = React.useState(false);
-    const [allowLateSubmissions, setAllowLateSubmissions] = React.useState(false);
-
-    // Step 3: Tools Selection
-    const [tools, setTools] = React.useState<ToolConfig>({
-        acafs: false,
-        cipas: false,
-        blaim: false,
-        vivaVoce: false,
-    });
-
-    // Step 4: Grading Settings
-    const [rubricCriteria, setRubricCriteria] = React.useState<RubricCriterion[]>([
-        { id: "1", name: "Correctness", description: "Accuracy of the solution.", weight: 60 },
-        { id: "2", name: "Code Quality", description: "Readability and structure.", weight: 40 },
-    ]);
-    const [sampleAnswer, setSampleAnswer] = React.useState("");
-    const [assignedTAs, setAssignedTAs] = React.useState<string[]>([]);
-    const [assignedInstructors, setAssignedInstructors] = React.useState<string[]>([]);
-
-    const totalWeight = rubricCriteria.reduce((acc, c) => acc + (Number(c.weight) || 0), 0);
+    // ── Derived rubric weight ──────────────────────────────────────────────────
+    const totalWeight = criteria.reduce((acc, c) => acc + (Number(c.weight) || 0), 0);
     const weightValid = totalWeight === 100;
 
+    // ── Rubric helpers ─────────────────────────────────────────────────────────
     const addCriterion = () => {
-        setRubricCriteria((prev) => [
-            ...prev,
-            { id: Math.random().toString(36).slice(2), name: "", description: "", weight: 0 },
-        ]);
+        const id = makeId();
+        const next: RubricCriterion = {
+            id,
+            name: "",
+            description: "",
+            grading_mode: "llm",
+            weight: 0,
+            bands: {
+                excellent:      { description: "", mark_range: { min: 85, max: 100 } },
+                good:           { description: "", mark_range: { min: 70, max: 84 } },
+                satisfactory:   { description: "", mark_range: { min: 50, max: 69 } },
+                unsatisfactory: { description: "", mark_range: { min: 0,  max: 49 } },
+            },
+        };
+        setCriteria([...criteria, next]);
+        setExpandedCriterionId(id);
     };
 
-    const updateCriterion = (id: string, field: keyof RubricCriterion, value: any) => {
-        setRubricCriteria((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
+    const updateCriterion = (id: string, updated: RubricCriterion) =>
+        setCriteria(criteria.map((c) => (c.id === id ? updated : c)));
+
+    const removeCriterion = (id: string) => {
+        setCriteria(criteria.filter((c) => c.id !== id));
+        if (expandedCriterionId === id) setExpandedCriterionId(null);
+    };
+
+    const moveCriterion = (id: string, dir: "up" | "down") => {
+        const idx = criteria.findIndex((c) => c.id === id);
+        if (idx < 0) return;
+        const next = [...criteria];
+        const swap = dir === "up" ? idx - 1 : idx + 1;
+        if (swap < 0 || swap >= next.length) return;
+        [next[idx], next[swap]] = [next[swap], next[idx]];
+        setCriteria(next);
+    };
+
+    // ── Test case helpers ──────────────────────────────────────────────────────
+    const addTestCase = () => {
+        const nextId = testCases.length > 0 ? Math.max(...testCases.map((t) => t.test_case_id)) + 1 : 1;
+        const next: TestCase = {
+            test_case_id: nextId,
+            description: "",
+            test_case_input: "",
+            expected_output: "",
+        };
+        setTestCases([...testCases, next]);
+        setExpandedTestCaseId(nextId);
+        setTestResults([]);
+    };
+
+    const updateTestCase = (id: number, updated: TestCase) =>
+        setTestCases(testCases.map((t) => (t.test_case_id === id ? updated : t)));
+
+    const removeTestCase = (id: number) => {
+        setTestCases(testCases.filter((t) => t.test_case_id !== id));
+        if (expandedTestCaseId === id) setExpandedTestCaseId(null);
+        setTestResults((prev) => prev.filter((r) => r.test_case_id !== id));
+    };
+
+    // ── Sample answer runner ───────────────────────────────────────────────────
+    const runSampleAnswer = async () => {
+        if (!sampleAnswer.code.trim() || testCases.length === 0) return;
+        setIsRunning(true);
+        setTestResults([]);
+        const results: TestCaseRunResult[] = [];
+
+        for (const tc of testCases) {
+            try {
+                const res = await assessmentsApi.runCode({
+                    language_id: sampleAnswer.language_id,
+                    source_code: sampleAnswer.code,
+                    stdin: tc.test_case_input,
+                });
+                const actual = (res.stdout ?? "").trimEnd();
+                const expected = tc.expected_output.trimEnd();
+                results.push({
+                    test_case_id: tc.test_case_id,
+                    passed: actual === expected,
+                    actual_output: actual,
+                    status: res.status,
+                    time: res.time,
+                });
+            } catch (err) {
+                results.push({
+                    test_case_id: tc.test_case_id,
+                    passed: false,
+                    actual_output: "",
+                    status: { id: -1, description: "Error" },
+                    time: null,
+                    error: handleApiError(err),
+                });
+            }
+        }
+
+        setTestResults(results);
+        setIsRunning(false);
+
+        const passed = results.filter((r) => r.passed).length;
+        toast[passed === results.length ? "success" : "warning"](
+            `${passed} / ${results.length} test cases passed`,
         );
     };
 
-    const removeCriterion = (id: string) => {
-        setRubricCriteria((prev) => prev.filter((c) => c.id !== id));
-    };
-
+    // ── Navigation ─────────────────────────────────────────────────────────────
     const handleNext = () => {
-        if (currentStep < steps.length) {
-            setStep(currentStep + 1);
-            setHighestStepVisited(currentStep + 1);
-        }
+        if (currentStep < steps.length) setStep(currentStep + 1);
     };
-
     const handleBack = () => {
-        if (currentStep > 1) {
-            setStep(currentStep - 1);
-        }
+        if (currentStep > 1) setStep(currentStep - 1);
     };
 
-    const handleSubmit = async () => {
-        if (!confirmed) return;
+    // ── Publish ────────────────────────────────────────────────────────────────
+    const handlePublish = async () => {
         setIsSubmitting(true);
         setSubmitError(null);
         try {
             const result = await instructorAssessmentsApi.createAssignment({
                 course_instance_id: instanceId,
-                title: title.trim(),
-                description: description.trim(),
-                code: title.trim().toLowerCase().replace(/\s+/g, "-"),
-                due_at: deadline ? new Date(deadline).toISOString() : null,
-                allow_late_submissions: allowLateSubmissions,
-                enforce_time_limit: timeLimitMinutes ? Number(timeLimitMinutes) * 60 : null,
-                allow_group_submission: groupSubmission,
-                max_group_size: groupSubmission ? 5 : null,
-                enable_ai_assistant: tools.acafs || tools.cipas,
-                enable_socratic_feedback: tools.cipas,
-                allow_regenerate: false,
+                title: assignment.name.trim(),
+                description: assignment.description.trim(),
+                code: makeSlug(assignment.name),
+                release_at: settings.release_date ? new Date(settings.release_date).toISOString() : null,
+                due_at: settings.due_date ? new Date(settings.due_date).toISOString() : null,
+                late_due_at:
+                    settings.allow_late_submission && settings.late_due_date
+                        ? new Date(settings.late_due_date).toISOString()
+                        : null,
+                allow_late_submissions: settings.allow_late_submission,
+                enforce_time_limit:
+                    settings.time_limit_enabled && settings.time_limit_minutes
+                        ? settings.time_limit_minutes * 60
+                        : null,
+                allow_group_submission: settings.group_submission,
+                max_group_size: settings.group_submission ? 5 : null,
+                // TODO [ACAFS]: enable_ai_assistant will activate rubric-based LLM evaluation.
+                // Requires assessment-service to store & forward rubric to ACAFS queue message.
+                enable_ai_assistant: true,
+                // TODO [ACAFS]: enable_socratic_feedback is pending ACAFS feedback pipeline.
+                // Set to true once ACAFS can generate per-criteria socratic hints.
+                enable_socratic_feedback: false,
+                allow_regenerate: settings.multiple_submissions,
+                // ── Fields not yet supported by assessment-service backend ──────────────
+                // TODO [assessment-service]: Add `assessment_type` column (lab | exam).
+                // assessment_type: assignment.type,
+                //
+                // TODO [assessment-service]: Add `objective` column (LLM context).
+                // objective: assignment.objective,
+                //
+                // TODO [assessment-service]: Store rubric JSON in assignment row or
+                // separate rubric table. POST /instructor-assignments/:id/rubric endpoint.
+                // rubric: { criteria },
+                //
+                // TODO [assessment-service]: Store test_cases JSON or separate table.
+                // POST /instructor-assignments/:id/test-cases endpoint.
+                // test_cases: testCases,
+                //
+                // TODO [assessment-service]: Store sample answer (language + code) in
+                // MinIO or dedicated table. POST /instructor-assignments/:id/sample-answer.
+                // sample_answer: sampleAnswer,
             });
+            reset();
             router.push(`/instructor/courses/${instanceId}/assignments/${result.id}`);
         } catch (err) {
             setSubmitError(handleApiError(err));
@@ -168,482 +311,887 @@ export default function CreateAssignmentPage() {
         }
     };
 
-    const staffOptions = [
-        { label: "Dr. Ahmed Khan", value: "usr-001" },
-        { label: "Prof. Sara Ali", value: "usr-002" },
-        { label: "TA Hassan Raza", value: "usr-003" },
-        { label: "TA Fatima Sheikh", value: "usr-004" },
-    ];
+    const handleSaveDraft = () => {
+        // Draft is auto-persisted by assignmentCreateStore via localStorage.
+        // This button provides explicit user confirmation.
+        toast.success("Draft saved — you can safely close this page.");
+    };
 
-    const enabledTools = Object.entries(tools)
-        .filter(([, v]) => v)
-        .map(([k]) => {
-            const map: Record<string, string> = {
-                acafs: "ACAFS",
-                cipas: "CIPAS",
-                blaim: "BLAIM",
-                vivaVoce: "Viva VOCE",
-            };
-            return map[k];
-        });
+    // ── Per-step next button state ─────────────────────────────────────────────
+    const nextDisabled =
+        isSubmitting ||
+        (currentStep === 1 && !assignment.name.trim()) ||
+        (currentStep === 3 && !weightValid);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RENDER
+    // ─────────────────────────────────────────────────────────────────────────
 
     return (
-        <div className="max-w-4xl mx-auto w-full flex flex-col min-h-[calc(100vh-140px)] animate-in fade-in duration-300">
-            <div className="mb-8">
-                <h1 className="text-2xl font-bold font-heading tracking-tight">Create Assignment</h1>
-                <p className="text-muted-foreground text-sm mt-1">
-                    Step {currentStep} of {steps.length}: {steps[currentStep - 1]?.title}
-                </p>
+        <div className="max-w-3xl mx-auto w-full flex flex-col min-h-[calc(100vh-140px)] animate-in fade-in duration-300 pb-4">
+
+            {/* ── Page header ── */}
+            <div className="mb-7">
+                <h1 className="text-2xl font-bold font-heading tracking-tight">
+                    {steps[currentStep - 1]?.title}
+                </h1>
+                {steps[currentStep - 1]?.description && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                        {steps[currentStep - 1].description}
+                    </p>
+                )}
             </div>
 
-            <div className="flex-1 bg-card border border-border/60 shadow-sm rounded-xl overflow-hidden p-6 md:p-8 relative">
+            {/* ── Step content ── */}
+            <div className="flex-1 space-y-4">
 
-                {/* ── Step 1: Basic Info ───────────────────────────── */}
+                {/* ════════════════════════════════════════════════════════
+                    STEP 1 — CREATE ASSIGNMENT
+                ════════════════════════════════════════════════════════ */}
                 {currentStep === 1 && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                        <div className="space-y-2">
-                            <Label htmlFor="title" className="text-base font-semibold">
-                                Assignment Title <span className="text-destructive">*</span>
+                    <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+
+                        {/* Assignment Name */}
+                        <div className="bg-card border border-border/60 rounded-xl p-6 space-y-3">
+                            <Label htmlFor="name" className="text-base font-semibold">
+                                Assignment Name <span className="text-destructive">*</span>
                             </Label>
                             <Input
-                                id="title"
+                                id="name"
                                 className="h-11"
-                                placeholder="e.g. Midterm Project Part 1"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="e.g. Midterm Lab — Sorting Algorithms"
+                                value={assignment.name}
+                                onChange={(e) => updateAssignment({ name: e.target.value })}
                             />
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="type" className="text-base font-semibold">Assessment Type</Label>
-                            <Select value={assessmentType} onValueChange={setAssessmentType}>
-                                <SelectTrigger id="type" className="h-11">
-                                    <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {ASSESSMENT_TYPES.map((t) => (
-                                        <SelectItem key={t} value={t}>
-                                            {t}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="description" className="text-base font-semibold">Description / Instructions</Label>
-                            <Textarea
-                                id="description"
-                                placeholder="Provide instructions or context for students..."
-                                className="min-h-[150px] resize-y"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* ── Step 2: Configuration ───────────────────────────── */}
-                {currentStep === 2 && (
-                    <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                        <div className="grid sm:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="deadline" className="text-base font-semibold">Deadline</Label>
-                                <Input
-                                    id="deadline"
-                                    type="datetime-local"
-                                    className="h-11"
-                                    value={deadline}
-                                    onChange={(e) => setDeadline(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="time-limit" className="text-base font-semibold">Time Limit</Label>
-                                <div className="flex items-center gap-3">
-                                    <Input
-                                        id="time-limit"
-                                        type="number"
-                                        min={0}
-                                        placeholder="e.g. 90"
-                                        value={timeLimitMinutes}
-                                        onChange={(e) =>
-                                            setTimeLimitMinutes(e.target.value === "" ? "" : Number(e.target.value))
-                                        }
-                                        className="h-11 flex-1"
-                                    />
-                                    <span className="text-sm text-muted-foreground whitespace-nowrap">min</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <label className="flex items-start gap-4 p-4 border border-border/60 rounded-xl bg-muted/20 cursor-pointer hover:border-primary/40 transition-colors">
-                                <Switch
-                                    checked={groupSubmission}
-                                    onCheckedChange={setGroupSubmission}
-                                    className="mt-1 shrink-0"
-                                />
-                                <div>
-                                    <div className="font-semibold">Group Submission</div>
-                                    <div className="text-sm text-muted-foreground">Allow students to submit in teams of up to 5</div>
-                                </div>
-                            </label>
-
-                            <label className="flex items-start gap-4 p-4 border border-border/60 rounded-xl bg-muted/20 cursor-pointer hover:border-primary/40 transition-colors">
-                                <Switch
-                                    checked={allowLateSubmissions}
-                                    onCheckedChange={setAllowLateSubmissions}
-                                    className="mt-1 shrink-0"
-                                />
-                                <div>
-                                    <div className="font-semibold">Late Submissions</div>
-                                    <div className="text-sm text-muted-foreground">Accept submissions after the deadline</div>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-                )}
-
-                {/* ── Step 3: Tools Selection ───────────────────────────── */}
-                {currentStep === 3 && (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                        <p className="text-muted-foreground mb-4">Select the AI-assisted tools to enable for this assignment.</p>
-
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            {(
-                                [
-                                    {
-                                        key: "acafs" as keyof ToolConfig,
-                                        label: "ACAFS",
-                                        desc: "Automated Code Analysis & Feedback System",
-                                        status: "Available"
-                                    },
-                                    {
-                                        key: "cipas" as keyof ToolConfig,
-                                        label: "CIPAS",
-                                        desc: "Code Integrity & Plagiarism Analysis System",
-                                        status: "Available"
-                                    },
-                                    {
-                                        key: "blaim" as keyof ToolConfig,
-                                        label: "BLAIM",
-                                        desc: "Behavioral Learning & Integrity Assessment Module",
-                                        status: "Beta"
-                                    },
-                                    {
-                                        key: "vivaVoce" as keyof ToolConfig,
-                                        label: "Viva VOCE",
-                                        desc: "AI-powered oral assessment integration",
-                                        status: "Alpha"
-                                    },
-                                ] as const
-                            ).map((tool) => (
-                                <label key={tool.key} className={cn(
-                                    "flex flex-col p-5 border rounded-xl transition-colors cursor-pointer relative",
-                                    tools[tool.key] ? "border-primary bg-primary/5 shadow-sm" : "border-border/60 hover:border-border bg-card"
-                                )}>
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-bold">{tool.label}</span>
-                                            {tool.status !== "Available" && (
-                                                <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">{tool.status}</Badge>
+                        {/* Assignment Type */}
+                        <div className="bg-card border border-border/60 rounded-xl p-6 space-y-4">
+                            <Label className="text-base font-semibold">Assignment Type</Label>
+                            <div className="grid grid-cols-2 gap-4">
+                                {ASSIGNMENT_TYPES.map((type) => {
+                                    const Icon = type.icon;
+                                    const selected = assignment.type === type.id;
+                                    return (
+                                        <button
+                                            key={type.id}
+                                            type="button"
+                                            onClick={() => updateAssignment({ type: type.id })}
+                                            className={cn(
+                                                "flex flex-col items-start gap-3 p-5 rounded-xl border-2 text-left transition-all",
+                                                selected
+                                                    ? "border-primary bg-primary/5 shadow-sm"
+                                                    : "border-border/60 hover:border-border hover:bg-muted/30",
                                             )}
+                                        >
+                                            <div
+                                                className={cn(
+                                                    "flex items-center justify-center h-10 w-10 rounded-lg transition-colors",
+                                                    selected
+                                                        ? "bg-primary text-primary-foreground"
+                                                        : "bg-muted text-muted-foreground",
+                                                )}
+                                            >
+                                                <Icon className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <div className="font-semibold">{type.label}</div>
+                                                <div className="text-xs text-muted-foreground mt-0.5">
+                                                    {type.description}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Description & Objective */}
+                        <div className="bg-card border border-border/60 rounded-xl p-6 space-y-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="description" className="text-base font-semibold">
+                                    Description
+                                </Label>
+                                <p className="text-xs text-muted-foreground -mt-1">
+                                    Visible to students. Explain the purpose, expectations, and requirements.
+                                </p>
+                                <Textarea
+                                    id="description"
+                                    placeholder="Describe what students need to do…"
+                                    className="min-h-[120px] resize-y"
+                                    value={assignment.description}
+                                    onChange={(e) => updateAssignment({ description: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="space-y-2 pt-5 border-t border-border/40">
+                                <div className="flex items-center gap-2">
+                                    <Label htmlFor="objective" className="text-base font-semibold">
+                                        Assignment Objective
+                                    </Label>
+                                    <Badge variant="secondary" className="text-[10px] uppercase tracking-wider">
+                                        AI Context
+                                    </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground -mt-1">
+                                    Used by the AI evaluation engine to understand learning outcomes.{" "}
+                                    <span className="font-medium">Not visible to students.</span>
+                                </p>
+                                <Textarea
+                                    id="objective"
+                                    placeholder="e.g. Students should demonstrate understanding of sorting algorithms and Big-O analysis…"
+                                    className="min-h-[100px] resize-y"
+                                    value={assignment.objective}
+                                    onChange={(e) => updateAssignment({ objective: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ════════════════════════════════════════════════════════
+                    STEP 2 — ASSIGNMENT SETTINGS
+                ════════════════════════════════════════════════════════ */}
+                {currentStep === 2 && (
+                    <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+
+                        {/* Programming Language */}
+                        <div className="bg-card border border-border/60 rounded-xl p-6 space-y-3">
+                            <div>
+                                <Label className="text-base font-semibold">Programming Language</Label>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Sets the default language for submissions and the sample answer editor.
+                                </p>
+                            </div>
+                            <LanguageSelector
+                                value={settings.language_id}
+                                onChange={(id) => {
+                                    updateSettings({ language_id: id });
+                                    // Sync sample answer language unless user already changed it
+                                    updateSampleAnswer({ language_id: id });
+                                }}
+                            />
+                        </div>
+
+                        {/* Dates */}
+                        <div className="bg-card border border-border/60 rounded-xl p-6 space-y-4">
+                            <Label className="text-base font-semibold">Dates</Label>
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="release-date" className="text-sm text-muted-foreground">
+                                        Release Date
+                                    </Label>
+                                    <Input
+                                        id="release-date"
+                                        type="datetime-local"
+                                        className="h-11"
+                                        value={settings.release_date}
+                                        onChange={(e) => updateSettings({ release_date: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="due-date" className="text-sm text-muted-foreground">
+                                        Due Date
+                                    </Label>
+                                    <Input
+                                        id="due-date"
+                                        type="datetime-local"
+                                        className="h-11"
+                                        value={settings.due_date}
+                                        onChange={(e) => updateSettings({ due_date: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Submission settings */}
+                        <div className="bg-card border border-border/60 rounded-xl p-6 space-y-3">
+                            <Label className="text-base font-semibold">Submission Settings</Label>
+
+                            {/* Late Submissions */}
+                            <div
+                                className={cn(
+                                    "rounded-xl border p-4 space-y-3 transition-colors",
+                                    settings.allow_late_submission
+                                        ? "border-primary/30 bg-primary/5"
+                                        : "border-border/60",
+                                )}
+                            >
+                                <label className="flex items-center justify-between cursor-pointer">
+                                    <div>
+                                        <div className="font-medium text-sm">Allow Late Submissions</div>
+                                        <div className="text-xs text-muted-foreground mt-0.5">
+                                            Accept submissions after the due date
                                         </div>
-                                        <Switch
-                                            checked={tools[tool.key]}
-                                            onCheckedChange={(v) =>
-                                                setTools((prev) => ({ ...prev, [tool.key]: v }))
-                                            }
+                                    </div>
+                                    <Switch
+                                        checked={settings.allow_late_submission}
+                                        onCheckedChange={(v) => updateSettings({ allow_late_submission: v })}
+                                    />
+                                </label>
+                                {settings.allow_late_submission && (
+                                    <div className="space-y-2 pt-3 border-t border-border/40">
+                                        <Label htmlFor="late-due" className="text-sm text-muted-foreground">
+                                            Late Due Date
+                                        </Label>
+                                        <Input
+                                            id="late-due"
+                                            type="datetime-local"
+                                            className="h-10"
+                                            value={settings.late_due_date}
+                                            onChange={(e) => updateSettings({ late_due_date: e.target.value })}
                                         />
                                     </div>
-                                    <p className="text-sm text-muted-foreground">{tool.desc}</p>
+                                )}
+                            </div>
+
+                            {/* Time Limit */}
+                            <div
+                                className={cn(
+                                    "rounded-xl border p-4 space-y-3 transition-colors",
+                                    settings.time_limit_enabled
+                                        ? "border-primary/30 bg-primary/5"
+                                        : "border-border/60",
+                                )}
+                            >
+                                <label className="flex items-center justify-between cursor-pointer">
+                                    <div>
+                                        <div className="font-medium text-sm">Enable Time Limit</div>
+                                        <div className="text-xs text-muted-foreground mt-0.5">
+                                            Restrict to a fixed duration after the student opens the assignment
+                                        </div>
+                                    </div>
+                                    <Switch
+                                        checked={settings.time_limit_enabled}
+                                        onCheckedChange={(v) => updateSettings({ time_limit_enabled: v })}
+                                    />
                                 </label>
-                            ))}
+                                {settings.time_limit_enabled && (
+                                    <div className="flex items-center gap-3 pt-3 border-t border-border/40">
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            value={settings.time_limit_minutes ?? ""}
+                                            onChange={(e) =>
+                                                updateSettings({
+                                                    time_limit_minutes:
+                                                        e.target.value === "" ? null : Number(e.target.value),
+                                                })
+                                            }
+                                            className="h-10 w-28"
+                                        />
+                                        <span className="text-sm text-muted-foreground">minutes</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Group Submission */}
+                            <label className="flex items-center justify-between p-4 rounded-xl border border-border/60 cursor-pointer hover:border-border transition-colors">
+                                <div>
+                                    <div className="font-medium text-sm">Group Submission</div>
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                        Allow students to submit as a team (up to 5)
+                                    </div>
+                                </div>
+                                <Switch
+                                    checked={settings.group_submission}
+                                    onCheckedChange={(v) => updateSettings({ group_submission: v })}
+                                />
+                            </label>
+
+                            {/* Multiple Submissions */}
+                            <label className="flex items-center justify-between p-4 rounded-xl border border-border/60 cursor-pointer hover:border-border transition-colors">
+                                <div>
+                                    <div className="font-medium text-sm">Enable Multiple Submissions</div>
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                        Allow students to resubmit and improve their work
+                                    </div>
+                                </div>
+                                <Switch
+                                    checked={settings.multiple_submissions}
+                                    onCheckedChange={(v) => updateSettings({ multiple_submissions: v })}
+                                />
+                            </label>
                         </div>
                     </div>
                 )}
 
-                {/* ── Step 4: Grading Settings ───────────────────────────── */}
-                {currentStep === 4 && (
-                    <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                        {/* Rubric */}
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-base font-semibold">Grading Rubric</Label>
-                                <Button variant="outline" size="sm" onClick={addCriterion} type="button">
-                                    <Plus className="mr-2 h-4 w-4" /> Add Criterion
-                                </Button>
-                            </div>
+                {/* ════════════════════════════════════════════════════════
+                    STEP 3 — RUBRIC
+                ════════════════════════════════════════════════════════ */}
+                {currentStep === 3 && (
+                    <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
 
-                            <div className="space-y-1.5">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-muted-foreground">Total Weight</span>
-                                    <span className={weightValid ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-red-500 dark:text-red-400 font-bold"}>
-                                        {totalWeight}% / 100%
-                                        {weightValid ? " ✓" : " — must equal 100%"}
+                        {/* Toolbar */}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                {/* Weight progress */}
+                                <span className="text-sm">
+                                    <span className="text-muted-foreground">Total: </span>
+                                    <span
+                                        className={cn(
+                                            "font-bold",
+                                            weightValid
+                                                ? "text-emerald-600 dark:text-emerald-400"
+                                                : totalWeight > 100
+                                                    ? "text-red-500"
+                                                    : "text-foreground",
+                                        )}
+                                    >
+                                        {totalWeight} / 100%
                                     </span>
-                                </div>
-                                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                                    {weightValid && (
+                                        <span className="ml-1 text-emerald-500">✓</span>
+                                    )}
+                                </span>
+                                <div className="h-2 w-28 rounded-full bg-muted overflow-hidden">
                                     <div
-                                        className={`h-full rounded-full transition-all duration-300 ${totalWeight > 100
-                                            ? "bg-red-500"
-                                            : weightValid
-                                                ? "bg-emerald-500"
-                                                : "bg-primary"
-                                            }`}
+                                        className={cn(
+                                            "h-full rounded-full transition-all duration-300",
+                                            totalWeight > 100
+                                                ? "bg-red-500"
+                                                : weightValid
+                                                    ? "bg-emerald-500"
+                                                    : "bg-primary",
+                                        )}
                                         style={{ width: `${Math.min(100, totalWeight)}%` }}
                                     />
                                 </div>
                             </div>
 
-                            {rubricCriteria.length === 0 ? (
-                                <div className="border border-dashed border-border/60 rounded-xl p-8 text-center text-muted-foreground bg-muted/5">
-                                    No criteria yet. Add your first criterion above.
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    {rubricCriteria.map((criterion) => (
-                                        <div
-                                            key={criterion.id}
-                                            className="p-4 border border-border/60 rounded-xl bg-card/50 space-y-3 relative group transition-colors hover:border-border"
+                            <div className="flex items-center gap-2">
+                                {/* Rubric Writing Guide */}
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="gap-1.5 text-muted-foreground text-xs"
                                         >
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                type="button"
-                                                className="absolute top-2 right-2 h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive hover:bg-destructive/10"
-                                                onClick={() => removeCriterion(criterion.id)}
+                                            <Info className="h-3.5 w-3.5" />
+                                            Writing Guide
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-lg">
+                                        <DialogHeader>
+                                            <DialogTitle>Rubric Writing Guidelines</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4 text-sm text-muted-foreground">
+                                            <p>A well-written rubric gives the AI grading engine clear, objective expectations for each level of performance.</p>
+                                            <ul className="space-y-2 list-disc list-inside">
+                                                <li><strong>All weights must sum to exactly 100.</strong> Each criterion's weight reflects its share of the total grade.</li>
+                                                <li><strong>Use concrete, observable descriptions</strong> for each band — avoid vague language like "good effort".</li>
+                                                <li><strong>LLM mode</strong> uses GPT to evaluate code against your descriptions. Best for qualitative criteria like code quality or design.</li>
+                                                <li><strong>LLM + AST mode</strong> enriches LLM evaluation with structural code analysis — ideal for correctness and complexity criteria.</li>
+                                                <li><strong>Deterministic mode</strong> relies entirely on test case output matching. Use for exact-output problems.</li>
+                                                <li><strong>Band ranges</strong> define what percentage of the criterion's weight a submission receives (e.g. 85–100% of the criterion weight for Excellent).</li>
+                                            </ul>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+
+                                <Button variant="outline" size="sm" onClick={addCriterion} type="button">
+                                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                    Add Criterion
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Criteria list */}
+                        {criteria.length === 0 ? (
+                            <div className="border border-dashed border-border/60 rounded-xl p-10 text-center text-muted-foreground bg-muted/5">
+                                <p className="text-sm">No criteria yet. Add your first criterion above.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {criteria.map((c, idx) => (
+                                    <RubricCriterionBlock
+                                        key={c.id}
+                                        criterion={c}
+                                        isExpanded={expandedCriterionId === c.id}
+                                        isFirst={idx === 0}
+                                        isLast={idx === criteria.length - 1}
+                                        onToggle={() =>
+                                            setExpandedCriterionId(
+                                                expandedCriterionId === c.id ? null : c.id,
+                                            )
+                                        }
+                                        onChange={(updated) => updateCriterion(c.id, updated)}
+                                        onRemove={() => removeCriterion(c.id)}
+                                        onMoveUp={() => moveCriterion(c.id, "up")}
+                                        onMoveDown={() => moveCriterion(c.id, "down")}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
+                        {!weightValid && criteria.length > 0 && (
+                            <p className="text-xs text-red-500 flex items-center gap-1.5">
+                                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                Criteria weights must sum to 100% before proceeding.
+                                Currently {totalWeight > 100 ? "over" : "under"} by{" "}
+                                {Math.abs(100 - totalWeight)}%.
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {/* ════════════════════════════════════════════════════════
+                    STEP 4 — TEST CASES
+                ════════════════════════════════════════════════════════ */}
+                {currentStep === 4 && (
+                    <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+
+                        {/* Toolbar */}
+                        <div className="flex items-center justify-between">
+                            <p className="text-sm text-muted-foreground">
+                                {testCases.length === 0
+                                    ? "No test cases yet. Test cases enable automated grading."
+                                    : `${testCases.length} test case${testCases.length !== 1 ? "s" : ""} defined`}
+                            </p>
+                            <div className="flex items-center gap-2">
+                                {/* Test Case Writing Guide */}
+                                <Dialog>
+                                    <DialogTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="gap-1.5 text-muted-foreground text-xs"
+                                        >
+                                            <Info className="h-3.5 w-3.5" />
+                                            Writing Guide
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-lg">
+                                        <DialogHeader>
+                                            <DialogTitle>Test Case Writing Guidelines</DialogTitle>
+                                        </DialogHeader>
+                                        <div className="space-y-4 text-sm text-muted-foreground">
+                                            <p>Test cases are run via <strong>Judge0</strong> — each test case sends your input to the student's code via stdin and compares stdout to your expected output.</p>
+                                            <ul className="space-y-2 list-disc list-inside">
+                                                <li><strong>Input format</strong>: exactly what the program reads from stdin. One value per line for multiple inputs.</li>
+                                                <li><strong>Expected output</strong>: exact stdout expected, including newlines. Trailing whitespace is ignored during comparison.</li>
+                                                <li><strong>Edge cases matter</strong>: include boundary inputs (empty input, maximum values, invalid data).</li>
+                                                <li><strong>Start with simple cases</strong>, then add complexity. Test case #1 should validate basic functionality.</li>
+                                                <li>Use the <em>Sample Answer</em> step to verify your test cases are correct before publishing.</li>
+                                            </ul>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+
+                                <Button variant="outline" size="sm" onClick={addTestCase} type="button">
+                                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                    Add Test Case
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Test case list */}
+                        {testCases.length > 0 && (
+                            <div className="space-y-3">
+                                {testCases.map((tc) => (
+                                    <TestCaseBlock
+                                        key={tc.test_case_id}
+                                        testCase={tc}
+                                        isExpanded={expandedTestCaseId === tc.test_case_id}
+                                        onToggle={() =>
+                                            setExpandedTestCaseId(
+                                                expandedTestCaseId === tc.test_case_id
+                                                    ? null
+                                                    : tc.test_case_id,
+                                            )
+                                        }
+                                        onChange={(updated) => updateTestCase(tc.test_case_id, updated)}
+                                        onRemove={() => removeTestCase(tc.test_case_id)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ════════════════════════════════════════════════════════
+                    STEP 5 — SAMPLE ANSWER
+                ════════════════════════════════════════════════════════ */}
+                {currentStep === 5 && (
+                    <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+
+                        {/* Language + Run bar */}
+                        <div className="bg-card border border-border/60 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                            <div className="flex-1 space-y-1.5">
+                                <Label className="text-sm font-semibold">Language</Label>
+                                <LanguageSelector
+                                    value={sampleAnswer.language_id}
+                                    onChange={(id) => updateSampleAnswer({ language_id: id })}
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={isRunning || !sampleAnswer.code.trim() || testCases.length === 0}
+                                onClick={runSampleAnswer}
+                                className="shrink-0 gap-2 self-end sm:self-auto sm:mt-6"
+                            >
+                                {isRunning ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Running…
+                                    </>
+                                ) : (
+                                    <>
+                                        <Play className="h-4 w-4" />
+                                        Run against test cases
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+
+                        {testCases.length === 0 && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1.5 px-1">
+                                <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                No test cases defined — add them in Step 4 to enable the run feature.
+                            </p>
+                        )}
+
+                        {/* Code editor */}
+                        <div className="bg-card border border-border/60 rounded-xl overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/40 bg-muted/20">
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    Reference implementation
+                                </span>
+                                <span className="text-xs text-muted-foreground">Ctrl+Enter to run</span>
+                            </div>
+                            <div className="h-[420px]">
+                                <EditorPanel
+                                    value={sampleAnswer.code}
+                                    onChange={(v) => updateSampleAnswer({ code: v })}
+                                    language={sampleAnswer.language_id}
+                                    fontSize={14}
+                                    theme={editorTheme}
+                                    onRun={runSampleAnswer}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Test case results */}
+                        {testResults.length > 0 && (
+                            <div className="bg-card border border-border/60 rounded-xl overflow-hidden">
+                                <div className="flex items-center justify-between px-5 py-3 border-b border-border/40">
+                                    <span className="text-sm font-semibold">Test Results</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {testResults.filter((r) => r.passed).length}/{testResults.length} passed
+                                    </span>
+                                </div>
+                                <div className="divide-y divide-border/40">
+                                    {testResults.map((r) => {
+                                        const tc = testCases.find((t) => t.test_case_id === r.test_case_id);
+                                        return (
+                                            <div
+                                                key={r.test_case_id}
+                                                className="flex items-start gap-4 px-5 py-3"
                                             >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                            <div className="grid grid-cols-[1fr_100px] gap-4">
-                                                <div className="space-y-1.5">
-                                                    <Label className="text-xs text-muted-foreground">Criterion Name</Label>
-                                                    <Input
-                                                        placeholder="e.g. Correctness"
-                                                        value={criterion.name}
-                                                        onChange={(e) =>
-                                                            updateCriterion(criterion.id, "name", e.target.value)
-                                                        }
-                                                    />
+                                                {r.passed ? (
+                                                    <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                                                ) : (
+                                                    <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                                                )}
+                                                <div className="flex-1 min-w-0 space-y-1">
+                                                    <p className="text-sm font-medium">
+                                                        Test #{r.test_case_id}
+                                                        {tc?.description && (
+                                                            <span className="ml-1.5 text-xs text-muted-foreground font-normal">
+                                                                {tc.description}
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                    {!r.passed && (
+                                                        <div className="grid grid-cols-2 gap-3 mt-2">
+                                                            <div>
+                                                                <p className="text-xs text-muted-foreground mb-1">Expected</p>
+                                                                <pre className="text-xs font-mono bg-muted/40 rounded p-2 whitespace-pre-wrap break-all">
+                                                                    {tc?.expected_output || "(empty)"}
+                                                                </pre>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs text-muted-foreground mb-1">Got</p>
+                                                                <pre className="text-xs font-mono bg-destructive/5 text-destructive rounded p-2 whitespace-pre-wrap break-all">
+                                                                    {r.error || r.actual_output || r.status.description}
+                                                                </pre>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    <Label className="text-xs text-muted-foreground">Weight %</Label>
-                                                    <Input
-                                                        type="number"
-                                                        min={0}
-                                                        max={100}
-                                                        value={criterion.weight}
-                                                        onChange={(e) =>
-                                                            updateCriterion(criterion.id, "weight", Number(e.target.value))
-                                                        }
-                                                    />
+                                                <div className="text-xs text-muted-foreground shrink-0">
+                                                    {r.time ? `${r.time}s` : ""}
                                                 </div>
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-xs text-muted-foreground">Description</Label>
-                                                <Input
-                                                    placeholder="What does a full-score look like?"
-                                                    value={criterion.description}
-                                                    onChange={(e) =>
-                                                        updateCriterion(criterion.id, "description", e.target.value)
-                                                    }
-                                                />
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* ════════════════════════════════════════════════════════
+                    STEP 6 — REVIEW & PUBLISH
+                ════════════════════════════════════════════════════════ */}
+                {currentStep === 6 && (
+                    <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+
+                        {submitError && (
+                            <div className="flex gap-2 p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-destructive text-sm font-medium">
+                                <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                                <span>{submitError}</span>
+                            </div>
+                        )}
+
+                        {/* Assignment Details */}
+                        <ReviewCard
+                            title="Assignment Details"
+                            onEdit={() => setStep(1)}
+                        >
+                            <ReviewRow label="Name" value={assignment.name || "—"} />
+                            <ReviewRow
+                                label="Type"
+                                value={
+                                    <Badge variant="outline" className="capitalize">
+                                        {assignment.type}
+                                    </Badge>
+                                }
+                            />
+                            {assignment.description && (
+                                <ReviewRow
+                                    label="Description"
+                                    value={
+                                        <span className="text-sm line-clamp-3 text-muted-foreground">
+                                            {assignment.description}
+                                        </span>
+                                    }
+                                />
+                            )}
+                            {assignment.objective && (
+                                <ReviewRow
+                                    label="Objective"
+                                    value={
+                                        <span className="text-sm line-clamp-3 text-muted-foreground">
+                                            {assignment.objective}
+                                        </span>
+                                    }
+                                />
+                            )}
+                        </ReviewCard>
+
+                        {/* Settings */}
+                        <ReviewCard title="Assignment Settings" onEdit={() => setStep(2)}>
+                            <ReviewRow
+                                label="Release"
+                                value={
+                                    settings.release_date
+                                        ? new Date(settings.release_date).toLocaleString()
+                                        : "Immediate"
+                                }
+                            />
+                            <ReviewRow
+                                label="Due Date"
+                                value={
+                                    settings.due_date
+                                        ? new Date(settings.due_date).toLocaleString()
+                                        : "No deadline"
+                                }
+                            />
+                            <ReviewRow
+                                label="Late Submissions"
+                                value={settings.allow_late_submission ? "Allowed" : "Not allowed"}
+                            />
+                            <ReviewRow
+                                label="Time Limit"
+                                value={
+                                    settings.time_limit_enabled && settings.time_limit_minutes
+                                        ? `${settings.time_limit_minutes} min`
+                                        : "None"
+                                }
+                            />
+                            <ReviewRow
+                                label="Group Submission"
+                                value={settings.group_submission ? "Enabled (up to 5)" : "Disabled"}
+                            />
+                            <ReviewRow
+                                label="Multiple Submissions"
+                                value={settings.multiple_submissions ? "Enabled" : "Disabled"}
+                            />
+                        </ReviewCard>
+
+                        {/* Rubric */}
+                        <ReviewCard
+                            title="Rubric"
+                            onEdit={() => setStep(3)}
+                            badge={
+                                weightValid ? (
+                                    <Badge className="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-0 text-xs">
+                                        100%
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="destructive" className="text-xs">
+                                        {totalWeight}% / 100%
+                                    </Badge>
+                                )
+                            }
+                        >
+                            {criteria.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No criteria defined.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {criteria.map((c) => (
+                                        <div
+                                            key={c.id}
+                                            className="flex items-center justify-between text-sm bg-muted/20 px-3 py-2 rounded-lg"
+                                        >
+                                            <span className="font-medium">{c.name || "Unnamed"}</span>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="secondary" className="text-[10px] uppercase">
+                                                    {c.grading_mode.replace("_", "+")}
+                                                </Badge>
+                                                <Badge variant="outline" className="font-mono text-xs">
+                                                    {c.weight}%
+                                                </Badge>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
-                        </div>
+                        </ReviewCard>
+
+                        {/* Test Cases */}
+                        <ReviewCard title="Test Cases" onEdit={() => setStep(4)}>
+                            {testCases.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No test cases defined.</p>
+                            ) : (
+                                <p className="text-sm">
+                                    {testCases.length} test case{testCases.length !== 1 ? "s" : ""} defined.
+                                </p>
+                            )}
+                        </ReviewCard>
 
                         {/* Sample Answer */}
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-base font-semibold">Sample Answer</Label>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    type="button"
-                                    disabled
-                                    className="text-xs text-muted-foreground bg-muted/20"
-                                >
-                                    <Eye className="mr-2 h-3 w-3" />
-                                    Autograder Preview (Coming Soon)
-                                </Button>
-                            </div>
-                            <Textarea
-                                placeholder="Provide a model answer or reference solution for autograding..."
-                                className="min-h-[120px] resize-y font-mono text-sm"
-                                value={sampleAnswer}
-                                onChange={(e) => setSampleAnswer(e.target.value)}
-                            />
-                        </div>
-
-                        {/* Assign Staff */}
-                        <div className="space-y-4 pt-4 border-t border-border/50">
-                            <Label className="text-base font-semibold">Staff Assignment</Label>
-                            <div className="grid sm:grid-cols-2 gap-4 text-sm">
-                                <div className="space-y-2">
-                                    <Label className="text-muted-foreground">Teaching Assistants</Label>
-                                    <MultiSelectTagInput
-                                        options={staffOptions}
-                                        value={assignedTAs}
-                                        onChange={setAssignedTAs}
-                                        placeholder="Select TAs..."
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-muted-foreground">Additional Instructors</Label>
-                                    <MultiSelectTagInput
-                                        options={staffOptions}
-                                        value={assignedInstructors}
-                                        onChange={setAssignedInstructors}
-                                        placeholder="Select instructors..."
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* ── Step 5: Review & Confirm ────────────────────────── */}
-                {currentStep === 5 && (
-                    <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                        {submitError && (
-                            <div className="flex gap-2 p-4 rounded-xl border border-destructive/30 bg-destructive/5 text-destructive text-sm font-medium">
-                                <AlertCircle className="h-5 w-5 shrink-0" />
-                                <span>{submitError}</span>
-                            </div>
-                        )}
-
-                        <div className="space-y-6">
-                            {/* General */}
-                            <div>
-                                <h3 className="text-lg font-bold font-heading mb-3 border-b border-border/40 pb-2">1. General Details</h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-muted-foreground">Title</span>
-                                        <span className="font-semibold">{title || "—"}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-muted-foreground">Type</span>
-                                        <span className="font-semibold">{assessmentType}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Config */}
-                            <div>
-                                <h3 className="text-lg font-bold font-heading mb-3 border-b border-border/40 pb-2">2. Configuration</h3>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-muted-foreground">Deadline</span>
-                                        <span className="font-semibold">{deadline ? new Date(deadline).toLocaleString() : "None"}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-muted-foreground">Time Limit</span>
-                                        <span className="font-semibold">{timeLimitMinutes ? `${timeLimitMinutes} min` : "No limit"}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-muted-foreground">Group Submission</span>
-                                        <span className="font-semibold">{groupSubmission ? "Yes" : "No"}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-muted-foreground">Late Submission</span>
-                                        <span className="font-semibold">{allowLateSubmissions ? "Yes" : "No"}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Tools */}
-                            <div>
-                                <h3 className="text-lg font-bold font-heading mb-3 border-b border-border/40 pb-2">3. Tools</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {enabledTools.length === 0 ? (
-                                        <span className="text-sm text-muted-foreground">No tools enabled.</span>
-                                    ) : (
-                                        enabledTools.map((t) => (
-                                            <Badge key={t} className="bg-primary/10 text-primary border-primary/20 font-semibold">{t}</Badge>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Grading */}
-                            <div>
-                                <div className="flex items-center justify-between border-b border-border/40 pb-2 mb-3">
-                                    <h3 className="text-lg font-bold font-heading">4. Grading</h3>
-                                    <span className={`text-sm font-bold ${weightValid ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
-                                        Total Weight: {totalWeight}%
-                                    </span>
-                                </div>
-                                <div className="space-y-2">
-                                    {rubricCriteria.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground">No criteria.</p>
-                                    ) : (
-                                        rubricCriteria.map((c) => (
-                                            <div key={c.id} className="flex items-center justify-between text-sm bg-muted/20 p-2 rounded-lg">
-                                                <span className="font-medium">{c.name || "Unnamed"}</span>
-                                                <Badge variant="outline" className="font-mono text-xs">{c.weight}%</Badge>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-8 pt-6 border-t border-border/60">
-                            <label className="flex items-start gap-4 p-5 rounded-xl border border-primary/20 bg-primary/5 cursor-pointer">
-                                <Checkbox
-                                    checked={confirmed}
-                                    onCheckedChange={(v) => setConfirmed(v === true)}
-                                    className="mt-1 h-5 w-5 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                                />
-                                <div>
-                                    <div className="font-semibold text-lg">Ready to Publish</div>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                        I confirm that the assignment details, rubric, and configuration above are correct.
-                                        Once published, students will be notified according to the course settings.
-                                    </p>
-                                </div>
-                            </label>
-                        </div>
+                        <ReviewCard title="Sample Answer" onEdit={() => setStep(5)}>
+                            {sampleAnswer.code.trim() ? (
+                                <p className="text-sm text-muted-foreground">
+                                    {sampleAnswer.code.trim().split("\n").length} lines of code.
+                                </p>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No sample answer provided.</p>
+                            )}
+                        </ReviewCard>
                     </div>
                 )}
             </div>
 
-            {/* Bottom Actions Bar */}
-            <div className="py-6 flex items-center justify-between sticky bottom-0 bg-background/95 backdrop-blur mt-auto">
+            {/* ── Bottom navigation ── */}
+            <div className="py-6 flex items-center justify-between sticky bottom-0 bg-background/95 backdrop-blur border-t border-border/40 mt-8">
                 <Button
                     variant="outline"
                     type="button"
-                    onClick={currentStep === 1 ? () => router.push(`/instructor/courses/${instanceId}/assignments`) : handleBack}
+                    onClick={
+                        currentStep === 1
+                            ? () => router.push(`/instructor/courses/${instanceId}/assignments`)
+                            : handleBack
+                    }
                     disabled={isSubmitting}
                     className="h-11 px-8 rounded-full"
                 >
                     {currentStep === 1 ? "Cancel" : "Back"}
                 </Button>
 
-                <Button
-                    type="button"
-                    onClick={currentStep === 5 ? handleSubmit : handleNext}
-                    disabled={
-                        isSubmitting ||
-                        (currentStep === 1 && !title.trim()) ||
-                        (currentStep === 4 && !weightValid) ||
-                        (currentStep === 5 && !confirmed)
-                    }
-                    className="h-11 px-8 rounded-full min-w-[140px]"
-                >
-                    {isSubmitting ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : currentStep === 5 ? (
-                        "Create Assignment"
-                    ) : (
-                        "Next Step"
+                <div className="flex items-center gap-3">
+                    {/* Save draft — available from step 2 onwards */}
+                    {currentStep >= 2 && (
+                        <Button
+                            variant="ghost"
+                            type="button"
+                            onClick={handleSaveDraft}
+                            className="h-11 px-5 rounded-full gap-2 text-muted-foreground hover:text-foreground"
+                        >
+                            <Save className="h-4 w-4" />
+                            Save Draft
+                        </Button>
                     )}
+
+                    {currentStep < steps.length ? (
+                        <Button
+                            type="button"
+                            onClick={handleNext}
+                            disabled={nextDisabled}
+                            className="h-11 px-8 rounded-full min-w-[120px]"
+                        >
+                            Next Step
+                        </Button>
+                    ) : (
+                        <Button
+                            type="button"
+                            onClick={handlePublish}
+                            disabled={isSubmitting || !weightValid || !assignment.name.trim()}
+                            className="h-11 px-8 rounded-full min-w-[160px]"
+                        >
+                            {isSubmitting ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                            ) : (
+                                "Publish Assignment"
+                            )}
+                        </Button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Review card helper components ───────────────────────────────────────────
+
+function ReviewCard({
+    title,
+    children,
+    onEdit,
+    badge,
+}: {
+    title: string;
+    children: React.ReactNode;
+    onEdit: () => void;
+    badge?: React.ReactNode;
+}) {
+    return (
+        <div className="bg-card border border-border/60 rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/40 bg-muted/20">
+                <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">{title}</span>
+                    {badge}
+                </div>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onEdit}
+                    className="h-7 px-3 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                >
+                    <Pencil className="h-3 w-3" />
+                    Edit
                 </Button>
             </div>
+            <div className="px-5 py-4 space-y-2">{children}</div>
+        </div>
+    );
+}
+
+function ReviewRow({
+    label,
+    value,
+}: {
+    label: string;
+    value: React.ReactNode;
+}) {
+    return (
+        <div className="flex items-start gap-4 text-sm">
+            <span className="text-muted-foreground w-36 shrink-0">{label}</span>
+            <span className="font-medium flex-1">{value}</span>
         </div>
     );
 }

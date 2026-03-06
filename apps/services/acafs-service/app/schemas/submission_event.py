@@ -57,6 +57,30 @@ class SubmissionEvent(BaseModel):
     user_agent: str
     enqueued_at: datetime
 
+    # -------------------------------------------------------------------------
+    # TODO [ACAFS – Evaluation Context Fields]
+    #
+    # The following fields must be added once assessment-service stores them.
+    # Uncomment and update the RabbitMQ publisher in assessment-service to
+    # include these in the queue message payload.
+    #
+    # Assignment metadata:
+    # assignment_type: Optional[str] = None        # "lab" | "exam"
+    # assignment_objective: Optional[str] = None   # LLM prompt context
+    #
+    # Rubric (drives per-criterion grading):
+    # rubric: Optional[list[dict[str, Any]]] = None
+    # Structure: [{id, name, description, grading_mode, weight, bands: {...}}]
+    #
+    # Test cases (drives deterministic evaluation):
+    # test_cases: Optional[list[dict[str, Any]]] = None
+    # Structure: [{test_case_id, description, test_case_input, expected_output}]
+    #
+    # Sample answer (LLM reference & deterministic ground-truth):
+    # sample_answer: Optional[dict[str, Any]] = None
+    # Structure: {language_id: int, code: str}
+    # -------------------------------------------------------------------------
+
     class Config:
         """Pydantic config."""
         json_encoders = {
