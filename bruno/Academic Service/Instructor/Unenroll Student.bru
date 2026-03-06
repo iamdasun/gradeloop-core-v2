@@ -1,0 +1,47 @@
+meta {
+  name: Unenroll Student
+  type: http
+  seq: 5
+}
+
+docs {
+  # Unenroll Student
+
+  Removes a student's enrollment from the course instance.
+
+  ## Prerequisites
+  - Valid access token with Instructor, Admin, or Super Admin role
+  - The caller must be assigned as an instructor of the course instance
+  - `COURSE_INSTANCE_ID` and `ENROLLMENT_USER_ID` environment variables must be set
+
+  ## Path Parameters
+  | Parameter  | Description |
+  |------------|-------------|
+  | `:id`      | Course instance UUID |
+  | `:userID`  | UUID of the student to unenroll |
+
+  ## Response
+  `204 No Content` — no response body on success.
+
+  ## Error Responses
+  | Status | Description |
+  |--------|-------------|
+  | 401    | Missing or invalid authorization |
+  | 403    | Caller not assigned to this course instance |
+  | 404    | Enrollment or course instance not found |
+}
+
+delete {
+  url: {{INSTRUCTOR_COURSES_URL_V1}}/{{COURSE_INSTANCE_ID}}/students/{{ENROLLMENT_USER_ID}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

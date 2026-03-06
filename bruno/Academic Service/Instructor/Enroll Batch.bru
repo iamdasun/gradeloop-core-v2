@@ -1,0 +1,75 @@
+meta {
+  name: Enroll Batch
+  type: http
+  seq: 7
+}
+
+docs {
+  # Enroll Batch
+
+  Enrolls all members of a batch into the course instance in a single
+  operation. Students who are already enrolled are silently skipped.
+
+  ## Prerequisites
+  - Valid access token with Instructor, Admin, or Super Admin role
+  - The caller must be assigned as an instructor of the course instance
+  - `COURSE_INSTANCE_ID` and `BATCH_ID` environment variables must be set
+
+  ## Path Parameters
+  | Parameter | Description |
+  |-----------|-------------|
+  | `:id`     | Course instance UUID |
+
+  ## Request Body
+  ```json
+  {
+    "batch_id": "<batch-uuid>"
+  }
+  ```
+
+  ## Response (200 OK)
+  ```json
+  {
+    "enrolled": 40,
+    "skipped": 5,
+    "total": 45,
+    "skipped_users": ["uuid1", "uuid2"]
+  }
+  ```
+
+  | Field          | Description |
+  |----------------|-------------|
+  | `enrolled`     | Number of students successfully enrolled |
+  | `skipped`      | Number already enrolled (conflict — skipped) |
+  | `total`        | Total batch members processed |
+  | `skipped_users`| UUIDs of already-enrolled students |
+
+  ## Error Responses
+  | Status | Description |
+  |--------|-------------|
+  | 400    | Missing or invalid `batch_id` |
+  | 401    | Missing or invalid authorization |
+  | 403    | Caller not assigned to this course instance |
+  | 404    | Course instance or batch not found |
+}
+
+post {
+  url: {{INSTRUCTOR_COURSES_URL_V1}}/{{COURSE_INSTANCE_ID}}/enroll-batch
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "batch_id": "{{BATCH_ID}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
