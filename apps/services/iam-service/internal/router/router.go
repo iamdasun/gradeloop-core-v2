@@ -36,6 +36,9 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 
 	// User routes with authentication middleware (admin-only operations)
 	users := api.Group("/users", middleware.AuthMiddleware(cfg.JWTSecretKey))
+	// Static sub-paths must be registered BEFORE /:id to prevent Fiber matching
+	// them as UUID parameters.
+	users.Get("/students", middleware.RequireInstructor(), cfg.UserHandler.GetStudents)
 	users.Get("/", middleware.RequireAdmin(), cfg.UserHandler.GetUsers)
 	users.Post("/bulk", cfg.UserHandler.GetUsersByIDs)
 	users.Get("/:id", cfg.UserHandler.GetUserByID)

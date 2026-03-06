@@ -67,6 +67,33 @@ func (h *UserHandler) GetUsers(c fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+// GetStudents returns a paginated list of students only.
+// Accessible to instructors, admins, and super admins.
+func (h *UserHandler) GetStudents(c fiber.Ctx) error {
+	page, err := strconv.Atoi(c.Query("page", "1"))
+	if err != nil {
+		page = 1
+	}
+
+	limit, err := strconv.Atoi(c.Query("limit", "500"))
+	if err != nil {
+		limit = 500
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	search := c.Query("search", "")
+
+	// Locked to student user type — instructors must not see other roles.
+	response, err := h.userService.GetUsers(c.RequestCtx(), page, limit, "student", search)
+	if err != nil {
+		return handleUserError(err)
+	}
+
+	return c.JSON(response)
+}
+
 // UpdateUser updates an existing user
 func (h *UserHandler) UpdateUser(c fiber.Ctx) error {
 	id := c.Params("id")
