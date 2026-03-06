@@ -147,11 +147,6 @@ const studentNavItems: NavItem[] = [
     href: "/student/assessments/my-sessions",
     icon: Mic2,
   },
-  {
-    title: "Viva Assessments",
-    href: "/student/assessments/my-sessions",
-    icon: Mic2,
-  },
 ];
 
 interface SidebarProps {
