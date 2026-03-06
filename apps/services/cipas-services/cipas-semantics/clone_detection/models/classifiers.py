@@ -290,6 +290,195 @@ class SemanticClassifier:
 
         return metrics
 
+    def fit(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_test: Optional[np.ndarray] = None,
+        y_test: Optional[np.ndarray] = None,
+        cv: bool = False,
+        feature_names: Optional[List[str]] = None,
+        calibrate_threshold: bool = True,
+        apply_feature_pruning: Optional[bool] = None,
+        apply_isotonic_calibration: Optional[bool] = None,
+    ) -> dict:
+        """
+        Train the XGBoost classifier with pre-split data.
+
+        This method accepts already-split training and test data, unlike train()
+        which does the splitting internally.
+
+        Args:
+            X_train: Training feature matrix
+            y_train: Training labels
+            X_test: Optional test feature matrix for evaluation
+            y_test: Optional test labels for evaluation
+            cv: Whether to perform cross-validation
+            feature_names: Optional list of feature names
+            calibrate_threshold: Whether to calibrate decision threshold after training
+            apply_feature_pruning: Override default feature pruning setting
+            apply_isotonic_calibration: Override default isotonic calibration setting
+
+        Returns:
+            Dictionary with training metrics
+        """
+        # Determine settings
+        do_pruning = (
+            apply_feature_pruning
+            if apply_feature_pruning is not None
+            else self.feature_pruning
+        )
+        do_calibration = (
+            apply_isotonic_calibration
+            if apply_isotonic_calibration is not None
+            else self.isotonic_calibration
+        )
+
+        logger.info(f"Training with {X_train.shape[0]} samples, {X_train.shape[1]} features")
+        logger.info(
+            f"Feature pruning: {do_pruning}, Isotonic calibration: {do_calibration}"
+        )
+
+        # Store original feature count
+        self.original_feature_count = X_train.shape[1]
+
+        # Step 1: Feature Pruning (if enabled)
+        if do_pruning:
+            logger.info("Performing feature pruning...")
+            # Combine train and test for pruning
+            if X_test is not None and y_test is not None:
+                X_combined = np.vstack([X_train, X_test])
+                y_combined = np.concatenate([y_train, y_test])
+            else:
+                X_combined = X_train
+                y_combined = y_train
+
+            X_combined_pruned, pruned_indices = self._prune_features(
+                X_combined, y_combined, test_size=0.2
+            )
+            self.pruned_feature_indices = pruned_indices
+            self.pruned_feature_count = X_combined_pruned.shape[1]
+
+            # Apply pruning to train and test sets
+            X_train = X_train[:, pruned_indices]
+            if X_test is not None:
+                X_test = X_test[:, pruned_indices]
+
+            logger.info(
+                f"Features after pruning: {self.pruned_feature_count} "
+                f"(removed {self.original_feature_count - self.pruned_feature_count})"
+            )
+        else:
+            self.pruned_feature_count = X_train.shape[1]
+
+        # Step 2: Train base model
+        logger.info(f"Training XGBoost with {X_train.shape[0]} samples...")
+        
+        if X_test is not None and y_test is not None:
+            eval_set = [(X_test, y_test)]
+            self.base_model.fit(X_train, y_train, eval_set=eval_set, verbose=False)
+        else:
+            self.base_model.fit(X_train, y_train, verbose=False)
+
+        # Store feature names (pruned)
+        if feature_names:
+            if do_pruning and self.pruned_feature_indices is not None:
+                self.feature_names = [
+                    feature_names[i] for i in self.pruned_feature_indices
+                ]
+            else:
+                self.feature_names = feature_names
+
+        # Step 3: Isotonic Calibration
+        if do_calibration:
+            logger.info("Applying isotonic probability calibration...")
+            self.model = CalibratedClassifierCV(
+                self.base_model,
+                method="isotonic",
+                cv=self.calibration_cv_folds,
+            )
+            self.model.fit(X_train, y_train)
+            self.is_calibrated = True
+            logger.info("Isotonic calibration applied")
+        else:
+            self.model = self.base_model
+            self.is_calibrated = False
+
+        self.is_trained = True
+
+        # Step 4: Evaluate on test set (if provided)
+        metrics = {}
+        
+        if X_test is not None and y_test is not None:
+            y_pred_default = self.model.predict(X_test)
+            y_proba_default = self.model.predict_proba(X_test)[:, 1]
+
+            metrics = {
+                "accuracy": accuracy_score(y_test, y_pred_default),
+                "precision": precision_score(y_test, y_pred_default, zero_division=0),
+                "recall": recall_score(y_test, y_pred_default, zero_division=0),
+                "f1": f1_score(y_test, y_pred_default, zero_division=0),
+                "roc_auc": roc_auc_score(y_test, y_proba_default),
+            }
+
+            # Cross-validation (on base model before calibration)
+            if cv and not do_calibration:
+                # Combine train and test for CV
+                X_cv = np.vstack([X_train, X_test])
+                y_cv = np.concatenate([y_train, y_test])
+                cv_scores = cross_val_score(self.base_model, X_cv, y_cv, cv=5, scoring="f1")
+                metrics["cv_f1_mean"] = cv_scores.mean()
+                metrics["cv_f1_std"] = cv_scores.std()
+                logger.info(
+                    f"Cross-validation F1: {metrics['cv_f1_mean']:.4f} "
+                    f"(+/- {metrics['cv_f1_std']:.4f})"
+                )
+
+            # Step 5: Threshold calibration (optimize for Macro-F1)
+            if calibrate_threshold:
+                logger.info("Calibrating decision threshold for Macro-F1...")
+                optimal_threshold = self.find_optimal_threshold(
+                    X_test, y_test, metric="f1_macro"
+                )
+
+                if optimal_threshold:
+                    self.decision_threshold = optimal_threshold
+                    metrics["optimal_threshold"] = optimal_threshold
+
+                    # Re-evaluate with optimal threshold
+                    y_pred_optimal = self.predict(X_test)
+                    metrics["accuracy_thresholded"] = accuracy_score(y_test, y_pred_optimal)
+                    metrics["precision_thresholded"] = precision_score(
+                        y_test, y_pred_optimal, zero_division=0
+                    )
+                    metrics["recall_thresholded"] = recall_score(
+                        y_test, y_pred_optimal, zero_division=0
+                    )
+                    metrics["f1_thresholded"] = f1_score(
+                        y_test, y_pred_optimal, zero_division=0
+                    )
+
+                    # Macro-F1 (average of F1 for each class)
+                    f1_class0 = f1_score(y_test, y_pred_optimal, pos_label=0)
+                    f1_class1 = f1_score(y_test, y_pred_optimal, pos_label=1)
+                    metrics["macro_f1_thresholded"] = (f1_class0 + f1_class1) / 2
+
+                    logger.info(
+                        f"Optimal threshold: {optimal_threshold:.3f} "
+                        f"(Macro-F1: {metrics.get('macro_f1_thresholded', 0):.4f})"
+                    )
+
+        metrics.update({
+            "feature_pruning_applied": do_pruning,
+            "isotonic_calibration_applied": do_calibration,
+            "original_features": self.original_feature_count,
+            "pruned_features": self.pruned_feature_count,
+        })
+
+        logger.info(f"Training metrics: {metrics}")
+
+        return metrics
+
     def _prune_features(
         self,
         X: np.ndarray,
