@@ -1,22 +1,11 @@
 #!/usr/bin/env python3
 """
-Simple Training Script for Type-IV Code Clone Detector.
+Train Type-IV Semantic Clone Detector.
 
-Train the Sheneamer et al. (2021) based Type-IV clone detector using
-Project CodeNet dataset.
-
-Quick Start:
-    # Basic training (10k samples)
-    poetry run python train.py
-
-    # Train with more data
-    poetry run python train.py --sample-size 20000
-
-    # Multi-language training
-    poetry run python train.py --languages java python csharp
-
-    # Quick test (1k samples)
-    poetry run python train.py --sample-size 1000 --model-name type4_xgb_test.pkl
+Usage:
+    python train.py                          # Use config.yaml defaults
+    python train.py --config config.yaml     # Specify custom config
+    python train.py --sample-size 20000      # Override specific values
 """
 
 import argparse
@@ -24,84 +13,92 @@ import logging
 import sys
 from pathlib import Path
 
-# Add current directory to path
-sys.path.insert(0, str(Path(__file__).parent))
+import yaml
 
 from clone_detection.utils.common_setup import setup_logging
-from train_codenet import train_codenet
 
 logger = setup_logging(__name__)
+
+DEFAULT_CONFIG_PATH = Path(__file__).parent / "config.yaml"
+
+
+def load_config(config_path: Path) -> dict:
+    """Load configuration from YAML file."""
+    with open(config_path, "r") as f:
+        return yaml.safe_load(f)
 
 
 def main():
     """Main training entry point."""
     parser = argparse.ArgumentParser(
-        description="Train Type-IV Code Clone Detector",
+        description="Train Type-IV Semantic Clone Detector",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Full dataset training (all 4 languages, ~500k pairs, several hours)
-  poetry run python train.py --full-dataset --all-languages
+  # Train with default config (Java, 10k samples)
+  python train.py
 
-  # Full dataset training (Java only, ~100k pairs)
-  poetry run python train.py --full-dataset --language java
+  # Train with custom config
+  python train.py --config /path/to/config.yaml
 
-  # Large sample training (100k pairs, recommended for production)
-  poetry run python train.py --all-languages --sample-size 100000
+  # Full dataset training
+  python train.py --full-dataset --language java
 
-  # Medium sample training (10k pairs, ~15-30 minutes)
-  poetry run python train.py --all-languages --sample-size 10000
+  # Multi-language training
+  python train.py --all-languages --sample-size 50000
 
-  # Quick test (1k samples, ~2-3 minutes)
-  poetry run python train.py --sample-size 1000 --model-name type4_xgb_test.pkl
-
-  # Train without visualizations (faster)
-  poetry run python train.py --full-dataset --no-visualize
-
-  # Custom output directory
-  poetry run python train.py --full-dataset --output-dir ./full_training_output
+  # Quick test
+  python train.py --sample-size 1000
         """,
+    )
+
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
+        help="Path to YAML config file (default: config.yaml)",
     )
 
     # Dataset arguments
     parser.add_argument(
         "--dataset",
         type=str,
-        default="../../../../datasets/project-codenet",
-        help="Path to Project CodeNet dataset (default: ../../../../datasets/project-codenet)",
+        default=None,
+        help="Override dataset path",
     )
     parser.add_argument(
         "--language",
         type=str,
-        default="java",
+        default=None,
         choices=["java", "python", "c", "csharp"],
-        help="Programming language to train on (default: java)",
+        help="Override programming language",
     )
     parser.add_argument(
         "--languages",
         type=str,
         nargs="+",
         default=None,
-        help="Multiple languages for multi-language training (e.g., --languages java python c csharp). If not specified, uses --language value.",
+        help="Override multiple languages",
     )
     parser.add_argument(
         "--all-languages",
         action="store_true",
-        help="Train on all 4 languages (java, python, c, csharp). Overrides --language and --languages",
+        default=None,
+        help="Override: train on all 4 languages",
     )
 
     # Model arguments
     parser.add_argument(
         "--model-name",
         type=str,
-        default="type4_xgb_codenet.pkl",
-        help="Name for the saved model file (default: type4_xgb_codenet.pkl)",
+        default=None,
+        help="Override model filename",
     )
     parser.add_argument(
         "--model-dir",
         type=str,
-        default="./models",
-        help="Directory to save trained model (default: ./models)",
+        default=None,
+        help="Override model directory",
     )
 
     # Training arguments
@@ -109,71 +106,61 @@ Examples:
         "--sample-size",
         type=int,
         default=None,
-        help="Number of training pairs to sample (default: None = use full dataset)",
+        help="Override sample size",
     )
     parser.add_argument(
         "--full-dataset",
         action="store_true",
-        help="Use full CodeNet dataset without sampling. Overrides --sample-size",
+        default=None,
+        help="Override: use full dataset",
     )
     parser.add_argument(
         "--clone-ratio",
         type=float,
-        default=0.5,
-        help="Ratio of clone pairs in training data (default: 0.5)",
+        default=None,
+        help="Override clone ratio",
     )
     parser.add_argument(
         "--hard-negative-ratio",
         type=float,
-        default=0.20,
-        help="Ratio of hard negative pairs in training data (default: 0.20)",
+        default=None,
+        help="Override hard negative ratio",
     )
     parser.add_argument(
         "--include-gptclonebench",
         action="store_true",
-        help="Include GPTCloneBench samples for domain adaptation",
-    )
-    parser.add_argument(
-        "--gptclonebench-path",
-        type=str,
-        default="../../../../datasets/gptclonebench/gptclonebench_dataset.jsonl",
-        help="Path to GPTCloneBench dataset (default: ../../../../datasets/gptclonebench/gptclonebench_dataset.jsonl)",
-    )
-    parser.add_argument(
-        "--gptclonebench-ratio",
-        type=float,
-        default=0.10,
-        help="Ratio of GPTCloneBench samples in training data (default: 0.10 = 10%%)",
+        default=None,
+        help="Override: include GPTCloneBench",
     )
     parser.add_argument(
         "--max-problems",
         type=int,
         default=None,
-        help="Maximum number of problems to use per language (speeds up training)",
+        help="Override max problems",
     )
     parser.add_argument(
         "--test-size",
         type=float,
-        default=0.2,
-        help="Fraction of data to use for testing (default: 0.2)",
+        default=None,
+        help="Override test size",
     )
 
     # Output arguments
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="./metrics_output",
-        help="Directory for visualization output (default: ./metrics_output)",
+        default=None,
+        help="Override output directory",
     )
     parser.add_argument(
         "--no-visualize",
         action="store_true",
-        help="Disable visualization generation (faster training)",
+        help="Disable visualizations",
     )
     parser.add_argument(
         "--no-cv",
         action="store_true",
-        help="Disable cross-validation during training (faster)",
+        help="Disable cross-validation",
     )
 
     # Logging
@@ -182,118 +169,116 @@ Examples:
         type=str,
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Logging level (default: INFO)",
+        help="Logging level",
     )
 
     args = parser.parse_args()
 
+    # Load config
+    if not args.config.exists():
+        logger.error(f"Config file not found: {args.config}")
+        logger.info("Using default configuration")
+        config = {}
+    else:
+        config = load_config(args.config)
+
+    # Get training config
+    training_config = config.get("training", {})
+    model_config = training_config.get("model", {})
+    dataset_config = training_config.get("dataset", {})
+    gptclonebench_config = training_config.get("gptclonebench", {})
+    features_config = training_config.get("features", {})
+    xgboost_config = training_config.get("xgboost", {})
+
+    # Build parameters (CLI overrides config)
+    params = {
+        "dataset_path": args.dataset
+        or dataset_config.get("path")
+        or config.get("datasets", {}).get("codenet", {}).get("path"),
+        "language": args.language or dataset_config.get("language", "java"),
+        "languages": (
+            args.languages
+            or (
+                ["java", "python", "c", "csharp"]
+                if (args.all_languages or dataset_config.get("all_languages"))
+                else dataset_config.get("languages")
+            )
+        ),
+        "model_name": args.model_name
+        or model_config.get("name", "type4_xgb_codenet.pkl"),
+        "model_dir": args.model_dir or model_config.get("dir", "./models"),
+        "sample_size": args.sample_size or training_config.get("sample_size"),
+        "full_dataset": args.full_dataset
+        if args.full_dataset is not None
+        else training_config.get("full_dataset", False),
+        "clone_ratio": args.clone_ratio or training_config.get("clone_ratio", 0.5),
+        "hard_negative_ratio": args.hard_negative_ratio
+        or training_config.get("hard_negative_ratio", 0.20),
+        "include_gptclonebench": (
+            args.include_gptclonebench
+            if args.include_gptclonebench is not None
+            else training_config.get("include_gptclonebench", False)
+        ),
+        "gptclonebench_path": gptclonebench_config.get("path")
+        or config.get("datasets", {}).get("gptclonebench", {}).get("path"),
+        "gptclonebench_ratio": gptclonebench_config.get("ratio", 0.10),
+        "max_problems": args.max_problems or training_config.get("max_problems"),
+        "test_size": args.test_size or training_config.get("test_size", 0.2),
+        "output_dir": args.output_dir
+        or model_config.get("output_dir", "./results/train"),
+        "visualize": not args.no_visualize and training_config.get("visualize", True),
+        "cross_validation": not args.no_cv
+        and training_config.get("cross_validation", True),
+        "log_level": args.log_level or training_config.get("log_level", "INFO"),
+        "xgboost_params": xgboost_config if xgboost_config else None,
+    }
+
     # Set logging level
-    logging.getLogger().setLevel(getattr(logging, args.log_level))
+    logging.getLogger().setLevel(getattr(logging, params["log_level"]))
 
-    # Handle --all-languages flag
-    if args.all_languages:
-        args.languages = ["java", "python", "c", "csharp"]
-        logger.info("Training on all 4 languages: java, python, c, csharp")
-    elif args.languages is None:
-        args.languages = [args.language]
-
-    # Handle --full-dataset flag
-    if args.full_dataset:
-        args.sample_size = None
-        logger.info("Using FULL CodeNet dataset (no sampling)")
-    elif args.sample_size is None:
-        # Default sample size for quick testing
-        logger.info("No sample size specified. Use --sample-size or --full-dataset")
-        logger.info(
-            "For production training, use: --full-dataset or --sample-size 100000"
-        )
+    # Handle full_dataset flag
+    if params["full_dataset"]:
+        params["sample_size"] = None
+        logger.info("Using FULL dataset (no sampling)")
 
     # Create model directory
-    model_dir = Path(args.model_dir)
+    model_dir = Path(params["model_dir"])
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    # Model name only (the function handles the path)
-    model_name = args.model_name
+    # Verify dataset exists
+    dataset_path = Path(params["dataset_path"])
+    if not dataset_path.exists():
+        logger.error(f"Dataset not found: {dataset_path}")
+        sys.exit(1)
 
     logger.info("=" * 70)
     logger.info("TYPE-IV CODE CLONE DETECTOR - TRAINING")
     logger.info("=" * 70)
-    logger.info(f"Dataset: {args.dataset}")
-    logger.info(f"Language(s): {args.languages or [args.language]}")
-    sample_size_str = (
-        f"{args.sample_size:,}" if args.sample_size else "Full dataset (capped at 500k)"
-    )
-    logger.info(f"Sample size: {sample_size_str}")
-    logger.info(f"Clone ratio: {args.clone_ratio}")
-    logger.info(f"Hard negative ratio: {args.hard_negative_ratio}")
-    if args.include_gptclonebench:
-        logger.info(
-            f"GPTCloneBench: {args.gptclonebench_path} ({args.gptclonebench_ratio * 100:.0f}%)"
-        )
-    else:
-        logger.info(
-            "GPTCloneBench: Not included (use --include-gptclonebench to enable)"
-        )
-    logger.info(f"Model output: {model_dir / model_name}")
-    logger.info(f"Visualizations: {'Enabled' if not args.no_visualize else 'Disabled'}")
+    logger.info(f"Dataset: {dataset_path}")
+    logger.info(f"Language(s): {params['languages'] or [params['language']]}")
+    logger.info(f"Sample size: {params['sample_size'] or 'Full dataset'}")
+    logger.info(f"Model output: {model_dir / params['model_name']}")
     logger.info("=" * 70)
 
-    # Verify dataset exists
-    dataset_path = Path(args.dataset)
-    if not dataset_path.exists():
-        logger.error(f"Dataset not found: {dataset_path}")
-        logger.info(
-            "Please ensure the CodeNet dataset is available at the specified path."
-        )
-        sys.exit(1)
+    # Import and run training
+    from train_codenet_core import train_codenet
 
-    # Train model
     try:
-        metrics = train_codenet(
-            dataset_path=args.dataset,
-            language=args.language,
-            languages=args.languages,
-            model_name=model_name,
-            sample_size=args.sample_size,
-            clone_ratio=args.clone_ratio,
-            hard_negative_ratio=args.hard_negative_ratio,
-            include_gptclonebench=args.include_gptclonebench,
-            gptclonebench_path=args.gptclonebench_path,
-            gptclonebench_ratio=args.gptclonebench_ratio,
-            test_size=args.test_size,
-            cross_validation=not args.no_cv,
-            visualize=not args.no_visualize,
-            output_dir=args.output_dir,
-            max_problems=args.max_problems,
-        )
+        metrics = train_codenet(**params)
 
-        # Print results
         logger.info("\n" + "=" * 70)
         logger.info("TRAINING COMPLETE")
         logger.info("=" * 70)
-        logger.info(f"\nModel saved to: {(model_dir / model_name).absolute()}")
+        logger.info(f"Model saved to: {(model_dir / params['model_name']).absolute()}")
 
-        logger.info("\nPerformance Metrics:")
-        for key, value in metrics.items():
-            if isinstance(value, float):
-                logger.info(f"  {key.replace('_', ' ').title()}: {value:.4f}")
-            elif key == "visualization_path":
-                logger.info(f"  Visualizations: {value}")
+        if metrics:
+            logger.info("\nPerformance Metrics:")
+            for key, value in metrics.items():
+                if isinstance(value, float):
+                    logger.info(f"  {key.replace('_', ' ').title()}: {value:.4f}")
 
-        logger.info("\n" + "=" * 70)
-        logger.info("Next Steps:")
-        logger.info("  1. Evaluate the model:")
-        logger.info("     poetry run python evaluate.py \\")
-        logger.info(f"       --model {model_dir / model_name} \\")
-        logger.info(
-            "       --dataset ../../../../datasets/gptclonebench/gptclonebench_dataset.jsonl \\"
-        )
-        logger.info("       --dataset-format gptclonebench \\")
-        logger.info("       --visualize")
-        logger.info("\n  2. Or use the pipeline script:")
-        logger.info("     poetry run python run_pipeline.py --evaluate \\")
-        logger.info(f"       --model {model_dir / model_name} \\")
-        logger.info("       --eval-datasets gptclonebench")
+        logger.info("\nNext step: Evaluate the model")
+        logger.info("  python evaluate.py")
         logger.info("=" * 70)
 
     except Exception as e:
