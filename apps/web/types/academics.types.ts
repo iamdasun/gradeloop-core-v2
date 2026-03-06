@@ -448,3 +448,32 @@ export interface StudentCourseEnrollment {
   final_grade?: string;
   enrolled_at: string;
 }
+
+// ─── Instructor enrollment helpers ───────────────────────────────────────────
+
+/**
+ * Batch metadata enriched with enrollment counts for a course instance.
+ * Returned by GET /instructor-courses/batches and
+ * GET /instructor-courses/:id/enrolled-batches.
+ */
+export interface EnrolledBatchStats {
+  batch_id: string;
+  name: string;
+  code: string;
+  start_year: number;
+  end_year: number;
+  is_active: boolean;
+  total_members: number;
+  enrolled_count: number;
+}
+
+/**
+ * Partial-success result from POST /instructor-courses/:id/enroll-batch.
+ */
+export interface EnrollBatchResult {
+  enrolled: number;
+  skipped: number;
+  total: number;
+  skipped_users: string[];
+}
+
