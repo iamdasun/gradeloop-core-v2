@@ -1,6 +1,7 @@
 {
   "features": [
     "feat_levenshtein_ratio",
+    "token_cosine",
     "token_edit_similarity",
     "token_lcs_similarity",
     "subtree_similarity",
@@ -11,8 +12,6 @@
     "feat_node_try_statement_diff",
     "feat_node_catch_clause_diff",
     "feat_node_finally_clause_diff",
-    "feat_node_method_invocation_diff",
-    "feat_node_class_declaration_diff",
-    "feat_node_field_declaration_diff"
+    "feat_node_method_invocation_diff"
   ]
 }

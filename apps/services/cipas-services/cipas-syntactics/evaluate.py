@@ -27,6 +27,13 @@ Usage:
     poetry run python evaluate.py
     poetry run python evaluate.py --model models/clone_detector_xgb.pkl --sample-size 2000
     poetry run python evaluate.py --clone-types 3 --threshold 0.25
+
+Note:
+    For full BigCloneBench dataset evaluation with parallel processing,
+    use evaluate_parallel.py instead:
+
+    poetry run python evaluate_parallel.py --dataset full --workers 16
+    poetry run python evaluate_parallel.py --dataset 100k --workers 8
 """
 
 import argparse
