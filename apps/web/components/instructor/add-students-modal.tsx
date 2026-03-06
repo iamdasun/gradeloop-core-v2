@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetDescription,
-} from "@/components/ui/sheet";
+    SideDialog,
+    SideDialogContent,
+    SideDialogHeader,
+    SideDialogTitle,
+    SideDialogDescription,
+} from "@/components/ui/side-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -476,15 +476,15 @@ export function AddStudentsModal({
     onEnrolled,
 }: AddStudentsModalProps) {
     return (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-full sm:max-w-2xl flex flex-col p-6 h-full gap-4 border-l-border/40">
-                <SheetHeader className="pb-4 border-b border-border/40 shrink-0">
-                    <SheetTitle className="text-2xl font-bold font-heading">Add Students</SheetTitle>
-                    <SheetDescription>
+        <SideDialog open={open} onOpenChange={onOpenChange}>
+            <SideDialogContent className="sm:max-w-2xl overflow-hidden">
+                <SideDialogHeader>
+                    <SideDialogTitle>Add Students</SideDialogTitle>
+                    <SideDialogDescription>
                         Enroll students individually or enroll an entire batch at once.
                         Already-enrolled students are skipped automatically.
-                    </SheetDescription>
-                </SheetHeader>
+                    </SideDialogDescription>
+                </SideDialogHeader>
 
                 <Tabs defaultValue="students" className="flex-1 flex flex-col min-h-0 gap-4">
                     <TabsList className="shrink-0 w-fit">
@@ -515,7 +515,7 @@ export function AddStudentsModal({
                         />
                     </TabsContent>
                 </Tabs>
-            </SheetContent>
-        </Sheet>
+            </SideDialogContent>
+        </SideDialog>
     );
 }
