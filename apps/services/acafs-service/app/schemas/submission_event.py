@@ -1,7 +1,7 @@
 """Schema definitions for submission events and AST blueprints."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -43,6 +43,35 @@ class ASTBlueprint(BaseModel):
     raw_ast: Optional[dict[str, Any]] = None
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Rubric models – forwarded from assessment-service via the submission event
+# ─────────────────────────────────────────────────────────────────────────────
+
+GradingMode = Literal["deterministic", "llm", "llm_ast"]
+
+
+class RubricBand(BaseModel):
+    """Performance band descriptor within a rubric criterion."""
+    description: str
+    min_mark: float
+    max_mark: float
+
+
+class RubricCriterion(BaseModel):
+    """Single graded criterion in a rubric.
+
+    grading_mode controls which evaluation path is used:
+    - deterministic : scored solely from Judge0 test-case pass/fail counts.
+    - llm           : scored by Gemini reasoning over student code and sample answer.
+    - llm_ast       : scored by Gemini reasoning enriched with AST structural evidence.
+    """
+    name: str
+    description: str
+    grading_mode: GradingMode
+    weight: float  # max marks this criterion contributes to total_score
+    bands: Optional[dict[str, RubricBand]] = None  # excellent/good/satisfactory/unsatisfactory
+
+
 class SubmissionEvent(BaseModel):
     """Submission event from RabbitMQ."""
     submission_id: UUID
@@ -64,13 +93,18 @@ class SubmissionEvent(BaseModel):
 
     # Assignment metadata (used as LLM prompt context):
     assessment_type: Optional[str] = None        # "lab" | "exam"
+    assignment_title: Optional[str] = None       # short title shown to model
+    assignment_description: Optional[str] = None # full problem description
     objective: Optional[str] = None              # free-text learning objective
 
-    # Test cases that were used for deterministic evaluation in the worker.
+    # Rubric: list of criteria that define how the submission is graded.
+    rubric: Optional[list[RubricCriterion]] = None
+
+    # Test cases used for deterministic evaluation.
     # Structure: [{id, input, expected_output}]
     test_cases: Optional[list[dict[str, Any]]] = None
 
-    # Reference implementation / sample answer for similarity comparison.
+    # Reference implementation / sample answer for LLM comparison.
     # Structure: {language_id: int, code: str}
     sample_answer: Optional[dict[str, Any]] = None
 
