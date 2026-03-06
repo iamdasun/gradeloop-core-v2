@@ -38,6 +38,7 @@
     "react": "19.2.3",
     "react-day-picker": "^9.13.2",
     "react-dom": "19.2.3",
+    "react-use-audio-recorder": "^0.4.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "zustand": "^5.0.11"

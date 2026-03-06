@@ -327,6 +327,7 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
             <div className="flex flex-col flex-1 overflow-hidden">
               <span className="font-semibold text-sm truncate">{displayName}</span>
               <span className="text-xs text-muted-foreground truncate capitalize">{user?.user_type || 'Member'}</span>
+              <span className="text-xs text-muted-foreground truncate capitalize">{user?.user_type || 'Member'}</span>
             </div>
           </div>
           <Button

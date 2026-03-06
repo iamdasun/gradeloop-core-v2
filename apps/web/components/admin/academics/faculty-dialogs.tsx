@@ -182,8 +182,8 @@ function LeadersEditor({
                         <option value="">Select employee…</option>
                         {employees.map((emp) => (
                           <option key={emp.id} value={emp.id}>
-                            {emp.email}
-                            {emp.designation ? ` — ${emp.designation}` : ''}
+                            {emp.full_name}
+                            {emp.designation ? ` — ${emp.designation}` : ""}
                           </option>
                         ))}
                       </select>

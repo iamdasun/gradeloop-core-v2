@@ -91,6 +91,27 @@ export default function CourseInstanceAssessmentsPage() {
         return () => { mounted = false; };
     }, [instanceId]);
 
+    // Group assignments by course
+    const assignmentsByCourse = React.useMemo(() => {
+        const grouped = new Map<string, { course: CourseInstructor | null; assignments: AssignmentResponse[] }>();
+        
+        assignments.forEach(assignment => {
+            const course = courses.find(c => c.course_instance_id === assignment.course_instance_id);
+            const key = assignment.course_instance_id;
+            
+            if (!grouped.has(key)) {
+                grouped.set(key, { course: course || null, assignments: [] });
+            }
+            grouped.get(key)!.assignments.push(assignment);
+        });
+        
+        return Array.from(grouped.entries()).map(([instanceId, data]) => ({
+            instanceId,
+            course: data.course,
+            assignments: data.assignments
+        }));
+    }, [assignments, courses]);
+
     const handleCreateAssignment = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!instanceId || !title || !languageCode) return;
@@ -283,6 +304,7 @@ export default function CourseInstanceAssessmentsPage() {
                     </CardContent>
                 </Card>
             ) : (
+<<<<<<<< HEAD:apps/web/app/(dashboard)/instructor/courses/[instanceId]/assessments/page.tsx
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {assignments.map((assignment) => (
                         <Link key={assignment.id} href={`/instructor/assessments/${assignment.id}`} prefetch={false} className="block group">
@@ -303,8 +325,52 @@ export default function CourseInstanceAssessmentsPage() {
                                         {assignment.description && (
                                             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{assignment.description}</p>
                                         )}
+========
+                <div className="flex flex-col gap-8">
+                    {assignmentsByCourse.map(({ instanceId, course, assignments: courseAssignments }) => {
+                        const courseName = course 
+                            ? `${course.course_code} - ${course.course_title}`
+                            : `Instance ${instanceId.substring(0, 8)}...`;
+                        
+                        return (
+                            <div key={instanceId} className="flex flex-col gap-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-lg font-bold">{courseName}</h2>
+                                        <p className="text-xs text-muted-foreground font-mono">
+                                            Instance: {instanceId}
+                                        </p>
+>>>>>>>> 6fe1f91c17cf8891700450af0198ac1dbd57eea2:apps/web/app/(dashboard)/instructor/assessments/page.tsx
                                     </div>
+                                    <Link href={`/instructor/courses/${instanceId}/assessments`}>
+                                        <Button variant="ghost" size="sm">
+                                            View All →
+                                        </Button>
+                                    </Link>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    {courseAssignments.map((assignment) => (
+                                        <Link key={assignment.id} href={`/instructor/assessments/${assignment.id}`} prefetch={false} className="block group">
+                                            <Card className="h-full border-border/60 hover:border-primary/30 hover:shadow-md transition-all duration-200 bg-background flex flex-col">
+                                                <CardContent className="p-6 flex flex-col gap-4 flex-1">
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                                                            <FileText className="h-5 w-5 text-primary" />
+                                                        </div>
+                                                        {assignment.is_active ? (
+                                                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
+                                                        ) : (
+                                                            <Badge variant="secondary">Draft</Badge>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h3 className="font-bold text-lg line-clamp-1" title={assignment.title}>{assignment.title}</h3>
+                                                        {assignment.description && (
+                                                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{assignment.description}</p>
+                                                        )}
+                                                    </div>
 
+<<<<<<<< HEAD:apps/web/app/(dashboard)/instructor/courses/[instanceId]/assessments/page.tsx
                                     <div className="flex flex-col gap-2 mt-2">
                                         <div className="flex items-center text-xs text-muted-foreground">
                                             <Terminal className="h-3 w-3 mr-1.5" />
@@ -325,6 +391,26 @@ export default function CourseInstanceAssessmentsPage() {
                             </Card>
                         </Link>
                     ))}
+========
+                                                    <div className="flex flex-col gap-2 mt-2">
+                                                        <div className="flex items-center text-xs text-muted-foreground">
+                                                            <Terminal className="h-3 w-3 mr-1.5" />
+                                                            <span>Language: <span className="font-semibold text-foreground capitalize">{assignment.code}</span></span>
+                                                        </div>
+                                                        <div className="flex items-center text-xs text-muted-foreground">
+                                                            <Calendar className="h-3 w-3 mr-1.5" />
+                                                            <span>Created: {format(new Date(assignment.created_at), 'MMM d, yyyy')}</span>
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+>>>>>>>> 6fe1f91c17cf8891700450af0198ac1dbd57eea2:apps/web/app/(dashboard)/instructor/assessments/page.tsx
                 </div>
             )}
         </div>
