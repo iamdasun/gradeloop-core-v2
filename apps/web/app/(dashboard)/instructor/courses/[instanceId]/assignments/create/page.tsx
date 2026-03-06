@@ -44,6 +44,11 @@ import {
     Save,
 } from "lucide-react";
 
+// ─── Allowed Judge0 language IDs for assignment creation ─────────────────────
+// C (GCC 9.2.0, Clang 7.0.1), C++ (GCC 9.2.0, GCC 14.1.0),
+// C# (Mono 6.6.0.161), Python (3.8.1, 3.11.2), Java (OpenJDK 13, JDK 17)
+const ALLOWED_LANGUAGE_IDS = [50, 75, 54, 105, 51, 71, 92, 62, 91];
+
 // ─── Assessment type grid options ─────────────────────────────────────────────
 
 const ASSIGNMENT_TYPES = [
@@ -465,6 +470,7 @@ export default function CreateAssignmentPage() {
                             </div>
                             <LanguageSelector
                                 value={settings.language_id}
+                                allowedIds={ALLOWED_LANGUAGE_IDS}
                                 onChange={(id) => {
                                     updateSettings({ language_id: id });
                                     // Sync sample answer language unless user already changed it
@@ -822,6 +828,7 @@ export default function CreateAssignmentPage() {
                                 <Label className="text-sm font-semibold">Language</Label>
                                 <LanguageSelector
                                     value={sampleAnswer.language_id}
+                                    allowedIds={ALLOWED_LANGUAGE_IDS}
                                     onChange={(id) => updateSampleAnswer({ language_id: id })}
                                 />
                             </div>
