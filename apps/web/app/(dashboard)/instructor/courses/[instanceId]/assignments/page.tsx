@@ -23,8 +23,7 @@ import {
 function deriveStatus(a: AssignmentResponse): "Draft" | "Active" | "Closed" {
     if (!a.is_active) return "Draft";
     if (a.due_at && new Date(a.due_at) < new Date()) return "Closed";
-    if (a.submission_config?.submission_allowed) return "Active";
-    return "Draft";
+    return "Active";
 }
 
 export default function InstructorAssignmentsPage() {

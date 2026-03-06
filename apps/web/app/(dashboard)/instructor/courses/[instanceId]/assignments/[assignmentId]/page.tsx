@@ -78,8 +78,9 @@ export default function InstructorAssignmentDetailsPage() {
 
     // Derive status
     let status = "Draft";
-    if (assignment?.is_active && assignment.submission_config?.submission_allowed) status = "Active";
-    if (assignment?.due_at && new Date(assignment.due_at) < new Date()) status = "Closed";
+    if (assignment?.is_active) {
+        status = assignment.due_at && new Date(assignment.due_at) < new Date() ? "Closed" : "Active";
+    }
 
     const enabledTools = [];
     if (assignment?.enable_ai_assistant) enabledTools.push("ACAFS", "CIPAS");
