@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useAssignmentCreateStore } from "@/lib/stores/assignmentCreateStore";
+import { useUIStore } from "@/lib/stores/uiStore";
 import { instructorAssessmentsApi } from "@/lib/api/assessments";
 import { handleApiError } from "@/lib/api/axios";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, Trash2, CheckCircle2, Eye, AlertCircle, ArrowLeft } from "lucide-react";
+import { Loader2, Plus, Trash2, CheckCircle2, Eye, AlertCircle } from "lucide-react";
 
 const ASSESSMENT_TYPES = ["Homework", "Quiz", "Midterm", "Final Exam", "Lab", "Project", "Assignment"];
 
@@ -46,12 +47,34 @@ export default function CreateAssignmentPage() {
     const instanceId = params.instanceId as string;
 
     const { currentStep, steps, setStep, setHighestStepVisited, reset } = useAssignmentCreateStore();
+    const pushSecondarySidebar = useUIStore((s) => s.pushSecondarySidebar);
+    const popSecondarySidebar = useUIStore((s) => s.popSecondarySidebar);
+    const setPageTitle = useUIStore((s) => s.setPageTitle);
 
     // On mount, ensure we start at step 1
     React.useEffect(() => {
         reset();
         return () => reset(); // Cleanup on unmount
     }, [reset]);
+
+    // Override the course sidebar with steps progress sidebar
+    React.useEffect(() => {
+        setPageTitle("Create Assignment");
+        pushSecondarySidebar({
+            title: "Create Assignment",
+            subtitle: undefined,
+            backHref: `/instructor/courses/${instanceId}/assignments`,
+            backLabel: "Cancel",
+            basePath: `/instructor/courses/${instanceId}/assignments/create`,
+            items: [],
+            mode: "steps",
+        });
+        return () => {
+            popSecondarySidebar();
+            setPageTitle(null);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [instanceId]);
 
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [submitError, setSubmitError] = React.useState<string | null>(null);
@@ -167,20 +190,10 @@ export default function CreateAssignmentPage() {
     return (
         <div className="max-w-4xl mx-auto w-full flex flex-col min-h-[calc(100vh-140px)] animate-in fade-in duration-300">
             <div className="mb-8">
-                <Button variant="ghost" size="sm" asChild className="mb-4 h-8 px-2 text-muted-foreground hover:text-foreground -ml-2">
-                    <Link href={`/instructor/courses/${instanceId}/assignments`}>
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Cancel Creation
-                    </Link>
-                </Button>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold font-heading tracking-tight">Create Assignment</h1>
-                        <p className="text-muted-foreground mt-1">
-                            Step {currentStep} of {steps.length}: {steps[currentStep - 1]?.title}
-                        </p>
-                    </div>
-                </div>
+                <h1 className="text-2xl font-bold font-heading tracking-tight">Create Assignment</h1>
+                <p className="text-muted-foreground text-sm mt-1">
+                    Step {currentStep} of {steps.length}: {steps[currentStep - 1]?.title}
+                </p>
             </div>
 
             <div className="flex-1 bg-card border border-border/60 shadow-sm rounded-xl overflow-hidden p-6 md:p-8 relative">

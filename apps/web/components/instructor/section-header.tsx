@@ -18,7 +18,7 @@ export function SectionHeader({
 }: SectionHeaderProps) {
     return (
         <div
-            className={cn("flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-6", className)}
+            className={cn("flex flex-col sm:flex-row sm:items-center justify-between gap-4", className)}
             {...props}
         >
             <div className="flex items-start sm:items-center gap-3">
