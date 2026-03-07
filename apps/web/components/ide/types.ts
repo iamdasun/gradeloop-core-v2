@@ -13,6 +13,8 @@ export interface CodeIDEProps {
   theme?: "light" | "dark";
   showSubmitButton?: boolean;
   showAIAssistant?: boolean;
+  /** When true the language selector is disabled — language is fixed by the assignment. */
+  lockLanguage?: boolean;
   /** When true a "Results" tab is shown in the right panel. */
   showGradePanel?: boolean;
   /** The grading result from ACAFS. Null while pending or unavailable. */

@@ -33,6 +33,7 @@ export function CodeIDE({
   showSubmitButton = false,
   showAIAssistant = false,
   showGradePanel = false,
+  lockLanguage = false,
   grade = null,
   isGrading = false,
 }: CodeIDEProps) {
@@ -72,7 +73,7 @@ export function CodeIDE({
       }
 
       const savedLanguage = localStorage.getItem(STORAGE_KEYS.LAST_LANGUAGE);
-      if (savedLanguage && !initialLanguage) {
+      if (savedLanguage && !initialLanguage && !lockLanguage) {
         setLanguage(parseInt(savedLanguage, 10));
       }
     }
@@ -264,7 +265,7 @@ export function CodeIDE({
         isExecuting={isExecuting}
         language={language}
         onLanguageChange={handleLanguageChange}
-        languageSelectorDisabled={readOnly || isExecuting}
+        languageSelectorDisabled={readOnly || isExecuting || lockLanguage}
       />
     </div>
   );

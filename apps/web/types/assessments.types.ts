@@ -53,6 +53,8 @@ export interface CreateAssignmentRequest {
     title: string;
     description: string;
     code: string;
+    /** Judge0 language ID chosen by the instructor (e.g. 62 = Java, 71 = Python). */
+    language_id?: number;
     release_at?: string | null;
     due_at?: string | null;
     late_due_at?: string | null;
@@ -76,6 +78,8 @@ export interface AssignmentResponse {
     title: string;
     description: string;
     code: string;
+    /** Judge0 language ID set by the instructor (e.g. 62 = Java, 71 = Python). */
+    language_id: number;
     assessment_type?: string;
     release_at?: string;
     due_at?: string;

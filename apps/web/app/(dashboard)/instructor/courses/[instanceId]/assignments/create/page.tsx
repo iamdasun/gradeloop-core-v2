@@ -51,9 +51,12 @@ import {
 } from "lucide-react";
 
 // ─── Allowed Judge0 language IDs for assignment creation ─────────────────────
-// C (GCC 9.2.0, Clang 7.0.1), C++ (GCC 9.2.0, GCC 14.1.0),
-// C# (Mono 6.6.0.161), Python (3.8.1, 3.11.2), Java (OpenJDK 13, JDK 17)
-const ALLOWED_LANGUAGE_IDS = [50, 75, 54, 105, 51, 71, 92, 62, 91];
+// Verified against Judge0 at http://4.224.42.143:2358/languages — only IDs that
+// actually exist on this instance AND have ACAFS AST support are listed.
+// C (GCC 9.2.0 / Clang 7.0.1), C++ (GCC 9.2.0 / Clang 7.0.1),
+// C# (Mono 6.6.0.161), Python (3.8.1), Java (OpenJDK 13.0.1),
+// JavaScript (Node.js 12.14.0), TypeScript (3.7.4), Go (1.13.5)
+const ALLOWED_LANGUAGE_IDS = [71, 62, 54, 76, 50, 75, 51, 63, 74, 60];
 
 // ─── Assessment type grid options ─────────────────────────────────────────────
 
@@ -344,6 +347,7 @@ export default function CreateAssignmentPage() {
         title: assignment.name.trim(),
         description: assignment.description.trim(),
         code: makeSlug(assignment.name),
+        language_id: settings.language_id,
         release_at: settings.release_date
           ? new Date(settings.release_date).toISOString()
           : null,

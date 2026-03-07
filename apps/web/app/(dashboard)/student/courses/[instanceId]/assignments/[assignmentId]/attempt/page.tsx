@@ -25,7 +25,8 @@ import { useUIStore } from "@/lib/stores/uiStore";
 import { toast } from "sonner";
 import { format, isPast } from "date-fns";
 
-// Map assignment language code strings to Judge0 language IDs
+// Map assignment language code strings to Judge0 language IDs.
+// Only IDs verified to exist on this Judge0 instance (/languages) are used.
 const LANGUAGE_CODE_TO_ID: Record<string, number> = {
     python: 71,
     python3: 71,
@@ -38,8 +39,10 @@ const LANGUAGE_CODE_TO_ID: Record<string, number> = {
     ts: 74,
     java: 62,
     c: 50,
+    clang_c: 75,
     cpp: 54,
     "c++": 54,
+    clang_cpp: 76,
     csharp: 51,
     "c#": 51,
     rust: 73,
@@ -52,16 +55,19 @@ const LANGUAGE_CODE_TO_ID: Record<string, number> = {
     r: 80,
 };
 
-// Reverse map: Judge0 language ID → canonical language name string
+// Reverse map: Judge0 language ID → canonical language name string.
+// IDs 91/92/93/94/95/105 removed — they do NOT exist on this Judge0 instance.
 const LANGUAGE_ID_TO_NAME: Record<number, string> = {
     71: "python",
-    60: "go",
+    62: "java",
+    54: "cpp",
+    76: "cpp",
+    50: "c",
+    75: "c",
+    51: "csharp",
     63: "javascript",
     74: "typescript",
-    62: "java",
-    50: "c",
-    54: "cpp",
-    51: "csharp",
+    60: "go",
     73: "rust",
     72: "ruby",
     68: "php",
@@ -70,14 +76,6 @@ const LANGUAGE_ID_TO_NAME: Record<number, string> = {
     81: "scala",
     61: "haskell",
     80: "r",
-    // Extended Judge0 IDs (newer versions)
-    92: "python",
-    91: "java",
-    93: "javascript",
-    94: "typescript",
-    95: "go",
-    75: "c",
-    76: "cpp",
 };
 
 function getLanguageId(code: string): number {
@@ -250,7 +248,9 @@ export default function StudentAttemptPage() {
 
     const isReadOnly = !!viewSubmissionId;
     const isOverdue = assignment.due_at ? isPast(new Date(assignment.due_at)) : false;
-    const languageId = getLanguageId(assignment.code);
+	// Use the language_id stored on the assignment (set by the instructor).
+	// Fall back to 71 (Python) only if missing (e.g. old assignments without the field).
+	const languageId = assignment.language_id || getLanguageId(assignment.code);
 
     return (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">
@@ -397,6 +397,7 @@ export default function StudentAttemptPage() {
                         userId={user?.id ?? "anonymous"}
                         initialCode={initialCode}
                         initialLanguage={languageId}
+                        lockLanguage={true}
                         readOnly={isReadOnly}
                         showSubmitButton={!isReadOnly && (!isOverdue || assignment.allow_late_submissions)}
                         showAIAssistant={assignment.enable_ai_assistant}
