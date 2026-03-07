@@ -17,8 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CodeIDE } from "@/components/ide";
-import { studentAssessmentsApi } from "@/lib/api/assessments";
-import type { AssignmentResponse } from "@/types/assessments.types";
+import { studentAssessmentsApi, acafsApi } from "@/lib/api/assessments";
+import type { AssignmentResponse, SubmissionGrade } from "@/types/assessments.types";
 import { handleApiError } from "@/lib/api/axios";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { toast } from "sonner";
@@ -51,6 +51,34 @@ const LANGUAGE_CODE_TO_ID: Record<string, number> = {
     r: 80,
 };
 
+// Reverse map: Judge0 language ID → canonical language name string
+const LANGUAGE_ID_TO_NAME: Record<number, string> = {
+    71: "python",
+    60: "go",
+    63: "javascript",
+    74: "typescript",
+    62: "java",
+    50: "c",
+    54: "cpp",
+    51: "csharp",
+    73: "rust",
+    72: "ruby",
+    68: "php",
+    83: "swift",
+    78: "kotlin",
+    81: "scala",
+    61: "haskell",
+    80: "r",
+    // Extended Judge0 IDs (newer versions)
+    92: "python",
+    91: "java",
+    93: "javascript",
+    94: "typescript",
+    95: "go",
+    75: "c",
+    76: "cpp",
+};
+
 function getLanguageId(code: string): number {
     return LANGUAGE_CODE_TO_ID[code.toLowerCase().trim()] ?? 71;
 }
@@ -71,6 +99,60 @@ export default function StudentAttemptPage() {
     const [submittedVersion, setSubmittedVersion] = React.useState<number | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [showBrief, setShowBrief] = React.useState(true);
+
+    // Grade polling state
+    // gradedSubmissionId is set after a new submit OR pre-set to viewSubmissionId
+    // so that read-only views can also show a pre-existing grade.
+    const [gradedSubmissionId, setGradedSubmissionId] = React.useState<string | null>(
+        viewSubmissionId ?? null
+    );
+    const [grade, setGrade] = React.useState<SubmissionGrade | null>(null);
+    const [isGrading, setIsGrading] = React.useState(false);
+
+    // Poll ACAFS for grade results with exponential back-off.
+    // ACAFS returns 404 while grading is pending; 200 when complete.
+    React.useEffect(() => {
+        if (!gradedSubmissionId) return;
+        let cancelled = false;
+        let attempts = 0;
+        const MAX_ATTEMPTS = 45; // ~3 min cap
+
+        setGrade(null);
+        setIsGrading(true);
+
+        async function poll() {
+            if (cancelled) return;
+            if (attempts >= MAX_ATTEMPTS) {
+                setIsGrading(false);
+                return;
+            }
+            attempts++;
+            try {
+                const g = await acafsApi.getSubmissionGrade(gradedSubmissionId!);
+                if (!cancelled) {
+                    setGrade(g);
+                    setIsGrading(false);
+                }
+            } catch (e) {
+                if (cancelled) return;
+                if (e instanceof Error && e.message === "GRADING_PENDING") {
+                    // Exponential back-off: 3s, 4.5s, 6.75s … capped at 30s
+                    const delay = Math.min(3000 * Math.pow(1.5, Math.min(attempts - 1, 7)), 30000);
+                    setTimeout(poll, delay);
+                } else {
+                    // Non-404 error or grading not enabled — stop quietly
+                    setIsGrading(false);
+                }
+            }
+        }
+
+        // Small initial delay to let the worker start
+        const timer = setTimeout(poll, 3000);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [gradedSubmissionId]);
 
     React.useEffect(() => {
         let mounted = true;
@@ -121,10 +203,13 @@ export default function StudentAttemptPage() {
             setError(null);
             const submission = await studentAssessmentsApi.submit({
                 assignment_id: assignment.id,
-                language: assignment.code,
+                language: LANGUAGE_ID_TO_NAME[languageId] ?? "python",
+                language_id: languageId,
                 code,
             });
             setSubmittedVersion(submission.version);
+            // Trigger grade polling for this new submission
+            setGradedSubmissionId(submission.id);
             toast.success(`Submitted successfully! Version ${submission.version}`);
         } catch (err) {
             const msg = handleApiError(err);
@@ -309,6 +394,9 @@ export default function StudentAttemptPage() {
                         readOnly={isReadOnly}
                         showSubmitButton={!isReadOnly && (!isOverdue || assignment.allow_late_submissions)}
                         showAIAssistant={assignment.enable_ai_assistant}
+                        showGradePanel={true}
+                        grade={grade}
+                        isGrading={isGrading}
                         onSubmit={handleSubmit}
                     />
                 </div>
