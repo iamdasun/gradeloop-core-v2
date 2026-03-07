@@ -18,7 +18,6 @@ import {
     ChevronDown,
     ChevronUp,
     Trophy,
-    MessageSquare,
     Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,9 +25,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { studentAssessmentsApi } from "@/lib/api/assessments";
-import type { AssignmentResponse, SubmissionResponse } from "@/types/assessments.types";
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+} from "@/components/ui/sheet";
+import { studentAssessmentsApi, acafsApi } from "@/lib/api/assessments";
+import type { AssignmentResponse, SubmissionResponse, SubmissionGrade } from "@/types/assessments.types";
 import { handleApiError } from "@/lib/api/axios";
+import { GradeResultPanel } from "@/components/assessments/grade-result-panel";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 
 function submissionStatusBadge(status: string) {
@@ -56,6 +62,10 @@ export default function StudentAssignmentDetailPage() {
     const [isLoading, setIsLoading] = React.useState(true);
     const [error, setError] = React.useState<string | null>(null);
     const [historyExpanded, setHistoryExpanded] = React.useState(false);
+    const [latestGrade, setLatestGrade] = React.useState<SubmissionGrade | null>(null);
+    const [isGradeLoading, setIsGradeLoading] = React.useState(false);
+    const [selectedGrade, setSelectedGrade] = React.useState<SubmissionGrade | null>(null);
+    const [selectedGradeLoading, setSelectedGradeLoading] = React.useState(false);
 
     React.useEffect(() => {
         let mounted = true;
@@ -70,6 +80,16 @@ export default function StudentAssignmentDetailPage() {
                 if (mounted) {
                     setAssignment(assignmentData);
                     setSubmissions(submissionsData.sort((a, b) => b.version - a.version));
+
+                    // Eagerly fetch grade for the latest submission (may be 404 if not graded yet).
+                    const latestSub = submissionsData.find((s) => s.is_latest);
+                    if (latestSub) {
+                        setIsGradeLoading(true);
+                        acafsApi.getSubmissionGrade(latestSub.id)
+                            .then((g) => { if (mounted) setLatestGrade(g); })
+                            .catch(() => { /* not graded yet — silent */ })
+                            .finally(() => { if (mounted) setIsGradeLoading(false); });
+                    }
                 }
             } catch (err) {
                 if (mounted) setError(handleApiError(err));
@@ -108,15 +128,22 @@ export default function StudentAssignmentDetailPage() {
     }
 
     const latestSubmission = submissions.find((s) => s.is_latest);
-    const isGraded = latestSubmission?.status?.toLowerCase() === "graded" ||
-        latestSubmission?.status?.toLowerCase() === "marked";
-    const isDraft = latestSubmission?.status?.toLowerCase() === "draft";
-    const isSubmitted = latestSubmission?.status?.toLowerCase() === "submitted";
     const isOverdue = assignment.due_at ? isPast(new Date(assignment.due_at)) : false;
 
     const visibleHistory = historyExpanded ? submissions : submissions.slice(0, 3);
 
+    // Handler for lazy-loading a non-latest submission’s grade
+    const handleViewGrade = (sub: SubmissionResponse) => {
+        setSelectedGrade(null);
+        setSelectedGradeLoading(true);
+        acafsApi.getSubmissionGrade(sub.id)
+            .then(setSelectedGrade)
+            .catch(() => setSelectedGrade(null))
+            .finally(() => setSelectedGradeLoading(false));
+    };
+
     return (
+        <>
         <div className="flex flex-col gap-8 pb-8">
             {/* Back navigation */}
             <div>
@@ -157,12 +184,12 @@ export default function StudentAssignmentDetailPage() {
                         <div className="flex gap-2">
                             <Button asChild>
                                 <Link href={`/student/courses/${instanceId}/assignments/${assignmentId}/attempt`} target="_blank" rel="noopener noreferrer">
-                                    {isDraft ? (
+                                    {latestSubmission?.status?.toLowerCase() === "draft" ? (
                                         <>
                                             <Play className="h-4 w-4 mr-2" />
                                             Continue Draft
                                         </>
-                                    ) : isSubmitted || isGraded ? (
+                                    ) : latestSubmission ? (
                                         <>
                                             <Send className="h-4 w-4 mr-2" />
                                             Resubmit
@@ -180,9 +207,23 @@ export default function StudentAssignmentDetailPage() {
                 </div>
             </div>
 
-            {/* Graded feedback banner */}
-            {isGraded && latestSubmission && (
-                <GradeFeedbackCard submission={latestSubmission} />
+            {/* Grade panel — shown whenever ACAFS has a result, regardless of submission status */}
+            {(isGradeLoading || latestGrade) && (
+                <Card className="border-border/60">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <Trophy className="h-4 w-4 text-primary" />
+                            Your Grade
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <GradeResultPanel
+                            grade={latestGrade}
+                            isLoading={isGradeLoading}
+                            instructorView={false}
+                        />
+                    </CardContent>
+                </Card>
             )}
 
             {/* Main 2-column layout */}
@@ -268,6 +309,16 @@ export default function StudentAssignmentDetailPage() {
                                                     View Code
                                                 </Link>
                                             </Button>
+                                            {!sub.is_latest && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="shrink-0 text-xs"
+                                                    onClick={() => handleViewGrade(sub)}
+                                                >
+                                                    View Grade
+                                                </Button>
+                                            )}
                                         </div>
                                     ))}
                                     {submissions.length > 3 && (
@@ -349,15 +400,17 @@ export default function StudentAssignmentDetailPage() {
                                     Your Status
                                 </p>
                                 <div className="flex items-center gap-3">
-                                    {isGraded ? (
+                                    {latestGrade ? (
                                         <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
-                                    ) : isSubmitted ? (
+                                    ) : latestSubmission.status.toLowerCase() === "accepted" ? (
                                         <Send className="h-5 w-5 text-primary shrink-0" />
                                     ) : (
                                         <AlertCircle className="h-5 w-5 text-warning-muted-foreground shrink-0" />
                                     )}
                                     <div>
-                                        <p className="font-semibold text-sm">{latestSubmission.status}</p>
+                                        <p className="font-semibold text-sm">
+                                            {latestGrade ? "Graded" : latestSubmission.status}
+                                        </p>
                                         <p className="text-xs text-muted-foreground">
                                             Version {latestSubmission.version} ·{" "}
                                             {formatDistanceToNow(new Date(latestSubmission.submitted_at), {
@@ -372,6 +425,40 @@ export default function StudentAssignmentDetailPage() {
                 </div>
             </div>
         </div>
+
+        {/* Sheet — view grade of a non-latest submission */}
+        <Sheet
+            open={selectedGrade !== null || selectedGradeLoading}
+            onOpenChange={(open) => {
+                if (!open) {
+                    setSelectedGrade(null);
+                    setSelectedGradeLoading(false);
+                }
+            }}
+        >
+            <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+                <SheetHeader className="mb-4">
+                    <SheetTitle className="flex items-center gap-2">
+                        <Trophy className="h-5 w-5 text-primary" />
+                        Submission Grade
+                    </SheetTitle>
+                </SheetHeader>
+                {selectedGradeLoading && !selectedGrade ? (
+                    <GradeResultPanel grade={null} isLoading />
+                ) : selectedGrade ? (
+                    <GradeResultPanel
+                        grade={selectedGrade}
+                        isLoading={false}
+                        instructorView={false}
+                    />
+                ) : (
+                    <p className="text-sm text-muted-foreground">
+                        No grade available for this submission yet.
+                    </p>
+                )}
+            </SheetContent>
+        </Sheet>
+        </>
     );
 }
 
@@ -402,44 +489,4 @@ function DetailRow({
     );
 }
 
-function GradeFeedbackCard({ submission }: { submission: SubmissionResponse }) {
-    return (
-        <Card className="border-success-border bg-success-muted">
-            <CardContent className="p-5 flex flex-col gap-3">
-                <div className="flex items-center gap-3">
-                    <Trophy className="h-6 w-6 text-success shrink-0" />
-                    <div>
-                        <p className="font-bold text-success-muted-foreground">Assignment Marked</p>
-                        <p className="text-xs text-success-muted-foreground/70">
-                            Your submission has been graded
-                        </p>
-                    </div>
-                </div>
-                <Separator className="bg-success-border" />
-                <div className="flex items-start gap-4">
-                    <div className="text-center">
-                        <p className="text-[10px] uppercase tracking-wider text-success-muted-foreground/70 mb-1">
-                            Grade
-                        </p>
-                        <p className="font-heading text-3xl font-black text-success-muted-foreground">
-                            {(submission as SubmissionResponse & { grade?: string }).grade ?? "—"}
-                        </p>
-                    </div>
-                    {(submission as SubmissionResponse & { feedback?: string }).feedback && (
-                        <>
-                            <Separator orientation="vertical" className="h-14 bg-success-border" />
-                            <div className="flex-1">
-                                <p className="text-[10px] uppercase tracking-wider text-success-muted-foreground/70 mb-1 flex items-center gap-1">
-                                    <MessageSquare className="h-3 w-3" /> Feedback
-                                </p>
-                                <p className="text-sm text-success-muted-foreground">
-                                    {(submission as SubmissionResponse & { feedback?: string }).feedback}
-                                </p>
-                            </div>
-                        </>
-                    )}
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
+

@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { instructorAssessmentsApi, assessmentsApi } from "@/lib/api/assessments";
+import { instructorAssessmentsApi, assessmentsApi, acafsApi } from "@/lib/api/assessments";
 import { usersApi } from "@/lib/api/users";
-import type { SubmissionResponse } from "@/types/assessments.types";
+import type { SubmissionResponse, SubmissionGrade } from "@/types/assessments.types";
 import type { UserListItem } from "@/types/auth.types";
 import { Users, FileDown, SearchX, Filter, Loader2, AlertCircle } from "lucide-react";
 import { SectionHeader } from "@/components/instructor/section-header";
@@ -12,11 +12,10 @@ import { StatusBadge } from "@/components/instructor/status-badge";
 import { Button } from "@/components/ui/button";
 import { EmptyStateCard } from "@/components/instructor/empty-state";
 import { SideSheetForm } from "@/components/instructor/side-sheet-form";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { GradeResultPanel } from "@/components/assessments/grade-result-panel";
 
 interface SubmissionWithMeta extends SubmissionResponse {
     studentName: string;
@@ -36,6 +35,8 @@ export default function AssignmentSubmissionsPage({
     const [selectedSubmission, setSelectedSubmission] = React.useState<SubmissionWithMeta | null>(null);
     const [submissionCode, setSubmissionCode] = React.useState<string | null>(null);
     const [isCodeLoading, setIsCodeLoading] = React.useState(false);
+    const [submissionGrade, setSubmissionGrade] = React.useState<SubmissionGrade | null>(null);
+    const [isGradeLoading, setIsGradeLoading] = React.useState(false);
     const [filter, setFilter] = React.useState<"all" | "pending" | "graded" | "late" | "missing">("all");
 
     React.useEffect(() => {
@@ -100,6 +101,28 @@ export default function AssignmentSubmissionsPage({
             .then((res) => { if (mounted) setSubmissionCode(res.code); })
             .catch(() => { if (mounted) setSubmissionCode(null); })
             .finally(() => { if (mounted) setIsCodeLoading(false); });
+        return () => { mounted = false; };
+    }, [selectedSubmission]);
+
+    // Load ACAFS grade when the sheet opens for a submitted assignment
+    React.useEffect(() => {
+        if (!selectedSubmission || selectedSubmission.status === "Missing") {
+            setSubmissionGrade(null);
+            return;
+        }
+        let mounted = true;
+        setIsGradeLoading(true);
+        setSubmissionGrade(null);
+        acafsApi
+            .getSubmissionGrade(selectedSubmission.id)
+            .then((grade) => { if (mounted) setSubmissionGrade(grade); })
+            .catch((err: Error) => {
+                // 404 means not yet graded — not an error worth logging loudly
+                if (mounted && err.message !== "GRADING_PENDING") {
+                    console.error("Failed to load submission grade:", err);
+                }
+            })
+            .finally(() => { if (mounted) setIsGradeLoading(false); });
         return () => { mounted = false; };
     }, [selectedSubmission]);
 
@@ -312,37 +335,20 @@ export default function AssignmentSubmissionsPage({
                             </div>
 
                             <div>
-                                <h4 className="font-bold font-heading mb-2">Feedback</h4>
-                                <Textarea
-                                    placeholder="Write constructive feedback for the student here..."
-                                    className="resize-none h-32"
+                                <h4 className="font-bold font-heading mb-3">Autograder Results</h4>
+                                <GradeResultPanel
+                                    grade={submissionGrade}
+                                    isLoading={isGradeLoading}
+                                    instructorView={true}
                                 />
-                            </div>
-
-                            <div>
-                                <h4 className="font-bold font-heading mb-2 text-primary">Final Score</h4>
-                                <div className="flex items-center gap-2">
-                                    <Input
-                                        type="number"
-                                        defaultValue=""
-                                        placeholder="0"
-                                        max={100}
-                                        min={0}
-                                        className="w-24"
-                                    />
-                                    <span className="text-muted-foreground font-medium">/ 100</span>
-                                </div>
                             </div>
                         </div>
                     )}
                 </div>
 
-                <div className="pt-6 mt-6 border-t border-border/40 flex items-center justify-between sticky bottom-0 bg-background/95 backdrop-blur py-4 z-10">
-                    <Button variant="ghost" onClick={() => setSelectedSubmission(null)}>
-                        Cancel
-                    </Button>
-                    <Button onClick={() => setSelectedSubmission(null)} disabled={selectedSubmission?.status === "Missing"}>
-                        Save Grade
+                <div className="pt-6 mt-6 border-t border-border/40 flex items-center justify-end sticky bottom-0 bg-background/95 backdrop-blur py-4 z-10">
+                    <Button variant="outline" onClick={() => setSelectedSubmission(null)}>
+                        Close
                     </Button>
                 </div>
             </SideSheetForm>

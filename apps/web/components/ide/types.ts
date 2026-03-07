@@ -1,3 +1,5 @@
+import type { SubmissionGrade } from "@/types/assessments.types";
+
 export interface CodeIDEProps {
   assignmentId?: string;
   assignmentTitle?: string;
@@ -11,6 +13,12 @@ export interface CodeIDEProps {
   theme?: "light" | "dark";
   showSubmitButton?: boolean;
   showAIAssistant?: boolean;
+  /** When true a "Results" tab is shown in the right panel. */
+  showGradePanel?: boolean;
+  /** The grading result from ACAFS. Null while pending or unavailable. */
+  grade?: SubmissionGrade | null;
+  /** True while the autograder is running (shows a spinner in the Results tab). */
+  isGrading?: boolean;
 }
 
 export interface ExecutionResult {
