@@ -12,6 +12,7 @@ Grading-mode routing (enforced in prompts.py guidelines):
                    evidence (function signatures, control flow, identifiers).
 """
 
+import asyncio
 import json
 from typing import Any
 
@@ -73,9 +74,12 @@ class LLMGrader:
 
         try:
             client = self._get_client()
-            response = client.models.generate_content(
-                model=self.settings.gemini_model,
-                contents=prompt,
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.models.generate_content(
+                    model=self.settings.gemini_model,
+                    contents=prompt,
+                ),
             )
             text = response.text.strip()
             # Strip markdown fences the model may still emit

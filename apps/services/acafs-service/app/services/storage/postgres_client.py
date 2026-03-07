@@ -32,6 +32,9 @@ class PostgresClient:
             min_size=2,
             max_size=10,
             command_timeout=60,
+            # Recycle idle connections after 5 min so stale TCP sockets
+            # (common after container restarts) are replaced automatically.
+            max_inactive_connection_lifetime=300,
         )
         logger.info("postgres_pool_created")
 
