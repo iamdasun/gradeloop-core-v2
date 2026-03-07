@@ -45,16 +45,35 @@ async def process_message(event: SubmissionEvent) -> None:
         await worker.process_event(event)
 
 
-def run_consumer() -> None:
-    """Run RabbitMQ consumer in a separate thread."""
+def run_consumer(loop: asyncio.AbstractEventLoop) -> None:
+    """Run RabbitMQ consumer in a separate thread.
+
+    Dispatches events to the *existing* FastAPI event loop via
+    run_coroutine_threadsafe so the asyncpg connection pool (initialised in
+    that loop) is always accessed from its own loop.
+
+    asyncio.run() must NOT be used here — it creates a brand-new event loop
+    that has no knowledge of the pool's internal futures, which produces
+    'cannot perform operation: another operation is in progress' errors.
+    """
     global consumer
     settings = get_settings()
-    
+
+    def handle_event(event: SubmissionEvent) -> None:
+        """Bridge: schedule coroutine on the main loop and wait for result."""
+        future = asyncio.run_coroutine_threadsafe(process_message(event), loop)
+        try:
+            # Block the pika I/O thread until processing completes so that
+            # basic_ack / basic_nack is sent only after the work is done.
+            future.result(timeout=300)
+        except Exception as e:
+            logger.error("consumer_event_dispatch_failed", error=str(e))
+
     consumer = RabbitMQConsumer(
         settings=settings,
-        message_handler=lambda event: asyncio.run(process_message(event)),
+        message_handler=handle_event,
     )
-    
+
     try:
         consumer.start()
     except Exception as e:
@@ -104,8 +123,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     # Initialize Socratic chat service
     chat_service = SocraticChatService(settings=settings)
     
-    # Start RabbitMQ consumer in background thread
-    consumer_thread = Thread(target=run_consumer, daemon=True)
+    # Start RabbitMQ consumer in background thread.
+    # Pass the running event loop so the consumer dispatches coroutines onto
+    # the same loop that owns the asyncpg pool.
+    loop = asyncio.get_event_loop()
+    consumer_thread = Thread(target=run_consumer, args=(loop,), daemon=True)
     consumer_thread.start()
     
     logger.info("acafs_service_ready")

@@ -107,12 +107,51 @@ function MessageBubble({ message }: { message: Message }) {
   );
 }
 
-export function AIAssistantPanel() {
+interface AIAssistantPanelProps {
+  assignmentId?: string | null;
+  assignmentTitle?: string | null;
+  assignmentDescription?: string | null;
+  userId?: string | null;
+  studentCode?: string | null;
+}
+
+export function AIAssistantPanel({ assignmentId, assignmentTitle, assignmentDescription, userId, studentCode }: AIAssistantPanelProps) {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load chat history for the assignment+user when available.
+  // Calls /api/acafs/chat/... which Next.js proxies server-side → avoids CORS.
+  useEffect(() => {
+    let mounted = true;
+    async function loadHistory() {
+      if (!assignmentId) return;
+      const uid = userId ?? "anonymous";
+      try {
+        const resp = await fetch(
+          `/api/acafs/chat/${encodeURIComponent(assignmentId)}/${encodeURIComponent(uid)}`
+        );
+        if (!mounted) return;
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const msgs = (data.messages ?? []).map((m: any) => ({
+          id: m.id ? String(m.id) : crypto.randomUUID(),
+          role: m.role as Role,
+          content: m.content ?? "",
+          timestamp: m.created_at ? new Date(m.created_at) : new Date(),
+        }));
+        if (msgs.length > 0) setMessages([WELCOME_MESSAGE, ...msgs]);
+      } catch (e) {
+        // ignore history load errors silently
+      }
+    }
+    loadHistory();
+    return () => {
+      mounted = false;
+    };
+  }, [assignmentId, userId]);
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
@@ -139,14 +178,49 @@ export function AIAssistantPanel() {
     setInput("");
     setIsLoading(true);
 
-    // Placeholder — wire up to your AI endpoint here
+    // Call ACAFS Socratic chat via Next.js proxy → no CORS issues.
     try {
-      await new Promise((r) => setTimeout(r, 1200));
+      const aid = assignmentId ?? "unknown-assignment";
+      const uid = userId ?? "anonymous";
+      const body: Record<string, unknown> = { content: trimmed };
+      if (studentCode) body.student_code = studentCode;
+      if (assignmentTitle) body.assignment_title = assignmentTitle;
+      if (assignmentDescription) body.assignment_description = assignmentDescription;
+
+      const resp = await fetch(
+        `/api/acafs/chat/${encodeURIComponent(aid)}/${encodeURIComponent(uid)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        const assistantMsg: Message = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `Tutor is unavailable (status ${resp.status}). ${text}`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      } else {
+        const data = await resp.json();
+        const reply = data.reply ?? data?.messages?.[data.messages.length - 1]?.content ?? "";
+        const assistantMsg: Message = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: reply || "Tutor did not return a reply.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+      }
+    } catch (err: any) {
       const assistantMsg: Message = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content:
-          "This is a placeholder response. Connect this panel to your AI backend to enable real conversations.",
+        content: `Tutor error: ${err?.message ?? String(err)}`,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMsg]);

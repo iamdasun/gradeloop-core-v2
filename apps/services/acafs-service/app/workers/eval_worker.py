@@ -58,9 +58,9 @@ class EvaluationWorker:
             submission_id=str(event.submission_id),
             assignment_id=str(event.assignment_id),
             language=event.language,
-            has_rubric=event.rubric is not None,
+            has_rubric=bool(event.rubric),
             has_test_cases=bool(event.test_cases),
-            has_sample_answer=event.sample_answer is not None,
+            has_sample_answer=bool(event.sample_answer),
         )
 
         try:
@@ -246,14 +246,17 @@ class EvaluationWorker:
     # ── helpers ─────────────────────────────────────────────────────────────
 
     async def _get_code(self, event: SubmissionEvent) -> str:
-        """Get source code from event payload or MinIO."""
+        """Get source code from event payload or MinIO.
+
+        The MinIO SDK is synchronous; get_submission_code contains no internal
+        awaits so it executes synchronously when awaited (fine for a single
+        small file read). Using asyncio.run() inside an executor would create
+        a nested event loop, which is unsafe and the root cause of the
+        'cannot perform operation: another operation is in progress' error.
+        """
         if event.code:
             return event.code
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self._executor,
-            lambda: asyncio.run(self.minio.get_submission_code(event.storage_path)),
-        )
+        return await self.minio.get_submission_code(event.storage_path)
 
     async def _parse_ast(self, event: SubmissionEvent, code: str) -> ASTBlueprint:
         """Parse AST from source code in a thread executor."""

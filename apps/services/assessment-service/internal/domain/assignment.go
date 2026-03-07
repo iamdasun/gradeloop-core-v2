@@ -45,6 +45,10 @@ type Assignment struct {
 
 	IsActive bool `gorm:"not null;default:true" json:"is_active"`
 
+	// LanguageID is the Judge0 language ID for this assignment.
+	// Defaults to 71 (Python 3.8.1) when not explicitly set.
+	LanguageID int `gorm:"not null;default:71" json:"language_id"`
+
 	CreatedBy uuid.UUID `gorm:"type:uuid;not null" json:"created_by"`
 
 	CreatedAt time.Time `json:"created_at"`

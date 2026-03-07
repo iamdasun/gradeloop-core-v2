@@ -57,6 +57,7 @@ func toAssignmentResponse(a *domain.Assignment) dto.AssignmentResponse {
 		Title:          a.Title,
 		Description:    a.Description,
 		Code:           a.Code,
+		LanguageID:     a.LanguageID,
 		AssessmentType: a.AssessmentType,
 		Objective:      a.Objective,
 

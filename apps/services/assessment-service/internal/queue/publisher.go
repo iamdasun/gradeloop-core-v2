@@ -24,6 +24,16 @@ type SubmissionTestCase struct {
 	ExpectedOutput string `json:"expected_output"`
 }
 
+// SubmissionRubricCriterion is the lightweight rubric criterion payload
+// forwarded to ACAFS for LLM-based grading. It mirrors the ACAFS
+// RubricCriterion schema (grading_mode: deterministic | llm | llm_ast).
+type SubmissionRubricCriterion struct {
+	Name        string  `json:"name"`
+	Description string  `json:"description,omitempty"`
+	GradingMode string  `json:"grading_mode"` // deterministic | llm | llm_ast
+	Weight      float64 `json:"weight"`       // max marks this criterion contributes
+}
+
 // SubmissionJob is the message payload written to the submission queue.
 // It carries everything the consumer worker needs to complete the submission
 // without touching the HTTP request context.
@@ -78,6 +88,17 @@ type SubmissionJob struct {
 	// LLM-based rubric evaluation that uses the reference implementation.
 	SampleAnswerCode       string `json:"sample_answer_code,omitempty"`
 	SampleAnswerLanguageID int    `json:"sample_answer_language_id,omitempty"`
+
+	// ── ACAFS rubric grading context ─────────────────────────────────────────
+	// AssignmentTitle and AssignmentDescription are injected into the LLM
+	// system prompt so the model understands the problem being solved.
+	AssignmentTitle       string `json:"assignment_title,omitempty"`
+	AssignmentDescription string `json:"assignment_description,omitempty"`
+
+	// Rubric carries the ordered grading criteria. When non-empty, ACAFS runs
+	// the full rubric-based LLM scoring pipeline. When nil/empty, ACAFS only
+	// parses the AST (no mark allocation).
+	Rubric []SubmissionRubricCriterion `json:"rubric,omitempty"`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

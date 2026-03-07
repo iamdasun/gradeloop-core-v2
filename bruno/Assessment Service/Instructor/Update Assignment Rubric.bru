@@ -1,0 +1,96 @@
+meta {
+  name: Update Assignment Rubric (Instructor)
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{INSTRUCTOR_ASSIGNMENTS_URL_V1}}/{{ASSIGNMENT_ID}}/rubric
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ACCESS_TOKEN}}
+}
+
+body:json {
+  {
+    "criteria": [
+      {
+        "name": "Correctness",
+        "description": "The solution produces the correct output for all provided test cases.",
+        "grading_mode": "deterministic",
+        "weight": 50,
+        "order_index": 1,
+        "bands": {
+          "excellent":      { "description": "All test cases pass.",              "mark_range": { "min": 45, "max": 50 } },
+          "good":           { "description": "Most test cases pass (>= 70%).",    "mark_range": { "min": 35, "max": 44 } },
+          "satisfactory":   { "description": "Some test cases pass (>= 40%).",    "mark_range": { "min": 20, "max": 34 } },
+          "unsatisfactory": { "description": "Fewer than 40% of test cases pass.", "mark_range": { "min": 0,  "max": 19 } }
+        }
+      },
+      {
+        "name": "Code Quality",
+        "description": "Readability, structure, and adherence to language conventions.",
+        "grading_mode": "llm",
+        "weight": 30,
+        "order_index": 2,
+        "bands": {
+          "excellent":      { "description": "Clean, idiomatic, well-named code.",         "mark_range": { "min": 27, "max": 30 } },
+          "good":           { "description": "Mostly readable with minor issues.",          "mark_range": { "min": 21, "max": 26 } },
+          "satisfactory":   { "description": "Somewhat readable; notable style issues.",    "mark_range": { "min": 12, "max": 20 } },
+          "unsatisfactory": { "description": "Hard to follow; poor naming or structure.",   "mark_range": { "min": 0,  "max": 11 } }
+        }
+      },
+      {
+        "name": "Problem Understanding",
+        "description": "The solution demonstrates a clear understanding of the problem requirements.",
+        "grading_mode": "llm",
+        "weight": 20,
+        "order_index": 3,
+        "bands": {
+          "excellent":      { "description": "Fully addresses the problem statement.",         "mark_range": { "min": 18, "max": 20 } },
+          "good":           { "description": "Addresses most aspects of the problem.",         "mark_range": { "min": 14, "max": 17 } },
+          "satisfactory":   { "description": "Partial understanding of the problem.",          "mark_range": { "min": 8,  "max": 13 } },
+          "unsatisfactory": { "description": "Misunderstands or ignores key requirements.",    "mark_range": { "min": 0,  "max": 7  } }
+        }
+      }
+    ]
+  }
+}
+
+docs {
+  # Update Assignment Rubric (Instructor)
+
+  **Replaces** all rubric criteria for the assignment atomically (delete + recreate).
+  Send an empty `criteria` array to clear the rubric entirely.
+
+  The `weight` values must sum to 100 across all criteria.
+
+  ## Endpoint
+  PUT /api/v1/instructor-assignments/:id/rubric
+
+  ## Authentication
+  Requires Instructor, Admin, or Super Admin role.
+
+  ## grading_mode values
+  - `deterministic` — scored from Judge0 test-case pass rate (no LLM call)
+  - `llm`           — scored by Gemini using the rubric bands
+  - `llm_ast`       — scored by Gemini with AST analysis context included
+
+  ## Response (200 OK)
+  ```json
+  {
+    "assignment_id": "uuid",
+    "criteria": [ { "id": "uuid", "name": "...", "weight": 50, ... } ],
+    "total_weight": 100
+  }
+  ```
+
+  ## Error Responses
+  - 400 Bad Request  — invalid JSON body
+  - 401 Unauthorized — missing or invalid JWT
+  - 403 Forbidden    — not assigned to the course instance
+  - 404 Not Found    — assignment does not exist
+}

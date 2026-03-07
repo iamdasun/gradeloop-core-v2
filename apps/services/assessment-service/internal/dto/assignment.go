@@ -75,10 +75,23 @@ type CreateAssignmentRequest struct {
 	EnableSocraticFeedback *bool `json:"enable_socratic_feedback"`
 	AllowRegenerate        *bool `json:"allow_regenerate"`
 
+	// LanguageID is the Judge0 language ID chosen by the instructor in the
+	// "Programming Language" selector. Sent as a top-level field so that the
+	// assignment's language is persisted even when no sample answer is provided.
+	// Defaults to 71 (Python 3.8.1) on the service side when omitted.
+	LanguageID int `json:"language_id,omitempty"`
+
 	// ── Inline content (optional — stored in separate tables on success) ———————
 	RubricCriteria []CreateRubricCriterionRequest `json:"rubric_criteria,omitempty"`
 	TestCases      []CreateTestCaseRequest        `json:"test_cases,omitempty"`
 	SampleAnswer   *CreateSampleAnswerRequest     `json:"sample_answer,omitempty"`
+}
+
+// UpdateRubricRequest is the payload for PUT /instructor-assignments/:id/rubric.
+// It replaces all existing rubric criteria for the assignment atomically
+// (delete-then-recreate). Send an empty Criteria slice to clear the rubric.
+type UpdateRubricRequest struct {
+	Criteria []CreateRubricCriterionRequest `json:"criteria"`
 }
 
 // UpdateAssignmentRequest is the payload for PATCH /assignments/:id
@@ -120,6 +133,9 @@ type AssignmentResponse struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Code        string `json:"code"`
+
+	// LanguageID is the Judge0 language ID set by the instructor.
+	LanguageID int `json:"language_id"`
 
 	AssessmentType string `json:"assessment_type,omitempty"`
 	Objective      string `json:"objective,omitempty"`

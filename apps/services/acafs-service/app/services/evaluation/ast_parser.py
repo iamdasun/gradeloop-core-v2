@@ -1,5 +1,6 @@
 """AST parser using tree-sitter for code analysis."""
 
+import concurrent.futures
 import time
 from typing import Any, Optional
 
@@ -107,37 +108,32 @@ class ASTParser:
 
     def _parse_with_timeout(self, parser: Parser, code: str) -> Optional[Tree]:
         """Parse code with timeout protection.
-        
+
+        Uses a dedicated thread so this method is safe to call from any thread,
+        including threads spawned by ThreadPoolExecutor (where signal.SIGALRM
+        is unavailable — it only works on the main OS thread).
+
         Args:
             parser: Tree-sitter parser
             code: Source code
-            
+
         Returns:
-            Parse tree or None if timeout
+            Parse tree or None if timeout / error
         """
-        import signal
-        from contextlib import contextmanager
-
-        @contextmanager
-        def timeout(seconds: int):
-            """Context manager for timeout."""
-            def handler(signum, frame):
-                raise TimeoutError(f"Parsing exceeded {seconds} seconds")
-
-            old_handler = signal.signal(signal.SIGALRM, handler)
-            signal.alarm(seconds)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(parser.parse, bytes(code, "utf-8"))
             try:
-                yield
-            finally:
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
-
-        try:
-            with timeout(self.settings.ast_timeout_seconds):
-                return parser.parse(bytes(code, "utf-8"))
-        except TimeoutError:
-            logger.error("parse_timeout", timeout_seconds=self.settings.ast_timeout_seconds)
-            return None
+                return future.result(timeout=self.settings.ast_timeout_seconds)
+            except concurrent.futures.TimeoutError:
+                logger.error(
+                    "parse_timeout",
+                    timeout_seconds=self.settings.ast_timeout_seconds,
+                )
+                future.cancel()
+                return None
+            except Exception as exc:
+                logger.error("parse_error_in_thread", error=str(exc))
+                return None
 
     def _extract_blueprint(self, tree: Tree, language: str) -> ASTBlueprint:
         """Extract structural blueprint from parse tree.

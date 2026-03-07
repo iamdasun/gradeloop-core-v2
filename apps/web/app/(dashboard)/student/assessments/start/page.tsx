@@ -109,10 +109,7 @@ export default function StartAssessmentPage() {
     return (
         <div className="flex flex-col gap-8 pb-8 max-w-4xl mx-auto">
             {/* Header */}
-            <div className="flex items-center gap-3 border-b border-border/40 pb-6">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Mic2 className="h-5 w-5 text-primary" />
-                </div>
+            <div className="flex items-center justify-between border-b border-border/40 pb-6">
                 <div>
                     <h1 className="text-2xl font-black tracking-tight">Start Viva Assessment</h1>
                     <p className="text-sm text-muted-foreground">

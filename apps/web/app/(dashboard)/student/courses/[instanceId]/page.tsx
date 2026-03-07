@@ -12,6 +12,7 @@ import {
     Calendar,
     ChevronRight,
     Clock,
+    Code2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,16 @@ import { studentAssessmentsApi } from "@/lib/api/assessments";
 import type { StudentCourseEnrollment, CourseInstructor } from "@/types/academics.types";
 import type { AssignmentResponse } from "@/types/assessments.types";
 import { handleApiError } from "@/lib/api/axios";
+import { useUIStore } from "@/lib/stores/uiStore";
 import { format, isPast, isToday, isTomorrow } from "date-fns";
+
+const LANGUAGE_ID_TO_NAME: Record<number, string> = {
+    71: "Python", 62: "Java", 54: "C++", 76: "C++",
+    50: "C", 75: "C", 51: "C#", 63: "JavaScript",
+    74: "TypeScript", 60: "Go", 73: "Rust", 72: "Ruby",
+    68: "PHP", 83: "Swift", 78: "Kotlin", 81: "Scala",
+    80: "R", 61: "Haskell", 82: "SQL",
+};
 
 function dueBadge(dateStr?: string) {
     if (!dateStr) return null;
@@ -38,6 +48,7 @@ export default function StudentCourseDetailPage() {
     const params = useParams();
     const router = useRouter();
     const instanceId = params.instanceId as string;
+    const setPageTitle = useUIStore((s) => s.setPageTitle);
 
     const [enrollment, setEnrollment] = React.useState<StudentCourseEnrollment | null>(null);
     const [instructors, setInstructors] = React.useState<CourseInstructor[]>([]);
@@ -60,6 +71,7 @@ export default function StudentCourseDetailPage() {
                     setEnrollment(enrollmentData);
                     setInstructors(instructorData);
                     setAssignments(assignmentData);
+                    setPageTitle(enrollmentData.course_title);
                 }
             } catch (err) {
                 if (mounted) setError(handleApiError(err));
@@ -73,6 +85,9 @@ export default function StudentCourseDetailPage() {
             mounted = false;
         };
     }, [instanceId]);
+
+    // Clear topbar title when leaving this page
+    React.useEffect(() => () => { setPageTitle(null); }, []);
 
     if (isLoading) {
         return (
@@ -203,18 +218,17 @@ export default function StudentCourseDetailPage() {
                                         href={`/student/courses/${instanceId}/assignments/${assignment.id}`}
                                         className="group flex items-center gap-4 p-4 rounded-xl border border-border/60 hover:border-primary/30 hover:shadow-sm bg-card transition-all"
                                     >
-                                        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                                            <FileText className="h-5 w-5 text-primary" />
-                                        </div>
-
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <p className="font-semibold group-hover:text-primary transition-colors truncate">
                                                     {assignment.title}
                                                 </p>
-                                                <Badge variant="outline" className="text-xs font-mono shrink-0">
-                                                    {assignment.code}
-                                                </Badge>
+                                                {assignment.language_id && LANGUAGE_ID_TO_NAME[assignment.language_id] && (
+                                                    <Badge variant="outline" className="text-xs shrink-0 gap-1">
+                                                        <Code2 className="h-3 w-3" />
+                                                        {LANGUAGE_ID_TO_NAME[assignment.language_id]}
+                                                    </Badge>
+                                                )}
                                                 {badge && (
                                                     <Badge variant={badge.variant} className="text-xs shrink-0">
                                                         {badge.label}

@@ -6,9 +6,10 @@ import { ExecutionPanel } from "./execution-panel";
 import { StatusBar } from "./status-bar";
 import { Toolbar } from "./toolbar";
 import { AIAssistantPanel } from "./ai-assistant-panel";
+import { GradeResultPanel } from "@/components/assessments/grade-result-panel";
 import { useCodeExecution } from "@/lib/hooks/use-code-execution";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Terminal, Sparkles } from "lucide-react";
+import { Terminal, Sparkles, BarChart2, Loader2 } from "lucide-react";
 import type { CodeIDEProps, ExecutionStatus } from "./types";
 import {
   DEFAULT_LANGUAGE_ID,
@@ -21,6 +22,9 @@ import { useTheme } from "next-themes";
 
 export function CodeIDE({
   assignmentId,
+  assignmentTitle,
+  assignmentDescription,
+  userId,
   initialCode,
   initialLanguage = DEFAULT_LANGUAGE_ID,
   onExecute,
@@ -28,9 +32,21 @@ export function CodeIDE({
   readOnly = false,
   showSubmitButton = false,
   showAIAssistant = false,
+  showGradePanel = false,
+  lockLanguage = false,
+  grade = null,
+  isGrading = false,
 }: CodeIDEProps) {
   const { theme: systemTheme } = useTheme();
   const theme = (systemTheme === "dark" ? "dark" : "light") as "dark" | "light";
+
+  // Controlled tab state so we can auto-switch to "results" when grade arrives.
+  const [activeTab, setActiveTab] = useState<string>("input-output");
+
+  // Auto-switch to the Results tab as soon as a grade is available.
+  useEffect(() => {
+    if (grade) setActiveTab("results");
+  }, [grade]);
 
   // Editor state
   const [code, setCode] = useState<string>(
@@ -57,7 +73,7 @@ export function CodeIDE({
       }
 
       const savedLanguage = localStorage.getItem(STORAGE_KEYS.LAST_LANGUAGE);
-      if (savedLanguage && !initialLanguage) {
+      if (savedLanguage && !initialLanguage && !lockLanguage) {
         setLanguage(parseInt(savedLanguage, 10));
       }
     }
@@ -165,8 +181,16 @@ export function CodeIDE({
         
         {/* Right: Tabbed Panel (40%) */}
         <div className="w-[400px]">
-          <Tabs defaultValue="input-output" className="flex h-full flex-col">
-            <TabsList className="grid w-full grid-cols-2 rounded-none border-b border-l">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex h-full flex-col">
+            <TabsList
+              className={`grid w-full rounded-none border-b border-l ${
+                [showAIAssistant, showGradePanel].filter(Boolean).length === 2
+                  ? "grid-cols-3"
+                  : [showAIAssistant, showGradePanel].some(Boolean)
+                  ? "grid-cols-2"
+                  : "grid-cols-1"
+              }`}
+            >
               <TabsTrigger value="input-output" className="gap-2 rounded-none">
                 <Terminal className="h-4 w-4" />
                 Input / Output
@@ -175,6 +199,15 @@ export function CodeIDE({
                 <TabsTrigger value="ai-assistant" className="gap-2 rounded-none">
                   <Sparkles className="h-4 w-4" />
                   AI Assistant
+                </TabsTrigger>
+              )}
+              {showGradePanel && (
+                <TabsTrigger value="results" className="gap-2 rounded-none">
+                  <BarChart2 className="h-4 w-4" />
+                  Results
+                  {isGrading && (
+                    <Loader2 className="h-3 w-3 animate-spin ml-0.5" />
+                  )}
                 </TabsTrigger>
               )}
             </TabsList>
@@ -190,7 +223,36 @@ export function CodeIDE({
             
             {showAIAssistant && (
               <TabsContent value="ai-assistant" className="flex-1 m-0 overflow-hidden">
-                <AIAssistantPanel />
+                <AIAssistantPanel
+                  assignmentId={assignmentId}
+                  assignmentTitle={assignmentTitle}
+                  assignmentDescription={assignmentDescription}
+                  userId={userId}
+                  studentCode={code}
+                />
+              </TabsContent>
+            )}
+
+            {showGradePanel && (
+              <TabsContent value="results" className="flex-1 m-0 overflow-y-auto">
+                {isGrading && !grade ? (
+                  <div className="flex flex-col items-center justify-center gap-3 h-full min-h-[200px] text-center p-6">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm font-medium">Autograding your submission…</p>
+                    <p className="text-xs text-muted-foreground">
+                      Running test cases and AI rubric analysis. This usually takes 15–60 seconds.
+                    </p>
+                  </div>
+                ) : grade ? (
+                  <GradeResultPanel grade={grade} compact instructorView={false} />
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-2 h-full min-h-[200px] text-center p-6">
+                    <BarChart2 className="h-8 w-8 text-muted-foreground/30" />
+                    <p className="text-sm text-muted-foreground">
+                      Submit your code to see AI-generated feedback and marks.
+                    </p>
+                  </div>
+                )}
               </TabsContent>
             )}
           </Tabs>
@@ -203,7 +265,7 @@ export function CodeIDE({
         isExecuting={isExecuting}
         language={language}
         onLanguageChange={handleLanguageChange}
-        languageSelectorDisabled={readOnly || isExecuting}
+        languageSelectorDisabled={readOnly || isExecuting || lockLanguage}
       />
     </div>
   );

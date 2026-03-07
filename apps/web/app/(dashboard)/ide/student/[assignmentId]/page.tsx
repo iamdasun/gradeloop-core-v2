@@ -17,6 +17,29 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+// Reverse map: Judge0 language ID → canonical language name string.
+// IDs 91/92/93/94/95/105 removed — they do NOT exist on this Judge0 instance.
+const LANGUAGE_ID_TO_NAME: Record<number, string> = {
+  71: "python",
+  62: "java",
+  54: "cpp",
+  76: "cpp",
+  50: "c",
+  75: "c",
+  51: "csharp",
+  63: "javascript",
+  74: "typescript",
+  60: "go",
+  73: "rust",
+  72: "ruby",
+  68: "php",
+  83: "swift",
+  78: "kotlin",
+  81: "scala",
+  61: "haskell",
+  80: "r",
+};
+
 export default function StudentIDEPage() {
   const params = useParams();
   const router = useRouter();
@@ -69,7 +92,8 @@ export default function StudentIDEPage() {
       
       await assessmentsApi.submitAssignment({
         assignment_id: assignmentId,
-        language: `language_${pendingSubmission.language}`,
+        language: LANGUAGE_ID_TO_NAME[pendingSubmission.language] ?? "python",
+        language_id: pendingSubmission.language,
         code: pendingSubmission.code,
       });
 

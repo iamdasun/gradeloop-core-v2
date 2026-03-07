@@ -102,11 +102,20 @@ class SocraticChatService:
             {"role": m["role"], "content": m["content"]} for m in recent
         ]
 
-        payload = {
+        # Only request extended reasoning for models that advertise it.
+        # Sending it to models that don't support it (e.g. free Arcee Trinity)
+        # can cause 400/422 errors.
+        _reasoning_models = ("claude-3-7", "o1", "o3", "deepseek-r1", "gemini-2.5")
+        supports_reasoning = any(
+            tag in self.settings.openrouter_model.lower() for tag in _reasoning_models
+        )
+
+        payload: dict = {
             "model": self.settings.openrouter_model,
             "messages": [{"role": "system", "content": system_prompt}] + clean_messages,
-            "reasoning": {"enabled": True},
         }
+        if supports_reasoning:
+            payload["reasoning"] = {"enabled": True}
 
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -117,9 +126,52 @@ class SocraticChatService:
                 )
                 resp.raise_for_status()
                 data = resp.json()
-                message = data["choices"][0]["message"]
-                content = _apply_guardrail(message.get("content", ""))
-                reasoning = message.get("reasoning_details")
+
+                # Parse multiple possible OpenRouter / model response shapes.
+                message = None
+                reasoning = None
+
+                # Common Chat Completions shape: { choices: [ { message: { content: '...' } } ] }
+                choices = data.get("choices") if isinstance(data, dict) else None
+                if choices and len(choices) > 0:
+                    first = choices[0]
+                    # message may be a dict with 'content' as string
+                    msg = first.get("message") or first.get("message", {})
+                    if isinstance(msg, dict):
+                        # content may be str or dict/parts
+                        content_field = msg.get("content")
+                        if isinstance(content_field, str):
+                            message = {"content": content_field}
+                        elif isinstance(content_field, dict):
+                            # {"parts": ["...text..."]}
+                            parts = content_field.get("parts") or content_field.get("texts")
+                            if parts and isinstance(parts, list):
+                                message = {"content": parts[0]}
+                    # Some providers put text at choices[0].get('text')
+                    if message is None and first.get("text"):
+                        message = {"content": first.get("text")}
+                    # reasoning details may be present
+                    reasoning = first.get("reasoning_details") or first.get("reasoning")
+
+                # Fallback shapes: { output: "..." } or { result: { output: "..." } }
+                if message is None:
+                    if isinstance(data.get("output"), str):
+                        message = {"content": data.get("output")}
+                    elif isinstance(data.get("result"), dict) and isinstance(data["result"].get("output"), str):
+                        message = {"content": data["result"]["output"]}
+
+                # Final fallback: try extracting any text-like field
+                if message is None:
+                    # try to find a top-level string value in the JSON
+                    for k, v in (data.items() if isinstance(data, dict) else []):
+                        if isinstance(v, str) and len(v) > 0:
+                            message = {"content": v}
+                            break
+
+                content = _apply_guardrail((message or {}).get("content", ""))
+                # If reasoning not found at choice level, try message dict
+                if reasoning is None and isinstance(message, dict):
+                    reasoning = message.get("reasoning_details") or message.get("reasoning")
                 logger.info("socratic_hint_generated", model=self.settings.openrouter_model)
                 return content, reasoning
         except Exception as e:

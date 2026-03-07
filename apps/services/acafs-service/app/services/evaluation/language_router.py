@@ -21,14 +21,26 @@ class SupportedLanguage(str, Enum):
 
 
 # Language ID mappings from Judge0 to ACAFS
+# Verified against local Judge0 instance (/languages) — only IDs that exist
+# on this deployment are listed. IDs 91/92/93/94/95/105 are NOT present.
 JUDGE0_LANGUAGE_MAP = {
-    50: SupportedLanguage.C,          # C (GCC)
-    54: SupportedLanguage.CPP,        # C++ (GCC)
-    60: SupportedLanguage.CPP,        # Go (not supported, fallback to C++)
-    62: SupportedLanguage.JAVA,       # Java
-    71: SupportedLanguage.PYTHON,     # Python 3
-    63: SupportedLanguage.JAVASCRIPT, # JavaScript (Node.js)
-    51: SupportedLanguage.CSHARP,     # C# (Mono)
+    # C
+    50: SupportedLanguage.C,           # C (GCC 9.2.0)
+    75: SupportedLanguage.C,           # C (Clang 7.0.1)
+    # C++
+    54: SupportedLanguage.CPP,         # C++ (GCC 9.2.0)
+    76: SupportedLanguage.CPP,         # C++ (Clang 7.0.1)
+    # C#
+    51: SupportedLanguage.CSHARP,      # C# (Mono 6.6.0.161)
+    # Java
+    62: SupportedLanguage.JAVA,        # Java (OpenJDK 13.0.1)
+    # Python
+    71: SupportedLanguage.PYTHON,      # Python (3.8.1)
+    # JavaScript / TypeScript (TypeScript uses JS AST)
+    63: SupportedLanguage.JAVASCRIPT,  # JavaScript (Node.js 12.14.0)
+    74: SupportedLanguage.JAVASCRIPT,  # TypeScript (3.7.4)
+    # Go — no dedicated parser; C parser gives basic structure
+    60: SupportedLanguage.C,           # Go (1.13.5)
 }
 
 

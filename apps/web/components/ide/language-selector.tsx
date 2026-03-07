@@ -44,23 +44,29 @@ export function LanguageSelector({
 
         // TODO: Replace with actual API call when backend endpoint is ready
         // For now, use a hardcoded list of common languages
+        // Verified against Judge0 instance at /languages — IDs 91/92/93/94/95/105 do NOT exist.
+        // Only languages with AST support in ACAFS (C, C++, C#, Java, Python, JS, TS, Go)
+        // plus common languages available on this instance are listed.
         const commonLanguages: LanguageOption[] = [
+          // Python
           { id: 71, name: "Python (3.8.1)", is_archived: false },
-          { id: 92, name: "Python (3.11.2)", is_archived: false },
+          // Java
           { id: 62, name: "Java (OpenJDK 13.0.1)", is_archived: false },
-          { id: 91, name: "Java (JDK 17.0.6)", is_archived: false },
+          // C++
           { id: 54, name: "C++ (GCC 9.2.0)", is_archived: false },
-          { id: 105, name: "C++ (GCC 14.1.0)", is_archived: false },
+          { id: 76, name: "C++ (Clang 7.0.1)", is_archived: false },
+          // C
           { id: 50, name: "C (GCC 9.2.0)", is_archived: false },
           { id: 75, name: "C (Clang 7.0.1)", is_archived: false },
-          { id: 63, name: "JavaScript (Node.js 12.14.0)", is_archived: false },
-          { id: 93, name: "JavaScript (Node.js 18.15.0)", is_archived: false },
-          { id: 74, name: "TypeScript (3.7.4)", is_archived: false },
-          { id: 94, name: "TypeScript (5.0.3)", is_archived: false },
-          { id: 60, name: "Go (1.13.5)", is_archived: false },
-          { id: 95, name: "Go (1.18.5)", is_archived: false },
-          { id: 73, name: "Rust (1.40.0)", is_archived: false },
+          // C#
           { id: 51, name: "C# (Mono 6.6.0.161)", is_archived: false },
+          // JavaScript / TypeScript
+          { id: 63, name: "JavaScript (Node.js 12.14.0)", is_archived: false },
+          { id: 74, name: "TypeScript (3.7.4)", is_archived: false },
+          // Go
+          { id: 60, name: "Go (1.13.5)", is_archived: false },
+          // Other supported
+          { id: 73, name: "Rust (1.40.0)", is_archived: false },
           { id: 72, name: "Ruby (2.7.0)", is_archived: false },
           { id: 68, name: "PHP (7.4.1)", is_archived: false },
           { id: 83, name: "Swift (5.2.3)", is_archived: false },

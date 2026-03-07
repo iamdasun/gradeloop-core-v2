@@ -293,6 +293,61 @@ func (h *InstructorHandler) GetAssignmentRubric(c fiber.Ctx) error {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/v1/instructor-assignments/:id/rubric
+// ─────────────────────────────────────────────────────────────────────────────
+
+// UpdateAssignmentRubric replaces all rubric criteria for an assignment.
+// Send an empty criteria array to clear the rubric entirely.
+func (h *InstructorHandler) UpdateAssignmentRubric(c fiber.Ctx) error {
+	assignmentID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	assignment, err := h.assignmentService.GetAssignmentByID(assignmentID)
+	if err != nil {
+		return err
+	}
+	courseIDs, err := h.instructorCourseIDs(c)
+	if err != nil {
+		return err
+	}
+	if !courseIDs[assignment.CourseInstanceID] {
+		return utils.ErrForbidden("you are not assigned to this course instance")
+	}
+
+	var req dto.UpdateRubricRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return utils.ErrBadRequest("invalid request body")
+	}
+
+	criteria, err := h.assignmentService.UpdateRubricCriteria(assignmentID, req.Criteria)
+	if err != nil {
+		return err
+	}
+
+	items := make([]dto.RubricCriterionResponse, 0, len(criteria))
+	totalWeight := 0
+	for _, cr := range criteria {
+		totalWeight += cr.Weight
+		items = append(items, dto.RubricCriterionResponse{
+			ID:          cr.ID.String(),
+			Name:        cr.Name,
+			Description: cr.Description,
+			GradingMode: cr.GradingMode,
+			Weight:      cr.Weight,
+			Bands:       json.RawMessage(cr.Bands),
+			OrderIndex:  cr.OrderIndex,
+		})
+	}
+	return c.Status(fiber.StatusOK).JSON(dto.ListRubricResponse{
+		AssignmentID: assignmentID.String(),
+		Criteria:     items,
+		TotalWeight:  totalWeight,
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/instructor-assignments/:id/test-cases
 // ─────────────────────────────────────────────────────────────────────────────
 

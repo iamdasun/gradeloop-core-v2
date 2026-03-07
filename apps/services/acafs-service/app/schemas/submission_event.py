@@ -66,7 +66,7 @@ class RubricCriterion(BaseModel):
     - llm_ast       : scored by Gemini reasoning enriched with AST structural evidence.
     """
     name: str
-    description: str
+    description: Optional[str] = None   # omitempty on Go side — may be absent
     grading_mode: GradingMode
     weight: float  # max marks this criterion contributes to total_score
     bands: Optional[dict[str, RubricBand]] = None  # excellent/good/satisfactory/unsatisfactory

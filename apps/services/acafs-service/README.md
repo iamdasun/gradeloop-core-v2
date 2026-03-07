@@ -70,6 +70,18 @@ Key variables:
 - `AST_MAX_LINES`: Maximum lines to parse (default: 5000)
 - `AST_TIMEOUT_SECONDS`: Parse timeout (default: 2)
 
+LLM / Socratic tutor variables (for live tutoring)
+-----------------------------------------------
+- `OPENROUTER_API_KEY`: API key for OpenRouter / Arcee (required for Socratic chat). Default placeholder is `SET_YOUR_API_KEY_HERE` in config.
+- `OPENROUTER_MODEL`: Model identifier; default `arcee-ai/trinity-large-preview:free`.
+- `OPENROUTER_BASE_URL`: Base URL for OpenRouter (default: `https://openrouter.ai/api/v1`).
+- `GEMINI_API_KEY`: API key for Gemini rubric grading (optional if using mock grading).
+- `GEMINI_MODEL`: Gemini model id used for rubric grading (default: `gemini-2.5-flash`).
+
+Notes:
+- If `OPENROUTER_API_KEY` is left as the placeholder, the Socratic tutor will return a mock hint explaining the key must be set.
+- Ensure the API key is provided via environment variables injected by your deployment (docker-compose, k8s secret, or CI runtime).
+
 ## API Endpoints
 
 | Endpoint | Description |

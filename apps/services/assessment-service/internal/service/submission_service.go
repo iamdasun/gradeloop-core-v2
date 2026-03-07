@@ -337,6 +337,28 @@ func (s *submissionService) CreateSubmission(
 		s.logger.Warn("failed to load sample answer for submission job", zap.Error(saErr))
 	}
 
+	// Always forward assignment title and description so ACAFS can include them
+	// in LLM system prompts even when no rubric is configured.
+	job.AssignmentTitle = assignment.Title
+	job.AssignmentDescription = assignment.Description
+
+	// Load rubric criteria for ACAFS LLM grading.
+	// When Rubric is non-empty, ACAFS runs the full scoring pipeline.
+	if criteria, rcErr := s.contentRepo.ListRubricCriteria(req.AssignmentID); rcErr == nil && len(criteria) > 0 {
+		rubric := make([]queue.SubmissionRubricCriterion, 0, len(criteria))
+		for _, c := range criteria {
+			rubric = append(rubric, queue.SubmissionRubricCriterion{
+				Name:        c.Name,
+				Description: c.Description,
+				GradingMode: c.GradingMode,
+				Weight:      float64(c.Weight),
+			})
+		}
+		job.Rubric = rubric
+	} else if rcErr != nil {
+		s.logger.Warn("failed to load rubric for submission job", zap.Error(rcErr))
+	}
+
 	publishCtx, cancel := context.WithTimeout(context.Background(), publishTimeout)
 	defer cancel()
 

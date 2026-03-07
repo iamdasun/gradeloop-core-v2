@@ -20,6 +20,7 @@ type AssignmentService interface {
 
 	// Content sub-resources
 	GetAssignmentRubric(assignmentID uuid.UUID) ([]domain.AssignmentRubricCriterion, error)
+	UpdateRubricCriteria(assignmentID uuid.UUID, req []dto.CreateRubricCriterionRequest) ([]domain.AssignmentRubricCriterion, error)
 	GetAssignmentTestCases(assignmentID uuid.UUID) ([]domain.AssignmentTestCase, error)
 	GetAssignmentSampleAnswer(assignmentID uuid.UUID) (*domain.AssignmentSampleAnswer, error)
 }
@@ -132,6 +133,18 @@ func (s *assignmentService) CreateAssignment(
 
 		IsActive:  true,
 		CreatedBy: createdBy,
+	}
+
+	// Propagate language: top-level req.LanguageID (from the "Programming
+	// Language" selector) takes precedence. Fall back to the sample answer's
+	// language, then default to 71 (Python 3.8.1).
+	switch {
+	case req.LanguageID > 0:
+		assignment.LanguageID = req.LanguageID
+	case req.SampleAnswer != nil && req.SampleAnswer.LanguageID > 0:
+		assignment.LanguageID = req.SampleAnswer.LanguageID
+	default:
+		assignment.LanguageID = 71 // default: Python 3.8.1
 	}
 
 	// 5. Persist assignment row
@@ -445,6 +458,47 @@ func (s *assignmentService) GetAssignmentRubric(assignmentID uuid.UUID) ([]domai
 		s.logger.Error("failed to list rubric criteria", zap.String("assignment_id", assignmentID.String()), zap.Error(err))
 		return nil, utils.ErrInternal("failed to load rubric", err)
 	}
+	return criteria, nil
+}
+
+// UpdateRubricCriteria replaces all rubric criteria for an assignment atomically.
+// It deletes all existing rows then inserts the new set in one DB round-trip each.
+func (s *assignmentService) UpdateRubricCriteria(assignmentID uuid.UUID, req []dto.CreateRubricCriterionRequest) ([]domain.AssignmentRubricCriterion, error) {
+	if err := s.contentRepo.DeleteRubricCriteria(assignmentID); err != nil {
+		s.logger.Error("failed to delete rubric criteria", zap.String("assignment_id", assignmentID.String()), zap.Error(err))
+		return nil, utils.ErrInternal("failed to replace rubric", err)
+	}
+
+	if len(req) == 0 {
+		return []domain.AssignmentRubricCriterion{}, nil
+	}
+
+	criteria := make([]domain.AssignmentRubricCriterion, 0, len(req))
+	for i, r := range req {
+		criteria = append(criteria, domain.AssignmentRubricCriterion{
+			AssignmentID: assignmentID,
+			Name:         r.Name,
+			Description:  r.Description,
+			GradingMode:  r.GradingMode,
+			Weight:       r.Weight,
+			Bands:        datatypes.JSON(r.Bands),
+			OrderIndex:   r.OrderIndex,
+		})
+		if criteria[i].GradingMode == "" {
+			criteria[i].GradingMode = "llm"
+		}
+	}
+
+	if err := s.contentRepo.CreateRubricCriteria(criteria); err != nil {
+		s.logger.Error("failed to create rubric criteria", zap.String("assignment_id", assignmentID.String()), zap.Error(err))
+		return nil, utils.ErrInternal("failed to save rubric", err)
+	}
+
+	s.logger.Info("rubric criteria updated",
+		zap.String("assignment_id", assignmentID.String()),
+		zap.Int("count", len(criteria)),
+	)
+
 	return criteria, nil
 }
 
