@@ -134,11 +134,62 @@ export interface ListSubmissionsResponse {
     count: number;
 }
 
+// ─── ACAFS grading types ─────────────────────────────────────────────────────
+
+/** Score and justification for a single rubric criterion. */
+export interface CriterionScore {
+    name: string;
+    score: number;
+    max_score: number;
+    /** deterministic | llm | llm_ast */
+    grading_mode: string;
+    /** Instructor-facing technical justification — never shown to students. */
+    reason: string;
+}
+
+/** Complete grading result returned by ACAFS GET /api/v1/acafs/grades/:submissionId */
+export interface SubmissionGrade {
+    submission_id: string;
+    assignment_id: string;
+    total_score: number;
+    max_total_score: number;
+    criteria_scores: CriterionScore[];
+    /** Student-facing holistic feedback paragraph (Hattie & Timperley). */
+    holistic_feedback: string;
+    graded_at: string;
+    grading_metadata?: Record<string, unknown>;
+}
+
 export interface CreateSubmissionRequest {
     assignment_id: string;
     group_id?: string;
     language: string;
+    /** Judge0 language ID — required for test-case execution. */
+    language_id?: number;
     code: string;
+}
+
+/** PUT /api/v1/instructor-assignments/:id/rubric — replace all rubric criteria. */
+export interface UpdateRubricRequest {
+    criteria: RubricCriterionDto[];
+}
+
+/** Response shape from GET/PUT /instructor-assignments/:id/rubric */
+export interface ListRubricResponse {
+    assignment_id: string;
+    criteria: RubricCriterionResponse[];
+    total_weight: number;
+}
+
+/** One rubric criterion as returned by the API. */
+export interface RubricCriterionResponse {
+    id: string;
+    name: string;
+    description?: string;
+    grading_mode: string;
+    weight: number;
+    bands: RubricBand[];
+    order_index: number;
 }
 
 export interface CreateGroupRequest {

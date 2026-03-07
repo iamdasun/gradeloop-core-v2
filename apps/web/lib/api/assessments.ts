@@ -10,7 +10,10 @@ import type {
     GroupResponse,
     CreateGroupRequest,
     RunCodeRequest,
-    RunCodeResponse
+    RunCodeResponse,
+    SubmissionGrade,
+    UpdateRubricRequest,
+    ListRubricResponse,
 } from '@/types/assessments.types';
 
 // ── Instructor-scoped Assessment endpoints ───────────────────────────────────
@@ -40,15 +43,14 @@ export const instructorAssessmentsApi = {
         return data.submissions || [];
     },
 
-    // TODO: Add when backend endpoint is available
-    getRubric: async (_assignmentId: string): Promise<{ criteria: { name: string; weight: number; description?: string }[] }> => {
-        // Mock for now — returns empty or sample rubric
-        return Promise.resolve({
-            criteria: [
-                { name: "Correctness", weight: 60, description: "Accuracy of the solution." },
-                { name: "Code Quality", weight: 40, description: "Readability and structure." },
-            ],
-        });
+    getRubric: async (assignmentId: string): Promise<ListRubricResponse> => {
+        const { data } = await axiosInstance.get<ListRubricResponse>(`/instructor-assignments/${assignmentId}/rubric`);
+        return data;
+    },
+
+    updateRubric: async (assignmentId: string, req: UpdateRubricRequest): Promise<ListRubricResponse> => {
+        const { data } = await axiosInstance.put<ListRubricResponse>(`/instructor-assignments/${assignmentId}/rubric`, req);
+        return data;
     },
 };
 
@@ -161,5 +163,25 @@ export const studentAssessmentsApi = {
     runCode: async (req: RunCodeRequest): Promise<RunCodeResponse> => {
         const { data } = await axiosInstance.post<RunCodeResponse>('/submissions/run-code', req);
         return data;
+    },
+};
+
+// ── ACAFS service endpoints (via Next.js same-origin proxy) ─────────────────
+
+export const acafsApi = {
+    /**
+     * Fetch the AI-generated grade for a submission.
+     * Proxied through /api/acafs/grades/:submissionId → ACAFS service.
+     *
+     * Throws an error with message "GRADING_PENDING" when grading hasn't
+     * completed yet (ACAFS returns 404). Callers should poll with back-off.
+     */
+    getSubmissionGrade: async (submissionId: string): Promise<SubmissionGrade> => {
+        const resp = await fetch(`/api/acafs/grades/${encodeURIComponent(submissionId)}`, {
+            cache: 'no-store',
+        });
+        if (resp.status === 404) throw new Error('GRADING_PENDING');
+        if (!resp.ok) throw new Error(`Grade fetch failed with status ${resp.status}`);
+        return resp.json() as Promise<SubmissionGrade>;
     },
 };
