@@ -11,6 +11,8 @@ import {
     Save,
     X,
     RefreshCw,
+    Trash2,
+    CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,11 +23,16 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ivasApi } from "@/lib/ivas-api";
+import { useToast } from "@/components/ui/toaster";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { BulkActionToolbar } from "@/components/instructor/BulkActionToolbar";
+import { SelectCheckbox } from "@/components/instructor/SelectCheckbox";
 import type {
     IvasAssignment,
     GradingCriteria,
     IvasQuestion,
     UpdateGradingCriteriaRequest,
+    UpdateQuestionRequest,
 } from "@/types/ivas";
 
 const DIFFICULTY_LABELS: Record<number, { label: string; color: string }> = {
@@ -48,9 +55,12 @@ function DifficultyBadge({ level }: { level: number }) {
 interface CriteriaCardProps {
     criteria: GradingCriteria;
     onUpdate: (id: string, data: UpdateGradingCriteriaRequest) => Promise<void>;
+    onDelete: (id: string) => void;
+    selected: boolean;
+    onSelectedChange: (checked: boolean) => void;
 }
 
-function CriteriaCard({ criteria, onUpdate }: CriteriaCardProps) {
+function CriteriaCard({ criteria, onUpdate, onDelete, selected, onSelectedChange }: CriteriaCardProps) {
     const [editing, setEditing] = React.useState(false);
     const [saving, setSaving] = React.useState(false);
     const [form, setForm] = React.useState<UpdateGradingCriteriaRequest>({
@@ -74,35 +84,45 @@ function CriteriaCard({ criteria, onUpdate }: CriteriaCardProps) {
     };
 
     return (
-        <Card className="border border-border/60">
+        <Card className={cn("border border-border/60", selected && "ring-2 ring-primary")}>
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-col gap-1 min-w-0">
-                        {editing ? (
-                            <Input
-                                value={form.competency ?? ""}
-                                onChange={(e) => setForm((f) => ({ ...f, competency: e.target.value }))}
-                                className="text-base font-semibold h-8"
-                            />
-                        ) : (
-                            <CardTitle className="text-base font-semibold truncate">{criteria.competency}</CardTitle>
-                        )}
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <DifficultyBadge level={criteria.difficulty_level} />
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <SelectCheckbox
+                            id={`criteria-${criteria.id}`}
+                            checked={selected}
+                            onCheckedChange={onSelectedChange}
+                        />
+                        <div className="flex flex-col gap-1 min-w-0 flex-1">
                             {editing ? (
                                 <Input
-                                    value={form.level_label ?? ""}
-                                    onChange={(e) => setForm((f) => ({ ...f, level_label: e.target.value }))}
-                                    className="h-6 text-xs w-32"
-                                    placeholder="Level label"
+                                    value={form.competency ?? ""}
+                                    onChange={(e) => setForm((f) => ({ ...f, competency: e.target.value }))}
+                                    className="text-base font-semibold h-8"
                                 />
                             ) : (
-                                <span className="text-xs text-muted-foreground">{criteria.level_label}</span>
+                                <CardTitle className="text-base font-semibold truncate">{criteria.competency}</CardTitle>
                             )}
-                            <span className="text-xs text-muted-foreground">{criteria.programming_language}</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <DifficultyBadge level={criteria.difficulty_level} />
+                                {editing ? (
+                                    <Input
+                                        value={form.level_label ?? ""}
+                                        onChange={(e) => setForm((f) => ({ ...f, level_label: e.target.value }))}
+                                        className="h-6 text-xs w-32"
+                                        placeholder="Level label"
+                                    />
+                                ) : (
+                                    <span className="text-xs text-muted-foreground">{criteria.level_label}</span>
+                                )}
+                                <span className="text-xs text-muted-foreground">{criteria.programming_language}</span>
+                            </div>
                         </div>
                     </div>
                     <div className="flex gap-1 shrink-0">
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => onDelete(criteria.id)}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
                         {editing ? (
                             <>
                                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSave} disabled={saving}>
@@ -162,25 +182,89 @@ function CriteriaCard({ criteria, onUpdate }: CriteriaCardProps) {
 
 interface QuestionCardProps {
     question: IvasQuestion;
+    onUpdate: (id: string, data: UpdateQuestionRequest) => Promise<void>;
+    onDelete: (id: string) => void;
+    selected: boolean;
+    onSelectedChange: (checked: boolean) => void;
 }
 
-function QuestionCard({ question }: QuestionCardProps) {
+function QuestionCard({ question, onUpdate, onDelete, selected, onSelectedChange }: QuestionCardProps) {
     const [expanded, setExpanded] = React.useState(false);
+    const [editing, setEditing] = React.useState(false);
+    const [form, setForm] = React.useState<UpdateQuestionRequest>({
+        question_text: question.question_text,
+        expected_answer: question.expected_answer,
+        competency: question.competency,
+        difficulty: question.difficulty,
+        max_points: question.max_points,
+        status: question.status as "draft" | "approved" | "rejected",
+    });
+
+    const handleSave = async () => {
+        try {
+            await onUpdate(question.id, form);
+            setEditing(false);
+        } catch (error) {
+            console.error("Failed to update question:", error);
+        }
+    };
+
     return (
-        <div className="rounded-lg border border-border/60 p-4 space-y-2">
-            <div className="flex items-start justify-between gap-2">
-                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 flex-1">{question.question_text}</p>
-                <div className="flex items-center gap-2 shrink-0">
-                    <DifficultyBadge level={question.difficulty} />
-                    <Badge variant="outline" className="text-xs">{question.competency}</Badge>
-                    <Badge
-                        variant="outline"
-                        className={cn("text-xs", question.status === "approved"
-                            ? "border-emerald-500 text-emerald-600"
-                            : "border-amber-500 text-amber-600")}
-                    >
-                        {question.status}
-                    </Badge>
+        <div className={cn("rounded-lg border border-border/60 p-4 space-y-2", selected && "ring-2 ring-primary")}>
+            <div className="flex items-start gap-2">
+                <SelectCheckbox
+                    id={`question-${question.id}`}
+                    checked={selected}
+                    onCheckedChange={onSelectedChange}
+                />
+                <div className="flex-1 min-w-0 space-y-2">
+                    {editing ? (
+                        <Input
+                            value={form.question_text}
+                            onChange={(e) => setForm((f) => ({ ...f, question_text: e.target.value }))}
+                            className="text-sm font-medium"
+                        />
+                    ) : (
+                        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{question.question_text}</p>
+                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <DifficultyBadge level={question.difficulty} />
+                        <Badge variant="outline" className="text-xs">{question.competency}</Badge>
+                        {editing ? (
+                            <></>
+                        ) : (
+                            <Badge
+                                variant="outline"
+                                className={cn("text-xs cursor-pointer", question.status === "approved"
+                                    ? "border-emerald-500 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                    : "border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20")}
+                                onClick={() => onUpdate(question.id, { 
+                                    status: question.status === "approved" ? "draft" : "approved" 
+                                })}
+                            >
+                                {question.status}
+                            </Badge>
+                        )}
+                        <div className="flex gap-1 shrink-0">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => onDelete(question.id)}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                            {editing ? (
+                                <>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSave}>
+                                        <Save className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(false)}>
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </>
+                            ) : (
+                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(true)}>
+                                    <Edit2 className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
             <button
@@ -192,7 +276,15 @@ function QuestionCard({ question }: QuestionCardProps) {
             </button>
             {expanded && (
                 <p className="text-sm text-muted-foreground border-l-2 border-border pl-3">
-                    {question.expected_answer}
+                    {editing ? (
+                        <Textarea
+                            rows={3}
+                            value={form.expected_answer ?? ""}
+                            onChange={(e) => setForm((f) => ({ ...f, expected_answer: e.target.value }))}
+                        />
+                    ) : (
+                        question.expected_answer
+                    )}
                 </p>
             )}
         </div>
@@ -202,6 +294,7 @@ function QuestionCard({ question }: QuestionCardProps) {
 export default function VivaSetupPage() {
     const params = useParams<{ assignmentId: string }>();
     const assignmentId = params.assignmentId;
+    const { addToast } = useToast();
 
     const [assignment, setAssignment] = React.useState<IvasAssignment | null>(null);
     const [criteria, setCriteria] = React.useState<GradingCriteria[]>([]);
@@ -212,10 +305,25 @@ export default function VivaSetupPage() {
     const [generatingQuestions, setGeneratingQuestions] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
+    
+    // Bulk selection state
+    const [selectedCriteria, setSelectedCriteria] = React.useState<Set<string>>(new Set());
+    const [selectedQuestions, setSelectedQuestions] = React.useState<Set<string>>(new Set());
+    const [bulkLoading, setBulkLoading] = React.useState(false);
+    
+    // Delete confirmation dialogs
+    const [deleteDialog, setDeleteDialog] = React.useState<{
+        open: boolean;
+        type: 'criteria' | 'question';
+        id?: string;
+    }>({ open: false, type: 'criteria' });
 
     const showSuccess = (msg: string) => {
-        setSuccessMsg(msg);
-        setTimeout(() => setSuccessMsg(null), 4000);
+        addToast({ title: msg, variant: "success" });
+    };
+    
+    const showError = (msg: string) => {
+        addToast({ title: msg, variant: "error" });
     };
 
     React.useEffect(() => {
@@ -288,9 +396,83 @@ export default function VivaSetupPage() {
     };
 
     const handleUpdateCriteria = async (id: string, data: UpdateGradingCriteriaRequest) => {
-        const updated = await ivasApi.updateCriteria(id, data);
-        setCriteria((prev) => prev.map((c) => (c.id === id ? updated : c)));
-        showSuccess("Criteria updated.");
+        try {
+            const updated = await ivasApi.updateCriteria(id, data);
+            setCriteria((prev) => prev.map((c) => (c.id === id ? updated : c)));
+            showSuccess("Criteria updated.");
+        } catch (error) {
+            showError("Failed to update criteria.");
+            throw error;
+        }
+    };
+    
+    const handleDeleteCriteria = (id: string) => {
+        setDeleteDialog({ open: true, type: 'criteria', id });
+    };
+    
+    const handleBulkDeleteCriteria = async () => {
+        if (selectedCriteria.size === 0) return;
+        try {
+            setBulkLoading(true);
+            await ivasApi.batchDeleteCriteria(assignmentId, Array.from(selectedCriteria));
+            setCriteria((prev) => prev.filter((c) => !selectedCriteria.has(c.id)));
+            setSelectedCriteria(new Set());
+            showSuccess(`Deleted ${selectedCriteria.size} criteria.`);
+        } catch (error) {
+            showError("Failed to delete criteria.");
+            throw error;
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+    
+    const handleUpdateQuestion = async (id: string, data: UpdateQuestionRequest) => {
+        try {
+            const updated = await ivasApi.updateQuestion(id, data);
+            setQuestions((prev) => prev.map((q) => (q.id === id ? updated : q)));
+            showSuccess("Question updated.");
+        } catch (error) {
+            showError("Failed to update question.");
+            throw error;
+        }
+    };
+    
+    const handleDeleteQuestion = (id: string) => {
+        setDeleteDialog({ open: true, type: 'question', id });
+    };
+    
+    const handleBulkDeleteQuestions = async () => {
+        if (selectedQuestions.size === 0) return;
+        try {
+            setBulkLoading(true);
+            await ivasApi.batchDeleteQuestions(Array.from(selectedQuestions));
+            setQuestions((prev) => prev.filter((q) => !selectedQuestions.has(q.id)));
+            setSelectedQuestions(new Set());
+            showSuccess(`Deleted ${selectedQuestions.size} questions.`);
+        } catch (error) {
+            showError("Failed to delete questions.");
+            throw error;
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+    
+    const handleBulkApproveQuestions = async () => {
+        if (selectedQuestions.size === 0) return;
+        try {
+            setBulkLoading(true);
+            await ivasApi.batchUpdateQuestions(Array.from(selectedQuestions), { status: "approved" });
+            setQuestions((prev) => prev.map((q) => 
+                selectedQuestions.has(q.id) ? { ...q, status: "approved" } : q
+            ));
+            setSelectedQuestions(new Set());
+            showSuccess(`Approved ${selectedQuestions.size} questions.`);
+        } catch (error) {
+            showError("Failed to approve questions.");
+            throw error;
+        } finally {
+            setBulkLoading(false);
+        }
     };
 
     return (
@@ -405,6 +587,12 @@ export default function VivaSetupPage() {
                 <div className="space-y-8">
                     {/* Grading Criteria */}
                     <section>
+                        <BulkActionToolbar
+                            selectedCount={selectedCriteria.size}
+                            onBulkDelete={handleBulkDeleteCriteria}
+                            onClearSelection={() => setSelectedCriteria(new Set())}
+                            isLoading={bulkLoading}
+                        />
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-base font-semibold">
                                 Grading Criteria
@@ -428,7 +616,18 @@ export default function VivaSetupPage() {
                         ) : (
                             <div className="space-y-3">
                                 {criteria.map((c) => (
-                                    <CriteriaCard key={c.id} criteria={c} onUpdate={handleUpdateCriteria} />
+                                    <CriteriaCard 
+                                        key={c.id} 
+                                        criteria={c} 
+                                        onUpdate={handleUpdateCriteria}
+                                        onDelete={handleDeleteCriteria}
+                                        selected={selectedCriteria.has(c.id)}
+                                        onSelectedChange={(checked) => {
+                                            const next = new Set(selectedCriteria);
+                                            if (checked) next.add(c.id); else next.delete(c.id);
+                                            setSelectedCriteria(next);
+                                        }}
+                                    />
                                 ))}
                             </div>
                         )}
@@ -436,6 +635,13 @@ export default function VivaSetupPage() {
 
                     {/* Questions */}
                     <section>
+                        <BulkActionToolbar
+                            selectedCount={selectedQuestions.size}
+                            onBulkDelete={handleBulkDeleteQuestions}
+                            onBulkApprove={handleBulkApproveQuestions}
+                            onClearSelection={() => setSelectedQuestions(new Set())}
+                            isLoading={bulkLoading}
+                        />
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-base font-semibold">
                                 Generated Questions
@@ -459,13 +665,52 @@ export default function VivaSetupPage() {
                         ) : (
                             <div className="space-y-3">
                                 {questions.map((q) => (
-                                    <QuestionCard key={q.id} question={q} />
+                                    <QuestionCard 
+                                        key={q.id} 
+                                        question={q}
+                                        onUpdate={handleUpdateQuestion}
+                                        onDelete={handleDeleteQuestion}
+                                        selected={selectedQuestions.has(q.id)}
+                                        onSelectedChange={(checked) => {
+                                            const next = new Set(selectedQuestions);
+                                            if (checked) next.add(q.id); else next.delete(q.id);
+                                            setSelectedQuestions(next);
+                                        }}
+                                    />
                                 ))}
                             </div>
                         )}
                     </section>
                 </div>
             </div>
+            
+            {/* Delete Confirmation Dialogs */}
+            <ConfirmDialog
+                open={deleteDialog.open && deleteDialog.type === 'criteria'}
+                onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}
+                title="Delete Grading Criteria"
+                description={`Are you sure you want to delete this grading criteria? This action cannot be undone.`}
+                variant="destructive"
+                confirmText="Delete"
+                onConfirm={async () => {
+                    if (deleteDialog.id) {
+                        await handleDeleteCriteria(deleteDialog.id);
+                    }
+                }}
+            />
+            <ConfirmDialog
+                open={deleteDialog.open && deleteDialog.type === 'question'}
+                onOpenChange={(open) => setDeleteDialog({ ...deleteDialog, open })}
+                title="Delete Question"
+                description={`Are you sure you want to delete this question? This action cannot be undone.`}
+                variant="destructive"
+                confirmText="Delete"
+                onConfirm={async () => {
+                    if (deleteDialog.id) {
+                        await handleDeleteQuestion(deleteDialog.id);
+                    }
+                }}
+            />
         </div>
     );
 }

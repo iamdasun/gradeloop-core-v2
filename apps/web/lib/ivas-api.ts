@@ -18,33 +18,84 @@ import type {
     StudentSessionSummary,
     InstructorAssessmentSummary,
     ProviderInfo,
+    UpdateQuestionRequest,
+    DeleteResponse,
+    AssignmentMetadata,
+    HintRequest,
+    HintResponse,
+    PauseSessionRequest,
+    PauseSessionResponse,
+    ResumeSessionRequest,
+    ResumeSessionResponse,
+    CodeContextUpload,
+    CodeContextResponse,
+    BulkDeleteCriteriaRequest,
+    BulkDeleteResponse,
+    BulkUpdateQuestionsRequest,
+    BulkUpdateQuestionsResponse,
+    StartAssessmentRequest,
+    StartAssessmentResponse,
 } from "@/types/ivas";
 
 const IVAS_BASE_URL =
     process.env.NEXT_PUBLIC_IVAS_API_URL || "https://ivas.sudila.com";
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
+// Retry wrapper for API calls with exponential backoff
+async function retryableRequest<T>(
+    path: string,
+    options: RequestInit = {}
+): Promise<T> {
+    let lastError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const url = `${IVAS_BASE_URL}${path}`;
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    "Content-Type": "application/json",
+                    ...options.headers,
+                },
+            });
+
+            if (!response.ok) {
+                const error = await response
+                    .json()
+                    .catch(() => ({ detail: "Unknown error" }));
+                throw new Error(error.detail || response.statusText);
+            }
+
+            if (response.status === 204) return {} as T;
+            return response.json();
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error("Unknown error");
+            
+            // Don't retry on client errors (4xx)
+            if (lastError.message.includes("4")) {
+                throw lastError;
+            }
+            
+            // Wait before retrying (exponential backoff)
+            if (attempt < MAX_RETRIES) {
+                await new Promise(resolve => 
+                    setTimeout(resolve, RETRY_DELAY * Math.pow(2, attempt - 1))
+                );
+            }
+        }
+    }
+    
+    throw lastError || new Error("Request failed after retries");
+}
+
 async function ivasRequest<T>(
     path: string,
     options: RequestInit = {}
 ): Promise<T> {
-    const url = `${IVAS_BASE_URL}${path}`;
-    const response = await fetch(url, {
-        ...options,
-        headers: {
-            "Content-Type": "application/json",
-            ...options.headers,
-        },
-    });
-
-    if (!response.ok) {
-        const error = await response
-            .json()
-            .catch(() => ({ detail: "Unknown error" }));
-        throw new Error(error.detail || response.statusText);
-    }
-
-    if (response.status === 204) return {} as T;
-    return response.json();
+    return retryableRequest<T>(path, options);
 }
 
 export const ivasApi = {
@@ -117,6 +168,19 @@ export const ivasApi = {
             `/api/v1/grading-criteria/${encodeURIComponent(criteriaId)}`,
             { method: "PATCH", body: JSON.stringify(data) }
         ),
+    deleteCriteria: (criteriaId: string) =>
+        ivasRequest<DeleteResponse>(
+            `/api/v1/grading-criteria/${encodeURIComponent(criteriaId)}`,
+            { method: "DELETE" }
+        ),
+    batchDeleteCriteria: (assignmentId: string, criteriaIds: string[]) =>
+        ivasRequest<BulkDeleteResponse>(
+            `/api/v1/assignments/${encodeURIComponent(assignmentId)}/grading-criteria/batch`,
+            { 
+                method: "DELETE", 
+                body: JSON.stringify({ criteria_ids: criteriaIds })
+            }
+        ),
 
     // --- Questions (Instructor) ---
     generateQuestions: (
@@ -150,10 +214,40 @@ export const ivasApi = {
         if (params?.competency) query.set("competency", params.competency);
         const qs = query.toString();
         return ivasRequest<{ data: IvasQuestion[] }>(
-            `/api/v1/assignments/${encodeURIComponent(assignmentId)}/questions${qs ? `?${qs}` : ""
+            `/api/v1/assignments/${encodeURIComponent(assignmentId)}/questions${qs ? `?${qs}` : ""}
             }`
         ).then((r) => r.data);
     },
+    getQuestion: (questionId: string) =>
+        ivasRequest<IvasQuestion>(
+            `/api/v1/questions/${encodeURIComponent(questionId)}`
+        ),
+    updateQuestion: (questionId: string, data: UpdateQuestionRequest) =>
+        ivasRequest<IvasQuestion>(
+            `/api/v1/questions/${encodeURIComponent(questionId)}`,
+            { method: "PATCH", body: JSON.stringify(data) }
+        ),
+    deleteQuestion: (questionId: string) =>
+        ivasRequest<DeleteResponse>(
+            `/api/v1/questions/${encodeURIComponent(questionId)}`,
+            { method: "DELETE" }
+        ),
+    batchUpdateQuestions: (questionIds: string[], updates: UpdateQuestionRequest) =>
+        ivasRequest<BulkUpdateQuestionsResponse>(
+            `/api/v1/questions/batch`,
+            { 
+                method: "PATCH", 
+                body: JSON.stringify({ question_ids: questionIds, updates })
+            }
+        ),
+    batchDeleteQuestions: (questionIds: string[]) =>
+        ivasRequest<BulkDeleteResponse>(
+            `/api/v1/questions/batch`,
+            { 
+                method: "DELETE", 
+                body: JSON.stringify({ question_ids: questionIds })
+            }
+        ),
 
     // --- Assessment Sessions ---
     triggerAssessment: (data: TriggerAssessmentRequest) =>
@@ -161,14 +255,34 @@ export const ivasApi = {
             method: "POST",
             body: JSON.stringify(data),
         }),
+    startAssessment: (data: StartAssessmentRequest) =>
+        ivasRequest<StartAssessmentResponse>("/api/v1/assessments/start", {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
     getSession: (sessionId: string) =>
         ivasRequest<SessionDetailsOut>(
             `/api/v1/assessments/sessions/${encodeURIComponent(sessionId)}`
+        ),
+    pauseSession: (sessionId: string, reason?: string) =>
+        ivasRequest<PauseSessionResponse>(
+            `/api/v1/assessments/sessions/${encodeURIComponent(sessionId)}/pause`,
+            { method: "PUT", body: JSON.stringify({ session_id: sessionId, reason }) }
+        ),
+    resumeSession: (sessionId: string) =>
+        ivasRequest<ResumeSessionResponse>(
+            `/api/v1/assessments/sessions/${encodeURIComponent(sessionId)}/resume`,
+            { method: "PUT", body: JSON.stringify({ session_id: sessionId }) }
         ),
     submitResponse: (sessionId: string, data: SubmitResponseRequest) =>
         ivasRequest<SubmitResponseResponse>(
             `/api/v1/assessments/sessions/${encodeURIComponent(sessionId)}/respond`,
             { method: "POST", body: JSON.stringify(data) }
+        ),
+    requestHint: (sessionId: string, questionInstanceId: string) =>
+        ivasRequest<HintResponse>(
+            `/api/v1/assessments/sessions/${encodeURIComponent(sessionId)}/hint`,
+            { method: "POST", body: JSON.stringify({ session_id: sessionId, question_instance_id: questionInstanceId }) }
         ),
     getTranscript: (sessionId: string) =>
         ivasRequest<AssessmentTranscriptOut>(
@@ -219,4 +333,34 @@ export const ivasApi = {
             )}/assessments${qs ? `?${qs}` : ""}`
         ).then((r) => r.data);
     },
+
+    // --- Assignment Metadata ---
+    saveAssignmentMetadata: (assignmentId: string, data: { assignment_text: string }) =>
+        ivasRequest<AssignmentMetadata>(
+            `/api/v1/assignments/${encodeURIComponent(assignmentId)}/metadata`,
+            { method: "POST", body: JSON.stringify(data) }
+        ),
+    getAssignmentMetadata: (assignmentId: string) =>
+        ivasRequest<AssignmentMetadata>(
+            `/api/v1/assignments/${encodeURIComponent(assignmentId)}/metadata`
+        ),
+
+    // --- Code Context ---
+    uploadCodeContext: (assignmentId: string, code: string, language?: string, fileName?: string) =>
+        ivasRequest<CodeContextResponse>(
+            `/api/v1/assignments/${encodeURIComponent(assignmentId)}/code-context`,
+            { 
+                method: "POST", 
+                body: JSON.stringify({ 
+                    assignment_id: assignmentId, 
+                    code, 
+                    language,
+                    file_name: fileName 
+                })
+            }
+        ),
+    getCodeContext: (assignmentId: string) =>
+        ivasRequest<{ code_context: string; language: string }>(
+            `/api/v1/assignments/${encodeURIComponent(assignmentId)}/code-context`
+        ),
 };

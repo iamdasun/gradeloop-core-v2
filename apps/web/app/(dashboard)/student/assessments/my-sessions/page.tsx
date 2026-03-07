@@ -10,6 +10,7 @@ import {
     XCircle,
     Play,
     BarChart3,
+    PlusCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,16 +82,19 @@ export default function MyVivaSessionsPage() {
     return (
         <div className="flex flex-col gap-8 pb-8">
             {/* Header */}
-            <div className="flex items-center gap-3 border-b border-border/40 pb-6">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Mic2 className="h-5 w-5 text-primary" />
-                </div>
+            <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-black tracking-tight">My Viva Assessments</h1>
                     <p className="text-sm text-muted-foreground">
                         View your past and active oral assessment sessions.
                     </p>
                 </div>
+                <Button asChild className="gap-2">
+                    <Link href="/student/assessments/start">
+                        <PlusCircle className="h-4 w-4" />
+                        Start New
+                    </Link>
+                </Button>
             </div>
 
             {error && (

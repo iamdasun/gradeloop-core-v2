@@ -296,3 +296,138 @@ export interface ChatMessage {
         misconceptions?: string[];
     };
 }
+
+// ============================================================
+// Question Management
+// ============================================================
+
+export interface UpdateQuestionRequest {
+    question_text?: string;
+    expected_answer?: string;
+    competency?: string;
+    difficulty?: number;
+    max_points?: number;
+    status?: "draft" | "approved" | "rejected";
+    criteria_id?: string;
+}
+
+export interface DeleteResponse {
+    message: string;
+    deleted_id: string;
+}
+
+// ============================================================
+// Assignment Metadata
+// ============================================================
+
+export interface AssignmentMetadata {
+    assignment_id: string;
+    assignment_text: string;
+    created_at: string;
+    updated_at: string;
+}
+
+// ============================================================
+// Hint System
+// ============================================================
+
+export interface HintRequest {
+    session_id: string;
+    question_instance_id: string;
+}
+
+export interface HintResponse {
+    hint_id: string;
+    question_instance_id: string;
+    hint_text: string;
+    penalty_applied: number;
+    total_hints_used: number;
+}
+
+// ============================================================
+// Session Pause/Resume
+// ============================================================
+
+export interface PauseSessionRequest {
+    session_id: string;
+    reason?: string;
+}
+
+export interface PauseSessionResponse {
+    session_id: string;
+    status: "paused";
+    paused_at: string;
+    message: string;
+}
+
+export interface ResumeSessionRequest {
+    session_id: string;
+}
+
+export interface ResumeSessionResponse {
+    session_id: string;
+    status: "in_progress";
+    resumed_at: string;
+    current_question: QuestionWithContext | null;
+    message: string;
+}
+
+// ============================================================
+// Code Context
+// ============================================================
+
+export interface CodeContextUpload {
+    assignment_id: string;
+    code: string;
+    language?: string;
+    file_name?: string;
+}
+
+export interface CodeContextResponse {
+    assignment_id: string;
+    code_context_id: string;
+    message: string;
+}
+
+// ============================================================
+// Bulk Operations
+// ============================================================
+
+export interface BulkDeleteCriteriaRequest {
+    criteria_ids: string[];
+}
+
+export interface BulkDeleteResponse {
+    deleted_count: number;
+    deleted_ids: string[];
+    message: string;
+}
+
+export interface BulkUpdateQuestionsRequest {
+    question_ids: string[];
+    updates: UpdateQuestionRequest;
+}
+
+export interface BulkUpdateQuestionsResponse {
+    updated_count: number;
+    updated_ids: string[];
+    message: string;
+}
+
+// ============================================================
+// Assessment Start
+// ============================================================
+
+export interface StartAssessmentRequest {
+    student_id: string;
+    assignment_id: string;
+    code_context?: string;
+}
+
+export interface StartAssessmentResponse {
+    session_id: string;
+    first_question: QuestionWithContext | null;
+    total_questions: number;
+    status: string;
+    message: string;
+}

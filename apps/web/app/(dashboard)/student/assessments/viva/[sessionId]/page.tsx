@@ -13,14 +13,41 @@ import {
     BarChart3,
     CornerDownRight,
     Info,
+    Square,
+    List,
+    Activity,
+    BrainCircuit,
+    Mic,
+    Pause,
+    Play,
+    Lightbulb,
+    Wifi,
+    WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { ivasApi } from "@/lib/ivas-api";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { useToast } from "@/components/ui/toaster";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import type {
     ChatMessage,
     QuestionWithContext,
@@ -62,102 +89,121 @@ function CompetencyBar({ item }: { item: CompetencySummary }) {
     );
 }
 
-// ── Message bubble ─────────────────────────────────────────────────────────────
+// ── Transcript Panel ──────────────────────────────────────────────────────────
 
-function MessageBubble({ msg }: { msg: ChatMessage }) {
-    if (msg.role === "system") {
-        return (
-            <div className="flex justify-center">
-                <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
-                    {msg.content}
-                </span>
-            </div>
-        );
-    }
-
-    if (msg.role === "user") {
-        return (
-            <div className="flex justify-end">
-                <div className="max-w-[75%] rounded-2xl rounded-tr-sm bg-primary text-primary-foreground px-4 py-2.5">
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                </div>
-            </div>
-        );
-    }
-
-    // assistant
-    const meta = msg.metadata;
-    const isQuestion = !meta?.isFeedback && meta?.questionType !== undefined;
-    const isFeedback = meta?.isFeedback === true;
-
-    if (isFeedback) {
-        // Check if it's a teaching message (teach_and_skip classification — indicated by Info style)
-        return (
-            <div className="flex gap-3">
-                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <Info className="h-3.5 w-3.5 text-primary" />
-                </div>
-                <div className="flex-1 max-w-[80%] rounded-2xl rounded-tl-sm bg-muted/50 px-4 py-3 space-y-2">
-                    {meta?.score !== undefined && (
-                        <ScoreBadge score={meta.score} />
-                    )}
-                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                    {meta?.misconceptions && meta.misconceptions.length > 0 && (
-                        <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40 px-3 py-2">
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
-                            <p className="text-xs text-amber-700 dark:text-amber-400">
-                                <span className="font-medium">Misconceptions: </span>
-                                {meta.misconceptions.join(", ")}
-                            </p>
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    }
-
-    if (isQuestion) {
-        return (
-            <div className="flex gap-3">
-                <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <Mic2 className="h-3.5 w-3.5 text-primary" />
-                </div>
-                <div className="flex-1 max-w-[80%] rounded-2xl rounded-tl-sm bg-card border border-border/60 px-4 py-3 space-y-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        {meta?.competency && (
-                            <Badge variant="secondary" className="text-xs">{meta.competency}</Badge>
-                        )}
-                        {meta?.difficulty !== undefined && (
-                            <span className="text-xs text-muted-foreground">Difficulty {meta.difficulty}</span>
-                        )}
-                        {meta?.questionType === "follow_up" && (
-                            <span className="inline-flex items-center gap-1 text-xs text-primary/70">
-                                <CornerDownRight className="h-3 w-3" />
-                                Follow-up
-                            </span>
-                        )}
-                        {meta?.questionType === "re_ask" && (
-                            <span className="text-xs text-muted-foreground italic">Let&apos;s try this again</span>
-                        )}
-                    </div>
-                    <p className="text-sm font-medium whitespace-pre-wrap">{msg.content}</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Plain assistant message
+function TranscriptPanel({ messages }: { messages: ChatMessage[] }) {
     return (
-        <div className="flex gap-3">
-            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                <Mic2 className="h-3.5 w-3.5 text-primary" />
+        <ScrollArea className="h-[calc(100vh-80px)] p-6 z-50">
+            <div className="space-y-6 pb-20">
+                {messages.map((msg, i) => (
+                    <div key={msg.id || i} className={cn("flex flex-col", msg.role === 'user' ? "items-end" : "items-start")}>
+                        <span className="text-[10px] text-zinc-500 uppercase font-semibold tracking-wider mb-1.5 ml-1">
+                            {msg.role === 'user' ? 'You' : 'IVAS'}
+                        </span>
+                        <div className={cn(
+                            "px-4 py-3 rounded-2xl max-w-[85%] text-[15px] leading-relaxed",
+                            msg.role === 'user'
+                                ? "bg-emerald-600/20 text-emerald-100 border border-emerald-500/20 rounded-tr-sm"
+                                : "bg-zinc-800/50 text-zinc-300 border border-zinc-700/50 rounded-tl-sm"
+                        )}>
+                            {msg.content}
+                        </div>
+                    </div>
+                ))}
             </div>
-            <div className="max-w-[80%] rounded-2xl rounded-tl-sm bg-muted/50 px-4 py-3">
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-            </div>
+        </ScrollArea>
+    );
+}
+
+// ── AI Core Orb ──────────────────────────────────────────────────────────────
+
+interface AICoreOrbProps {
+    state: "idle" | "ai_speaking" | "user_speaking" | "thinking";
+}
+
+function AICoreOrb({ state }: AICoreOrbProps) {
+    return (
+        <div className="relative flex items-center justify-center">
+            {/* Outer Glow */}
+            <motion.div
+                animate={{
+                    scale: state === "user_speaking" ? [1, 1.2, 1] : [1, 1.05, 1],
+                    opacity: state === "idle" ? 0.3 : 0.6,
+                }}
+                transition={{
+                    duration: state === "user_speaking" ? 0.8 : 3,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                }}
+                className={cn(
+                    "absolute h-64 w-64 rounded-full blur-[60px]",
+                    state === "user_speaking" ? "bg-emerald-500/40" :
+                        state === "ai_speaking" ? "bg-teal-500/40" : "bg-emerald-500/20"
+                )}
+            />
+
+            {/* Pulsing Rings */}
+            {[...Array(3)].map((_, i) => (
+                <motion.div
+                    key={i}
+                    animate={{
+                        scale: state === "ai_speaking" ? [1, 1.4 + i * 0.1] : [1, 1.1 + i * 0.05],
+                        opacity: state === "ai_speaking" ? [0.5, 0] : [0.2, 0],
+                    }}
+                    transition={{
+                        duration: state === "user_speaking" ? 1 : 2,
+                        repeat: Infinity,
+                        delay: i * 0.4,
+                        ease: "easeOut",
+                    }}
+                    className="absolute h-48 w-48 rounded-full border border-emerald-500/30"
+                />
+            ))}
+
+            {/* Core Orb */}
+            <motion.div
+                animate={{
+                    rotate: state === "thinking" ? 360 : 0,
+                    scale: state === "user_speaking" ? 1.1 : 1,
+                }}
+                transition={{
+                    rotate: { duration: 10, repeat: Infinity, ease: "linear" },
+                    scale: { duration: 0.5 }
+                }}
+                className={cn(
+                    "relative h-40 w-40 rounded-full flex items-center justify-center border-2 overflow-hidden shadow-[0_0_50px_rgba(16,185,129,0.2)]",
+                    state === "user_speaking"
+                        ? "bg-emerald-500/20 border-emerald-400/50"
+                        : "bg-zinc-900 border-zinc-800"
+                )}
+            >
+                <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-teal-500/10" />
+                <BrainCircuit className={cn(
+                    "h-16 w-16 transition-colors duration-500 z-10",
+                    state !== "idle" ? "text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.5)]" : "text-zinc-600"
+                )} />
+            </motion.div>
         </div>
     );
 }
+
+// ── Voice Waveform ───────────────────────────────────────────────────────────
+
+function VoiceWaveform({ audioData }: { audioData: number[] }) {
+    return (
+        <div className="flex items-center gap-1.5 h-12">
+            {audioData.map((h, i) => (
+                <motion.div
+                    key={i}
+                    animate={{ height: h }}
+                    transition={{ type: 'spring', bounce: 0.1, duration: 0.1 }}
+                    className="w-1.5 rounded-full bg-emerald-400/80 shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                />
+            ))}
+        </div>
+    );
+}
+
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
@@ -167,6 +213,7 @@ export default function VivaSessionPage() {
     const router = useRouter();
     const sessionId = params.sessionId;
     const user = useAuthStore((s) => s.user);
+    const { addToast } = useToast();
 
     // assignmentId passed as query param when starting new: ?assignmentId=...
     const assignmentIdFromQuery = searchParams.get("assignmentId");
@@ -186,17 +233,145 @@ export default function VivaSessionPage() {
     const [inputValue, setInputValue] = React.useState("");
     const [abandonConfirm, setAbandonConfirm] = React.useState(false);
     const [abandoning, setAbandoning] = React.useState(false);
+    
+    // Enhanced features state
+    const [isPaused, setIsPaused] = React.useState(false);
+    const [connectionStatus, setConnectionStatus] = React.useState<"connected" | "disconnected" | "reconnecting">("connected");
+    const [showHintDialog, setShowHintDialog] = React.useState(false);
+    const [currentHint, setCurrentHint] = React.useState<string>("");
+    const [hintsUsed, setHintsUsed] = React.useState(0);
+    const [reconnectAttempts, setReconnectAttempts] = React.useState(0);
 
-    const bottomRef = React.useRef<HTMLDivElement>(null);
-    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+    // Audio context for visualization
+    const [audioData, setAudioData] = React.useState<number[]>(Array(5).fill(20));
 
-    const scrollToBottom = () => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Keep reference to the active websocket
+    const wsRef = React.useRef<WebSocket | null>(null);
+    const reconnectTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    // Web Speech API hook logic
+    const [isRecording, setIsRecording] = React.useState(false);
+    const [recordingTime, setRecordingTime] = React.useState(0);
+    const [interimTranscript, setInterimTranscript] = React.useState("");
+    const recognitionRef = React.useRef<any>(null);
+    const recordingIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+    const visualizerIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    // Simulate audio volume for visuals
+    React.useEffect(() => {
+        if (isRecording || sending) {
+            visualizerIntervalRef.current = setInterval(() => {
+                setAudioData(Array.from({ length: 5 }, () => Math.random() * 40 + 10));
+            }, 100);
+        } else {
+            if (visualizerIntervalRef.current) clearInterval(visualizerIntervalRef.current);
+            setAudioData(Array(5).fill(10));
+        }
+        return () => {
+            if (visualizerIntervalRef.current) clearInterval(visualizerIntervalRef.current);
+        }
+    }, [isRecording, sending]);
+
+    // Stop recording timer when component unmounts
+    React.useEffect(() => {
+        return () => {
+            if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+            if (recognitionRef.current) recognitionRef.current.stop();
+        };
+    }, []);
+
+    const startRecording = () => {
+        // Stop any ongoing TTS audio
+        document.querySelectorAll('audio').forEach(audio => {
+            audio.pause();
+            audio.currentTime = 0;
+        });
+
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            addMessage({ role: "system", content: "Error: Your browser does not support the Web Speech API. Please use Chrome or Edge." });
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        let finalTranscript = '';
+
+        recognition.onstart = () => {
+            setIsRecording(true);
+            setRecordingTime(0);
+            recordingIntervalRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+        };
+
+        recognition.onresult = (event: any) => {
+            let interim = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interim += event.results[i][0].transcript;
+                }
+            }
+            setInterimTranscript(interim || finalTranscript);
+        };
+
+        recognition.onerror = (event: any) => {
+            if (event.error === 'no-speech') {
+                // If the user stops speaking for a while, just stop recording and submit what we have implicitly
+                if (finalTranscript.trim()) {
+                    handleSubmit(finalTranscript.trim());
+                }
+            } else if (event.error !== 'aborted') {
+                addMessage({ role: "system", content: `Speech recognition error: ${event.error}` });
+            }
+            stopRecording(false);
+        };
+
+        recognition.onend = () => {
+            if (finalTranscript.trim()) {
+                // Submit the transcribed text
+                handleSubmit(finalTranscript.trim());
+            }
+            stopRecording(false); // Make sure state is reset without double-submitting
+            setInterimTranscript("");
+        };
+
+        recognitionRef.current = recognition;
+        try {
+            recognition.start();
+        } catch (e) {
+            console.error("Could not start recognition:", e);
+        }
     };
 
-    React.useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
+    const stopRecording = (shouldSubmit: boolean = true) => {
+        setIsRecording(false);
+        if (recordingIntervalRef.current) {
+            clearInterval(recordingIntervalRef.current);
+            recordingIntervalRef.current = null;
+        }
+        if (recognitionRef.current) {
+            // Stop speech recognition (this will trigger onend event, which handles submission if shouldSubmit is implicitly handled there. 
+            // In continuous mode, calling stop() finalizes the current speech and triggers onend)
+            try {
+                // Prevent the onend from double firing if we manually cancelled it or if we don't want it to submit empty
+                if (!shouldSubmit) {
+                    recognitionRef.current.onend = null;
+                }
+                recognitionRef.current.stop();
+            } catch (e) {
+                // Ignore
+            }
+            recognitionRef.current = null;
+        }
+    };
+
+    const bottomRef = React.useRef<HTMLDivElement>(null);
 
     const addMessage = (msg: Omit<ChatMessage, "id" | "timestamp">) => {
         setMessages((prev) => [
@@ -366,83 +541,230 @@ export default function VivaSessionPage() {
         // If session exists but no messages (shouldn't happen normally)
     }, [sessionId, initializing, session, messages.length, user?.id]);
 
-    const handleSubmit = async () => {
-        if (!inputValue.trim() || !currentQuestion || sending || isComplete) return;
+    // --- Voice WebSocket Connection ---
+    React.useEffect(() => {
+        if (!user?.id || !sessionId || sessionId === "new" || isComplete || initializing) return;
 
-        const responseText = inputValue.trim();
-        setInputValue("");
+        const baseUrl = process.env.NEXT_PUBLIC_IVAS_API_URL || "https://ivas.sudila.com";
+        const wsBaseUrl = baseUrl.replace(/^http/, "ws");
+        const wsUrl = `${wsBaseUrl}/api/v1/assessments/sessions/${encodeURIComponent(sessionId)}/voice`;
+
+        let ws: WebSocket | null = null;
+
+        const connect = () => {
+            ws = new WebSocket(wsUrl);
+            wsRef.current = ws;
+
+            ws.onopen = () => {
+                console.log("Voice WebSocket connected");
+                // On open, optionally tell the backend we are here for this question (if supported check first)
+                if (currentQuestion?.question_instance_id) {
+                    ws?.send(JSON.stringify({
+                        type: 'start_session',
+                        question_instance_id: currentQuestion.question_instance_id,
+                        question_text: currentQuestion.question_text,
+                    }));
+                }
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    // Try to parse as JSON first (based on the sample)
+                    const msg = JSON.parse(event.data);
+
+                    // Route WebSocket actions matching the HTML test logic
+                    if (msg.type === "instructor_response") {
+                        addMessage({ role: "system", content: "Instructor: " + msg.message });
+                        if (msg.audio_b64) playBase64Audio(msg.audio_b64, true);
+                        setSending(false);
+                    } else if (msg.type === "evaluation") {
+                        addMessage({
+                            role: "assistant",
+                            content: msg.feedback || "Evaluation complete",
+                            metadata: {
+                                isFeedback: true,
+                                score: msg.score ?? undefined,
+                                misconceptions: msg.misconceptions ?? undefined,
+                            },
+                        });
+                        if (msg.audio_b64) playBase64Audio(msg.audio_b64, true);
+                    } else if (msg.type === "next_question") {
+                        setCurrentQuestion({
+                            ...msg,
+                            question_text: msg.question_text,
+                            question_instance_id: msg.question_instance_id,
+                            is_follow_up: msg.is_follow_up
+                        } as any);
+
+                        addMessage({
+                            role: "assistant",
+                            content: msg.question_text,
+                            metadata: {
+                                questionType: msg.is_follow_up ? "follow_up" : "new",
+                            },
+                        });
+                        if (msg.audio_b64) playBase64Audio(msg.audio_b64);
+                        setSending(false);
+                    } else if (msg.type === "session_complete") {
+                        setIsComplete(true);
+                        setFinalData({
+                            final_score: msg.final_score,
+                            max_score: msg.max_score,
+                            competency_summary: msg.competency_summary,
+                        });
+                        if (msg.message) addMessage({ role: "system", content: msg.message });
+                        if (msg.audio_b64) playBase64Audio(msg.audio_b64, true);
+                        setCurrentQuestion(null);
+                        setSending(false);
+                    } else if (msg.type === "error") {
+                        addMessage({ role: "system", content: `Error: ${msg.message}` });
+                        setSending(false);
+                    }
+
+                    // Fallbacks for direct audio property payload
+                    if (msg.audio) {
+                        playBase64Audio(msg.audio);
+                    } else if (msg.audioContent) {
+                        playBase64Audio(msg.audioContent);
+                    }
+                } catch {
+                    // Not JSON, assume raw base64 string
+                    if (typeof event.data === "string" && event.data.length > 20) {
+                        playBase64Audio(event.data);
+                    }
+                }
+            };
+
+            // --- Voice Audio Playback Logic from Test ---
+            const audioQueue: string[] = [];
+            let isPlaying = false;
+
+            const playNextInQueue = () => {
+                if (audioQueue.length === 0) {
+                    isPlaying = false;
+                    return;
+                }
+                isPlaying = true;
+                const url = audioQueue.shift()!;
+                const audio = new window.Audio(url);
+                audio.onended = () => {
+                    URL.revokeObjectURL(url);
+                    playNextInQueue();
+                };
+                audio.onerror = (e) => {
+                    console.error("Error playing audio", e);
+                    URL.revokeObjectURL(url);
+                    playNextInQueue();
+                };
+                audio.play().catch(e => {
+                    console.warn("Audio autoplay blocked by browser or failed", e);
+                    isPlaying = false;
+                });
+            };
+
+            const playBase64Audio = (base64Data: string, cancelPrevious = false) => {
+                try {
+                    if (!base64Data) return;
+
+                    if (cancelPrevious) {
+                        audioQueue.length = 0; // Clear array
+                        document.querySelectorAll('audio').forEach(audio => {
+                            audio.pause();
+                            audio.currentTime = 0;
+                        });
+                        isPlaying = false;
+                    }
+
+                    // Convert base64 to blob URL
+                    const binaryString = atob(base64Data);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    const blob = new Blob([bytes], { type: 'audio/mp3' });
+                    const url = URL.createObjectURL(blob);
+
+                    audioQueue.push(url);
+                    if (!isPlaying) {
+                        playNextInQueue();
+                    }
+                } catch (err) {
+                    console.error("Error queueing audio data", err);
+                }
+            };
+
+            ws.onerror = (err) => {
+                console.error("Voice WebSocket error", err);
+                setConnectionStatus("reconnecting");
+            };
+
+            ws.onclose = () => {
+                console.log("Voice WebSocket closed");
+                if (wsRef.current === ws) wsRef.current = null;
+                
+                // Auto-reconnect if session is still in progress and not paused
+                if (session?.session.status === "in_progress" && !isPaused && !isComplete && reconnectAttempts < 5) {
+                    setConnectionStatus("reconnecting");
+                    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+                    reconnectTimeoutRef.current = setTimeout(() => {
+                        setReconnectAttempts(prev => prev + 1);
+                        connect();
+                    }, delay);
+                    
+                    addToast({
+                        title: "Reconnecting...",
+                        description: `Attempting to reconnect (${reconnectAttempts + 1}/5)`,
+                        variant: "warning"
+                    });
+                } else if (reconnectAttempts >= 5) {
+                    setConnectionStatus("disconnected");
+                    addToast({
+                        title: "Connection Lost",
+                        description: "Failed to reconnect. Please refresh the page.",
+                        variant: "error"
+                    });
+                }
+            };
+        };
+
+        connect();
+
+        return () => {
+            if (ws) {
+                ws.close();
+            }
+        };
+    }, [sessionId, isComplete, initializing, user?.id]);
+
+    const handleSubmit = async (transcribedText?: string) => {
+        if (!transcribedText || !currentQuestion || sending || isComplete) return;
+
+        let responseText = transcribedText;
+
         setSending(true);
 
         // Optimistically add user message
         addMessage({ role: "user", content: responseText });
 
         try {
-            const result = await ivasApi.submitResponse(sessionId, {
-                question_instance_id: currentQuestion.question_instance_id,
-                response_text: responseText,
-            });
-
-            // Add feedback message
-            if (result.feedback_text) {
-                addMessage({
-                    role: "assistant",
-                    content: result.feedback_text,
-                    metadata: {
-                        isFeedback: true,
-                        score: result.evaluation_score ?? undefined,
-                        misconceptions: result.detected_misconceptions ?? undefined,
-                    },
-                });
-            }
-
-            // System message if present
-            if (result.message) {
-                addMessage({ role: "system", content: result.message });
-            }
-
-            if (result.is_complete) {
-                setIsComplete(true);
-                setFinalData({
-                    final_score: result.final_score,
-                    max_score: result.max_score,
-                    competency_summary: result.competency_summary,
-                });
-                setCurrentQuestion(null);
-            } else if (result.next_question) {
-                setCurrentQuestion(result.next_question);
-                addMessage({
-                    role: "assistant",
-                    content: result.next_question.question_text,
-                    metadata: {
-                        competency: result.next_question.competency,
-                        difficulty: result.next_question.difficulty,
-                        questionType: result.next_question.question_type,
-                    },
-                });
+            // If the WebSocket is alive, send over WebSocket
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                wsRef.current.send(JSON.stringify({
+                    type: 'message',
+                    question_instance_id: currentQuestion.question_instance_id,
+                    text: responseText,
+                }));
+            } else {
+                addMessage({ role: "system", content: "Error: WebSocket stream is disconnected. Please refresh the page." });
+                setSending(false);
             }
         } catch (err) {
-            const message =
-                err instanceof Error ? err.message : "Failed to submit response.";
-            if (message.toLowerCase().includes("already")) {
-                addMessage({ role: "system", content: "Response already submitted." });
-            } else if (message.toLowerCase().includes("not active") || message.toLowerCase().includes("400")) {
-                addMessage({ role: "system", content: "Session has ended." });
-                setIsComplete(true);
-            } else {
-                addMessage({ role: "system", content: `Error: ${message}` });
-            }
-        } finally {
+            const message = err instanceof Error ? err.message : "Failed to submit response.";
+            addMessage({ role: "system", content: `Error: ${message}` });
             setSending(false);
-            textareaRef.current?.focus();
         }
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            handleSubmit();
-        }
-    };
 
     const handleAbandon = async () => {
         try {
@@ -455,6 +777,59 @@ export default function VivaSessionPage() {
             setAbandonConfirm(false);
         } finally {
             setAbandoning(false);
+        }
+    };
+    
+    const handlePauseResume = async () => {
+        try {
+            if (isPaused) {
+                // Resume
+                const result = await ivasApi.resumeSession(sessionId);
+                setIsPaused(false);
+                setCurrentQuestion(result.current_question);
+                addToast({
+                    title: "Session Resumed",
+                    variant: "success",
+                });
+            } else {
+                // Pause
+                await ivasApi.pauseSession(sessionId, "User requested pause");
+                setIsPaused(true);
+                addToast({
+                    title: "Session Paused",
+                    description: "You can resume when you're ready.",
+                    variant: "warning",
+                });
+            }
+        } catch (error) {
+            addToast({
+                title: "Failed to update session",
+                description: error instanceof Error ? error.message : "Please try again.",
+                variant: "error",
+            });
+        }
+    };
+    
+    const handleRequestHint = async () => {
+        if (!currentQuestion?.question_instance_id) return;
+        
+        try {
+            const result = await ivasApi.requestHint(sessionId, currentQuestion.question_instance_id);
+            setCurrentHint(result.hint_text);
+            setHintsUsed(prev => prev + 1);
+            setShowHintDialog(true);
+            
+            addToast({
+                title: "Hint Available",
+                description: `Penalty: ${result.penalty_applied} points`,
+                variant: "default",
+            });
+        } catch (error) {
+            addToast({
+                title: "Failed to get hint",
+                description: error instanceof Error ? error.message : "Please try again.",
+                variant: "error",
+            });
         }
     };
 
@@ -485,161 +860,333 @@ export default function VivaSessionPage() {
         : messages.filter((m) => m.role === "assistant" && !m.metadata?.isFeedback).length;
 
     return (
-        <div className="flex flex-col h-[calc(100dvh-120px)] max-h-[900px]">
-            {/* Session Header */}
-            <div className="flex items-center justify-between gap-3 border-b border-border/40 pb-4 mb-4 shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                            <Mic2 className="h-5 w-5 text-primary" />
-                        </div>
-                        {!isComplete && (
-                            <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-background animate-pulse" />
+        <div className="fixed inset-0 z-[100] w-full h-full bg-black text-emerald-50 overflow-hidden font-sans selection:bg-emerald-500/30">
+            {/* Ambient Background Effects */}
+            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+                <motion.div
+                    animate={{
+                        opacity: sending ? 0.4 : 0.15,
+                        scale: sending ? 1.2 : 1,
+                        x: sending ? [0, 20, 0] : 0,
+                        backgroundColor: sending ? "rgba(20, 184, 166, 0.2)" : "rgba(16, 185, 129, 0.1)"
+                    }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute -top-[20%] -left-[10%] w-[80vw] h-[80vw] rounded-full blur-[120px]"
+                />
+                <motion.div
+                    animate={{
+                        opacity: isRecording ? 0.5 : 0.15,
+                        scale: isRecording ? 1.3 : 1,
+                        x: isRecording ? [0, -20, 0] : 0,
+                        backgroundColor: isRecording ? "rgba(16, 185, 129, 0.25)" : "rgba(20, 184, 166, 0.1)"
+                    }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute -bottom-[20%] -right-[10%] w-[70vw] h-[70vw] rounded-full blur-[100px]"
+                />
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+            </div>
+
+            {/* Top Navigation / HeaderBar */}
+            <div className="relative z-10 flex items-center justify-between px-6 py-5">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        {connectionStatus === "connected" ? (
+                            <>
+                                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
+                                <span className="text-sm font-semibold tracking-wider text-emerald-400/90 uppercase">IVAS Session</span>
+                            </>
+                        ) : connectionStatus === "reconnecting" ? (
+                            <>
+                                <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                                <span className="text-sm font-semibold tracking-wider text-amber-400/90 uppercase flex items-center gap-1">
+                                    Reconnecting
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <WifiOff className="h-4 w-4 text-red-500" />
+                                <span className="text-sm font-semibold tracking-wider text-red-400/90 uppercase">Disconnected</span>
+                            </>
                         )}
                     </div>
-                    <div>
-                        <h1 className="text-lg font-bold leading-tight">Viva Assessment</h1>
-                        <p className="text-xs text-muted-foreground">
-                            {isComplete ? (
-                                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                                    <CheckCircle2 className="h-3 w-3" /> Completed
-                                </span>
-                            ) : (
-                                `Question ${questionIndex} of ${session?.total_questions ?? "?"}`
-                            )}
-                        </p>
-                    </div>
+                    {session && !isComplete && (
+                        <div className="flex items-center gap-3 ml-4 bg-zinc-900/30 px-3 py-1 rounded-full border border-zinc-800/50">
+                            <span className="text-xs font-medium text-zinc-400">
+                                Q{questionIndex} / {session.total_questions}
+                            </span>
+                            <div className="h-3 w-[1px] bg-zinc-800" />
+                            <span className="text-xs font-mono text-zinc-500">
+                                {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                            </span>
+                        </div>
+                    )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                    {!isComplete && (
+                <div className="flex items-center gap-3">
+                    {!isComplete && session?.session.status === "in_progress" && (
                         <>
+                            {/* Hint Button */}
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="bg-zinc-900/40 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white backdrop-blur-md rounded-full px-4 transition-all"
+                                onClick={handleRequestHint}
+                            >
+                                <Lightbulb className="h-4 w-4 mr-2" />
+                                Hint
+                            </Button>
+                            
+                            {/* Pause/Resume Button */}
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className={cn(
+                                    "backdrop-blur-md rounded-full px-4 transition-all",
+                                    isPaused 
+                                        ? "bg-emerald-600/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-600/30" 
+                                        : "bg-zinc-900/40 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                                )}
+                                onClick={handlePauseResume}
+                            >
+                                {isPaused ? (
+                                    <>
+                                        <Play className="h-4 w-4 mr-2" />
+                                        Resume
+                                    </>
+                                ) : (
+                                    <>
+                                        <Pause className="h-4 w-4 mr-2" />
+                                        Pause
+                                    </>
+                                )}
+                            </Button>
+                        </>
+                    )}
+                    
+                    <Sheet>
+                        <SheetTrigger asChild>
+                            <Button variant="outline" size="sm" className="bg-zinc-900/40 border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white backdrop-blur-md rounded-full px-4 transition-all">
+                                <List className="h-4 w-4 mr-2" /> History
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent className="bg-zinc-950/95 border-zinc-800 text-zinc-100 p-0 sm:max-w-md w-[85vw] backdrop-blur-xl">
+                            <SheetHeader className="p-6 border-b border-zinc-800/60 bg-zinc-900/20">
+                                <SheetTitle className="text-zinc-100 flex items-center gap-2">
+                                    <Activity className="h-4 w-4 text-emerald-500" />
+                                    Session History
+                                </SheetTitle>
+                            </SheetHeader>
+                            <TranscriptPanel messages={messages} />
+                        </SheetContent>
+                    </Sheet>
+
+                    {!isComplete ? (
+                        <div className="flex gap-2">
                             {abandonConfirm ? (
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs text-muted-foreground">Abandon this session?</span>
-                                    <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={handleAbandon}
-                                        disabled={abandoning}
-                                    >
-                                        {abandoning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Yes, abandon"}
+                                <div className="flex items-center bg-red-950/40 border border-red-900/50 rounded-full pl-3 pr-1 py-1 backdrop-blur-md">
+                                    <Button size="sm" variant="destructive" className="h-7 px-3 text-xs rounded-full bg-red-600/80 hover:bg-red-600" onClick={handleAbandon} disabled={abandoning}>
+                                        {abandoning ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirm End"}
                                     </Button>
-                                    <Button size="sm" variant="ghost" onClick={() => setAbandonConfirm(false)}>
-                                        Cancel
+                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-red-300 hover:text-red-100 hover:bg-white/10 rounded-full" onClick={() => setAbandonConfirm(false)}>
+                                        <XCircle className="h-4 w-4" />
                                     </Button>
                                 </div>
                             ) : (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-muted-foreground"
-                                    onClick={() => setAbandonConfirm(true)}
-                                >
-                                    <XCircle className="h-3.5 w-3.5 mr-1" />
-                                    Abandon
+                                <Button size="sm" variant="ghost" className="text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors" onClick={() => setAbandonConfirm(true)}>
+                                    <XCircle className="h-4 w-4" />
                                 </Button>
                             )}
-                        </>
-                    )}
-                    {isComplete && (
-                        <Button asChild size="sm" variant="outline">
+                        </div>
+                    ) : (
+                        <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-[0_0_15px_rgba(16,185,129,0.3)]">
                             <Link href={`/student/assessments/results/${sessionId}`}>
-                                <BarChart3 className="h-3.5 w-3.5 mr-1" />
-                                View Results
+                                <BarChart3 className="h-4 w-4 mr-2" /> Results
                             </Link>
                         </Button>
                     )}
                 </div>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-                {messages.map((msg) => (
-                    <MessageBubble key={msg.id} msg={msg} />
-                ))}
+            {/* CenterStage */}
+            <main className="flex-1 relative z-10 flex flex-col items-center justify-center px-6 w-full max-w-5xl mx-auto h-full overflow-y-auto pt-10 pb-32">
+                <AICoreOrb state={isComplete ? "idle" : sending ? "thinking" : isRecording ? "user_speaking" : "ai_speaking"} />
 
-                {/* Typing indicator */}
-                {sending && (
-                    <div className="flex gap-3">
-                        <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
-                        </div>
-                        <div className="rounded-2xl rounded-tl-sm bg-muted/50 px-4 py-3">
-                            <p className="text-sm text-muted-foreground italic">AI is evaluating your response…</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Completion card */}
-                {isComplete && finalData && (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-900/20 p-5 space-y-4">
-                        <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-semibold">
-                            <CheckCircle2 className="h-5 w-5" />
-                            Assessment Complete!
-                        </div>
-                        {finalData.final_score !== null && finalData.max_score !== null && (
-                            <div>
-                                <p className="text-3xl font-black text-emerald-700 dark:text-emerald-400">
-                                    {finalData.final_score}/{finalData.max_score}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    {Math.round((finalData.final_score / finalData.max_score) * 100)}% overall
-                                </p>
-                            </div>
-                        )}
-                        {finalData.competency_summary && finalData.competency_summary.length > 0 && (
-                            <div className="space-y-2">
-                                {finalData.competency_summary.map((item) => (
-                                    <CompetencyBar key={item.competency} item={item} />
-                                ))}
-                            </div>
-                        )}
-                        <Button asChild className="w-full">
-                            <Link href={`/student/assessments/results/${sessionId}`}>
-                                <BarChart3 className="h-4 w-4 mr-2" />
-                                View Full Results
-                            </Link>
-                        </Button>
-                    </div>
-                )}
-
-                <div ref={bottomRef} />
-            </div>
-
-            {/* Input Area */}
-            <div className="shrink-0 mt-4 border-t border-border/40 pt-4">
-                {isComplete ? (
-                    <div className="rounded-xl border border-dashed border-border/60 p-4 text-center text-sm text-muted-foreground">
-                        This session has ended.
-                    </div>
-                ) : (
-                    <div className="flex gap-3 items-end">
-                        <Textarea
-                            ref={textareaRef}
-                            rows={3}
-                            placeholder="Type your answer… (Enter to send, Shift+Enter for new line)"
-                            className="flex-1 resize-none"
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            disabled={sending || isComplete}
-                        />
-                        <Button
-                            size="icon"
-                            className="h-[72px] w-12 shrink-0"
-                            onClick={handleSubmit}
-                            disabled={!inputValue.trim() || sending || isComplete}
+                <div className="mt-16 w-full text-center space-y-8 select-none">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={currentQuestion?.question_instance_id || 'done'}
+                            initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+                            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                            exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
+                            transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+                            className="max-w-3xl mx-auto"
                         >
-                            {sending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                            {isComplete ? (
+                                <div className="space-y-6">
+                                    <h2 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-400 tracking-tight">
+                                        Session Complete
+                                    </h2>
+                                    <p className="text-zinc-400 text-lg max-w-lg mx-auto leading-relaxed">
+                                        You have successfully finished the viva assessment. View your detailed feedback in the results page.
+                                    </p>
+                                </div>
                             ) : (
-                                <Send className="h-4 w-4" />
+                                <h2 className="text-2xl sm:text-3xl md:text-4xl font-medium text-zinc-100 leading-tight tracking-tight">
+                                    {currentQuestion?.question_text || "I'm preparing the next sequence..."}
+                                </h2>
                             )}
-                        </Button>
+                        </motion.div>
+                    </AnimatePresence>
+
+                    {/* Voice Feedback Layer */}
+                    <div className="min-h-[100px] flex flex-col items-center justify-center">
+                        <AnimatePresence>
+                            {isRecording && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.98 }}
+                                    className="max-w-2xl px-4"
+                                >
+                                    <p className="text-lg sm:text-xl text-emerald-400/70 font-medium leading-normal italic text-center">
+                                        {interimTranscript || "Listening..."}
+                                    </p>
+                                    <div className="mt-4 flex justify-center">
+                                        <VoiceWaveform audioData={audioData} />
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        {!isRecording && sending && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="flex flex-col items-center gap-2"
+                            >
+                                <div className="flex gap-1">
+                                    {[0, 1, 2].map(i => (
+                                        <motion.div
+                                            key={i}
+                                            animate={{ opacity: [0.2, 1, 0.2] }}
+                                            transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                                            className="h-1.5 w-1.5 rounded-full bg-emerald-500"
+                                        />
+                                    ))}
+                                </div>
+                                <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold">Processing Neural Response</span>
+                            </motion.div>
+                        )}
                     </div>
-                )}
+                </div>
+            </main>
+
+            {/* VoiceControls (Bottom Dock) */}
+            <div className="fixed bottom-0 left-0 right-0 z-30 pb-10 pt-10 pointer-events-none">
+                <div className="max-w-md mx-auto flex flex-col items-center gap-4 pointer-events-auto">
+                    {!isComplete && (
+                        <div className="relative">
+                            {isRecording && (
+                                <motion.div
+                                    animate={{ scale: [1, 2], opacity: [0.5, 0] }}
+                                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
+                                    className="absolute inset-0 rounded-full bg-red-500/30 -z-10"
+                                />
+                            )}
+                            <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => isRecording ? stopRecording(true) : startRecording()}
+                                disabled={sending}
+                                className={cn(
+                                    "flex h-20 w-20 items-center justify-center rounded-full transition-all duration-500 shadow-2xl",
+                                    isRecording
+                                        ? "bg-red-500 text-white"
+                                        : sending
+                                            ? "bg-zinc-800 text-zinc-600 cursor-not-allowed"
+                                            : "bg-zinc-100 hover:bg-white text-zinc-950"
+                                )}
+                            >
+                                {sending ? (
+                                    <Loader2 className="h-8 w-8 animate-spin" />
+                                ) : isRecording ? (
+                                    <Square className="h-8 w-8 fill-current" />
+                                ) : (
+                                    <Mic className="h-9 w-9" />
+                                )}
+                            </motion.button>
+                        </div>
+                    )}
+
+                    <AnimatePresence>
+                        {!isComplete && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-500"
+                            >
+                                {isRecording ? "Active Capture" : sending ? "Synchronizing" : "System Ready"}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
             </div>
+
+
+            {/* Hint Dialog */}
+            <Dialog open={showHintDialog} onOpenChange={setShowHintDialog}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Lightbulb className="h-5 w-5 text-amber-500" />
+                            Hint Available
+                        </DialogTitle>
+                        <DialogDescription>
+                            Use this hint to help answer the current question. Note: Hints may affect your final score.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/40">
+                            <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
+                                {currentHint}
+                            </p>
+                        </div>
+                        <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Hints used in this session: {hintsUsed}</span>
+                            <span className="text-amber-600 dark:text-amber-400">Penalty applied</span>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={() => setShowHintDialog(false)}>
+                            Got it
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Error Overlay */}
+            <AnimatePresence>
+                {initError && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-sm"
+                    >
+                        <div className="max-w-md w-full bg-red-950/90 border border-red-900/50 p-6 rounded-2xl shadow-2xl backdrop-blur-xl">
+                            <div className="flex items-center gap-3 text-red-400 mb-2">
+                                <AlertTriangle className="h-6 w-6" />
+                                <h3 className="text-xl font-bold">Session Error</h3>
+                            </div>
+                            <p className="text-red-200/80 mb-6">{initError}</p>
+                            <Button asChild className="w-full bg-red-600 hover:bg-red-500 text-white border-0">
+                                <Link href="/student/assessments/dashboard">Return to Dashboard</Link>
+                            </Button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

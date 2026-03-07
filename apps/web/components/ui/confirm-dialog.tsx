@@ -1,84 +1,97 @@
-'use client';
+"use client";
 
-/**
- * Reusable confirmation dialog built on top of the Dialog primitive.
- *
- * Avoids the @radix-ui/react-alert-dialog dependency since Dialog already
- * ships with the project.
- */
-
-import * as React from 'react';
-import { AlertTriangle, Trash2 } from 'lucide-react';
+import * as React from "react";
+import { Button } from "@/components/ui/button";
 import {
-  SideDialog as Dialog,
-  SideDialogContent as DialogContent,
-  SideDialogDescription as DialogDescription,
-  SideDialogFooter as DialogFooter,
-  SideDialogHeader as DialogHeader,
-  SideDialogTitle as DialogTitle,
-} from '@/components/ui/side-dialog';
-import { Button } from '@/components/ui/button';
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { AlertTriangle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface ConfirmDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  description: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  onConfirm: () => void;
-  loading?: boolean;
-  /** Use destructive=true for delete / irreversible actions */
-  destructive?: boolean;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    title: string;
+    description: string | React.ReactNode;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: "default" | "destructive";
+    onConfirm: () => void | Promise<void>;
+    isLoading?: boolean;
+    className?: string;
 }
 
 export function ConfirmDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
-  onConfirm,
-  loading = false,
-  destructive = false,
+    open,
+    onOpenChange,
+    title,
+    description,
+    confirmText = "Confirm",
+    cancelText = "Cancel",
+    variant = "default",
+    onConfirm,
+    isLoading = false,
+    className,
 }: ConfirmDialogProps) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            {destructive ? (
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-                <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
-              </div>
-            ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/30">
-                <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-              </div>
-            )}
-            <DialogTitle>{title}</DialogTitle>
-          </div>
-          <DialogDescription className="pt-1">{description}</DialogDescription>
-        </DialogHeader>
+    const [isConfirming, setIsConfirming] = React.useState(false);
 
-        <DialogFooter className="gap-2">
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={loading}
-          >
-            {cancelLabel}
-          </Button>
-          <Button
-            variant={destructive ? 'destructive' : 'default'}
-            onClick={onConfirm}
-            disabled={loading}
-          >
-            {loading ? 'Processing…' : confirmLabel}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+    const handleConfirm = async () => {
+        try {
+            setIsConfirming(true);
+            await onConfirm();
+            onOpenChange(false);
+        } finally {
+            setIsConfirming(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className={cn("sm:max-w-md", className)}>
+                <DialogHeader>
+                    <div className="flex items-start gap-3">
+                        {variant === "destructive" && (
+                            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                        )}
+                        <DialogTitle>{title}</DialogTitle>
+                    </div>
+                    {typeof description === "string" ? (
+                        <DialogDescription>{description}</DialogDescription>
+                    ) : (
+                        description
+                    )}
+                </DialogHeader>
+                <DialogFooter className="gap-2 sm:gap-0">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                        disabled={isLoading || isConfirming}
+                    >
+                        {cancelText}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant={variant === "destructive" ? "destructive" : "default"}
+                        onClick={handleConfirm}
+                        disabled={isLoading || isConfirming}
+                    >
+                        {isConfirming || isLoading ? (
+                            <>
+                                <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                Processing...
+                            </>
+                        ) : (
+                            confirmText
+                        )}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 }
