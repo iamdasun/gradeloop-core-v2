@@ -13,6 +13,7 @@ import {
     Settings,
     ArrowRight,
     Plus,
+    Mic2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/instructor/status-badge";
@@ -385,6 +386,13 @@ export default function InstructorDashboardPage() {
                             title: "Create Assignment",
                             desc: "Select a course and create a new graded assignment.",
                             action: "Select Course",
+                        },
+                        {
+                            href: "/instructor/assessments/dashboard",
+                            icon: Mic2,
+                            title: "Viva Dashboard",
+                            desc: "Monitor and review live viva assessment sessions.",
+                            action: "Open Viva Dashboard",
                         },
                         {
                             href: "/instructor/settings",

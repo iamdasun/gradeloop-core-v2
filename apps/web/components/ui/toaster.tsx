@@ -65,15 +65,14 @@ function ToastContainer() {
             {toasts.map((t) => (
                 <div
                     key={t.id}
-                    className={`pointer-events-auto flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg bg-white dark:bg-zinc-900 animate-in slide-in-from-right-5 fade-in-0 duration-300 ${
-                        t.variant === "success"
+                    className={`pointer-events-auto flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg bg-white dark:bg-zinc-900 animate-in slide-in-from-right-5 fade-in-0 duration-300 ${t.variant === "success"
                             ? "border-emerald-200 dark:border-emerald-800/60"
                             : t.variant === "error"
-                              ? "border-red-200 dark:border-red-800/60"
-                              : t.variant === "warning"
-                                ? "border-amber-200 dark:border-amber-800/60"
-                                : "border-zinc-200 dark:border-zinc-700"
-                    }`}
+                                ? "border-red-200 dark:border-red-800/60"
+                                : t.variant === "warning"
+                                    ? "border-amber-200 dark:border-amber-800/60"
+                                    : "border-zinc-200 dark:border-zinc-700"
+                        }`}
                 >
                     <span className="shrink-0 mt-0.5">
                         {t.variant === "success" && (
@@ -122,11 +121,7 @@ function ToastContainer() {
     );
 }
 
-// Exported Toaster - just wraps ToastContainer with provider
+// Exported Toaster - renders the toast container (must be inside ToastProvider)
 export function Toaster() {
-    return (
-        <ToastProvider>
-            <ToastContainer />
-        </ToastProvider>
-    );
+    return <ToastContainer />;
 }

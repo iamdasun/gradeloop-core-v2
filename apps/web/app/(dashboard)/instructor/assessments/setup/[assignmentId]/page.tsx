@@ -23,12 +23,13 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ivasApi } from "@/lib/ivas-api";
+import { instructorAssessmentsApi, assessmentsApi } from "@/lib/api/assessments";
+import type { AssignmentResponse } from "@/types/assessments.types";
 import { useToast } from "@/components/ui/toaster";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { BulkActionToolbar } from "@/components/instructor/BulkActionToolbar";
 import { SelectCheckbox } from "@/components/instructor/SelectCheckbox";
 import type {
-    IvasAssignment,
     GradingCriteria,
     IvasQuestion,
     UpdateGradingCriteriaRequest,
@@ -60,8 +61,9 @@ interface CriteriaCardProps {
     onSelectedChange: (checked: boolean) => void;
 }
 
-function CriteriaCard({ criteria, onUpdate, onDelete, selected, onSelectedChange }: CriteriaCardProps) {
+function CriteriaRow({ criteria, onUpdate, onDelete, selected, onSelectedChange }: CriteriaCardProps) {
     const [editing, setEditing] = React.useState(false);
+    const [expanded, setExpanded] = React.useState(false);
     const [saving, setSaving] = React.useState(false);
     const [form, setForm] = React.useState<UpdateGradingCriteriaRequest>({
         competency: criteria.competency,
@@ -84,99 +86,107 @@ function CriteriaCard({ criteria, onUpdate, onDelete, selected, onSelectedChange
     };
 
     return (
-        <Card className={cn("border border-border/60", selected && "ring-2 ring-primary")}>
-            <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <SelectCheckbox
-                            id={`criteria-${criteria.id}`}
-                            checked={selected}
-                            onCheckedChange={onSelectedChange}
+        <tbody>
+            <tr className={cn("border-b border-border/40 hover:bg-muted/30 transition-colors", selected && "bg-primary/5")}>
+                <td className="w-8 px-3 py-3">
+                    <SelectCheckbox
+                        id={`criteria-${criteria.id}`}
+                        checked={selected}
+                        onCheckedChange={onSelectedChange}
+                    />
+                </td>
+                <td className="px-3 py-3 font-semibold text-sm max-w-[180px]">
+                    {editing ? (
+                        <Input
+                            value={form.competency ?? ""}
+                            onChange={(e) => setForm((f) => ({ ...f, competency: e.target.value }))}
+                            className="h-7 text-sm"
                         />
-                        <div className="flex flex-col gap-1 min-w-0 flex-1">
-                            {editing ? (
-                                <Input
-                                    value={form.competency ?? ""}
-                                    onChange={(e) => setForm((f) => ({ ...f, competency: e.target.value }))}
-                                    className="text-base font-semibold h-8"
-                                />
-                            ) : (
-                                <CardTitle className="text-base font-semibold truncate">{criteria.competency}</CardTitle>
-                            )}
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <DifficultyBadge level={criteria.difficulty_level} />
-                                {editing ? (
-                                    <Input
-                                        value={form.level_label ?? ""}
-                                        onChange={(e) => setForm((f) => ({ ...f, level_label: e.target.value }))}
-                                        className="h-6 text-xs w-32"
-                                        placeholder="Level label"
-                                    />
-                                ) : (
-                                    <span className="text-xs text-muted-foreground">{criteria.level_label}</span>
-                                )}
-                                <span className="text-xs text-muted-foreground">{criteria.programming_language}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => onDelete(criteria.id)}>
-                            <Trash2 className="h-4 w-4" />
+                    ) : (
+                        <span className="block truncate" title={criteria.competency}>{criteria.competency}</span>
+                    )}
+                </td>
+                <td className="px-3 py-3">
+                    <DifficultyBadge level={criteria.difficulty_level} />
+                </td>
+                <td className="px-3 py-3 text-sm text-muted-foreground">
+                    {editing ? (
+                        <Input
+                            value={form.level_label ?? ""}
+                            onChange={(e) => setForm((f) => ({ ...f, level_label: e.target.value }))}
+                            className="h-7 text-xs w-28"
+                        />
+                    ) : (
+                        criteria.level_label
+                    )}
+                </td>
+                <td className="px-3 py-3 text-xs text-muted-foreground">{criteria.programming_language}</td>
+                <td className="px-3 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                        <Button
+                            size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => setExpanded((v) => !v)}
+                            title={expanded ? "Collapse" : "Expand details"}
+                        >
+                            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         </Button>
                         {editing ? (
                             <>
-                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSave} disabled={saving}>
-                                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSave} disabled={saving}>
+                                    {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                                 </Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(false)}>
-                                    <X className="h-4 w-4" />
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditing(false)}>
+                                    <X className="h-3.5 w-3.5" />
                                 </Button>
                             </>
                         ) : (
-                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(true)}>
-                                <Edit2 className="h-4 w-4" />
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditing(true)}>
+                                <Edit2 className="h-3.5 w-3.5" />
                             </Button>
                         )}
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => onDelete(criteria.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                     </div>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-                <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Level Description</p>
-                    {editing ? (
-                        <Textarea
-                            rows={2}
-                            value={form.level_description ?? ""}
-                            onChange={(e) => setForm((f) => ({ ...f, level_description: e.target.value }))}
-                        />
-                    ) : (
-                        <p className="text-zinc-700 dark:text-zinc-300">{criteria.level_description}</p>
-                    )}
-                </div>
-                <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">Marking Criteria</p>
-                    {editing ? (
-                        <Textarea
-                            rows={3}
-                            value={form.marking_criteria ?? ""}
-                            onChange={(e) => setForm((f) => ({ ...f, marking_criteria: e.target.value }))}
-                        />
-                    ) : (
-                        <p className="text-zinc-700 dark:text-zinc-300">{criteria.marking_criteria}</p>
-                    )}
-                </div>
-                {criteria.learning_objectives.length > 0 && (
-                    <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Learning Objectives</p>
-                        <ul className="list-disc pl-4 space-y-0.5">
-                            {criteria.learning_objectives.map((obj, i) => (
-                                <li key={i} className="text-zinc-700 dark:text-zinc-300">{obj}</li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
+                </td>
+            </tr>
+            {expanded && (
+                <tr className="bg-muted/20 border-b border-border/40">
+                    <td colSpan={6} className="px-6 py-4">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Level Description</p>
+                                {editing ? (
+                                    <Textarea rows={2} value={form.level_description ?? ""}
+                                        onChange={(e) => setForm((f) => ({ ...f, level_description: e.target.value }))} />
+                                ) : (
+                                    <p className="text-sm text-foreground/80">{criteria.level_description}</p>
+                                )}
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Marking Criteria</p>
+                                {editing ? (
+                                    <Textarea rows={3} value={form.marking_criteria ?? ""}
+                                        onChange={(e) => setForm((f) => ({ ...f, marking_criteria: e.target.value }))} />
+                                ) : (
+                                    <p className="text-sm text-foreground/80">{criteria.marking_criteria}</p>
+                                )}
+                            </div>
+                            {criteria.learning_objectives.length > 0 && (
+                                <div className="sm:col-span-2">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Learning Objectives</p>
+                                    <ul className="list-disc pl-4 space-y-0.5">
+                                        {criteria.learning_objectives.map((obj, i) => (
+                                            <li key={i} className="text-sm text-foreground/80">{obj}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    </td>
+                </tr>
+            )}
+        </tbody>
     );
 }
 
@@ -188,7 +198,7 @@ interface QuestionCardProps {
     onSelectedChange: (checked: boolean) => void;
 }
 
-function QuestionCard({ question, onUpdate, onDelete, selected, onSelectedChange }: QuestionCardProps) {
+function QuestionRow({ question, onUpdate, onDelete, selected, onSelectedChange }: QuestionCardProps) {
     const [expanded, setExpanded] = React.useState(false);
     const [editing, setEditing] = React.useState(false);
     const [form, setForm] = React.useState<UpdateQuestionRequest>({
@@ -210,84 +220,95 @@ function QuestionCard({ question, onUpdate, onDelete, selected, onSelectedChange
     };
 
     return (
-        <div className={cn("rounded-lg border border-border/60 p-4 space-y-2", selected && "ring-2 ring-primary")}>
-            <div className="flex items-start gap-2">
-                <SelectCheckbox
-                    id={`question-${question.id}`}
-                    checked={selected}
-                    onCheckedChange={onSelectedChange}
-                />
-                <div className="flex-1 min-w-0 space-y-2">
+        <tbody>
+            <tr className={cn("border-b border-border/40 hover:bg-muted/30 transition-colors", selected && "bg-primary/5")}>
+                <td className="w-8 px-3 py-3">
+                    <SelectCheckbox
+                        id={`question-${question.id}`}
+                        checked={selected}
+                        onCheckedChange={onSelectedChange}
+                    />
+                </td>
+                <td className="px-3 py-3 text-sm font-medium max-w-[260px]">
                     {editing ? (
                         <Input
                             value={form.question_text}
                             onChange={(e) => setForm((f) => ({ ...f, question_text: e.target.value }))}
-                            className="text-sm font-medium"
+                            className="h-7 text-sm"
                         />
                     ) : (
-                        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{question.question_text}</p>
+                        <span className="block truncate" title={question.question_text}>{question.question_text}</span>
                     )}
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <DifficultyBadge level={question.difficulty} />
-                        <Badge variant="outline" className="text-xs">{question.competency}</Badge>
-                        {editing ? (
-                            <></>
-                        ) : (
-                            <Badge
-                                variant="outline"
-                                className={cn("text-xs cursor-pointer", question.status === "approved"
-                                    ? "border-emerald-500 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                                    : "border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20")}
-                                onClick={() => onUpdate(question.id, { 
-                                    status: question.status === "approved" ? "draft" : "approved" 
-                                })}
-                            >
-                                {question.status}
-                            </Badge>
+                </td>
+                <td className="px-3 py-3">
+                    <Badge variant="outline" className="text-xs whitespace-nowrap">{question.competency}</Badge>
+                </td>
+                <td className="px-3 py-3">
+                    <DifficultyBadge level={question.difficulty} />
+                </td>
+                <td className="px-3 py-3 text-sm text-center font-mono">{question.max_points}</td>
+                <td className="px-3 py-3">
+                    <Badge
+                        variant="outline"
+                        className={cn(
+                            "text-xs cursor-pointer select-none",
+                            question.status === "approved"
+                                ? "border-emerald-500 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                                : "border-amber-500 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                         )}
-                        <div className="flex gap-1 shrink-0">
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 hover:text-red-700" onClick={() => onDelete(question.id)}>
-                                <Trash2 className="h-4 w-4" />
-                            </Button>
-                            {editing ? (
-                                <>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleSave}>
-                                        <Save className="h-4 w-4" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(false)}>
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </>
-                            ) : (
-                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(true)}>
-                                    <Edit2 className="h-4 w-4" />
+                        onClick={() => !editing && onUpdate(question.id, {
+                            status: question.status === "approved" ? "draft" : "approved"
+                        })}
+                    >
+                        {question.status}
+                    </Badge>
+                </td>
+                <td className="px-3 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                        <Button
+                            size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => setExpanded((v) => !v)}
+                            title={expanded ? "Hide answer" : "Show expected answer"}
+                        >
+                            {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                        </Button>
+                        {editing ? (
+                            <>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleSave}>
+                                    <Save className="h-3.5 w-3.5" />
                                 </Button>
-                            )}
-                        </div>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditing(false)}>
+                                    <X className="h-3.5 w-3.5" />
+                                </Button>
+                            </>
+                        ) : (
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditing(true)}>
+                                <Edit2 className="h-3.5 w-3.5" />
+                            </Button>
+                        )}
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => onDelete(question.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                     </div>
-                </div>
-            </div>
-            <button
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                onClick={() => setExpanded((v) => !v)}
-            >
-                {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                Expected answer
-            </button>
+                </td>
+            </tr>
             {expanded && (
-                <p className="text-sm text-muted-foreground border-l-2 border-border pl-3">
-                    {editing ? (
-                        <Textarea
-                            rows={3}
-                            value={form.expected_answer ?? ""}
-                            onChange={(e) => setForm((f) => ({ ...f, expected_answer: e.target.value }))}
-                        />
-                    ) : (
-                        question.expected_answer
-                    )}
-                </p>
+                <tr className="bg-muted/20 border-b border-border/40">
+                    <td colSpan={7} className="px-6 py-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Expected Answer</p>
+                        {editing ? (
+                            <Textarea
+                                rows={3}
+                                value={form.expected_answer ?? ""}
+                                onChange={(e) => setForm((f) => ({ ...f, expected_answer: e.target.value }))}
+                            />
+                        ) : (
+                            <p className="text-sm text-foreground/80 border-l-2 border-border pl-3">{question.expected_answer}</p>
+                        )}
+                    </td>
+                </tr>
             )}
-        </div>
+        </tbody>
     );
 }
 
@@ -296,7 +317,7 @@ export default function VivaSetupPage() {
     const assignmentId = params.assignmentId;
     const { addToast } = useToast();
 
-    const [assignment, setAssignment] = React.useState<IvasAssignment | null>(null);
+    const [realAssignment, setRealAssignment] = React.useState<AssignmentResponse | null>(null);
     const [criteria, setCriteria] = React.useState<GradingCriteria[]>([]);
     const [questions, setQuestions] = React.useState<IvasQuestion[]>([]);
     const [assignmentText, setAssignmentText] = React.useState("");
@@ -305,12 +326,12 @@ export default function VivaSetupPage() {
     const [generatingQuestions, setGeneratingQuestions] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
     const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
-    
+
     // Bulk selection state
     const [selectedCriteria, setSelectedCriteria] = React.useState<Set<string>>(new Set());
     const [selectedQuestions, setSelectedQuestions] = React.useState<Set<string>>(new Set());
     const [bulkLoading, setBulkLoading] = React.useState(false);
-    
+
     // Delete confirmation dialogs
     const [deleteDialog, setDeleteDialog] = React.useState<{
         open: boolean;
@@ -321,7 +342,7 @@ export default function VivaSetupPage() {
     const showSuccess = (msg: string) => {
         addToast({ title: msg, variant: "success" });
     };
-    
+
     const showError = (msg: string) => {
         addToast({ title: msg, variant: "error" });
     };
@@ -331,13 +352,19 @@ export default function VivaSetupPage() {
         async function load() {
             try {
                 setLoadingInitial(true);
-                const [asgn, crit, qs] = await Promise.allSettled([
-                    ivasApi.getAssignment(assignmentId),
+                const [realAsgn, crit, qs] = await Promise.allSettled([
+                    assessmentsApi.getAssignment(assignmentId),
                     ivasApi.getCriteria(assignmentId),
                     ivasApi.getQuestions(assignmentId),
                 ]);
                 if (!mounted) return;
-                if (asgn.status === "fulfilled") setAssignment(asgn.value);
+                if (realAsgn.status === "fulfilled") {
+                    setRealAssignment(realAsgn.value);
+                    // Auto-populate the assignment text from the real assignment description
+                    if (realAsgn.value.description) {
+                        setAssignmentText(realAsgn.value.description);
+                    }
+                }
                 if (crit.status === "fulfilled") setCriteria(crit.value);
                 if (qs.status === "fulfilled") setQuestions(qs.value);
             } catch {
@@ -405,11 +432,11 @@ export default function VivaSetupPage() {
             throw error;
         }
     };
-    
+
     const handleDeleteCriteria = (id: string) => {
         setDeleteDialog({ open: true, type: 'criteria', id });
     };
-    
+
     const handleBulkDeleteCriteria = async () => {
         if (selectedCriteria.size === 0) return;
         try {
@@ -425,7 +452,7 @@ export default function VivaSetupPage() {
             setBulkLoading(false);
         }
     };
-    
+
     const handleUpdateQuestion = async (id: string, data: UpdateQuestionRequest) => {
         try {
             const updated = await ivasApi.updateQuestion(id, data);
@@ -436,11 +463,11 @@ export default function VivaSetupPage() {
             throw error;
         }
     };
-    
+
     const handleDeleteQuestion = (id: string) => {
         setDeleteDialog({ open: true, type: 'question', id });
     };
-    
+
     const handleBulkDeleteQuestions = async () => {
         if (selectedQuestions.size === 0) return;
         try {
@@ -456,13 +483,13 @@ export default function VivaSetupPage() {
             setBulkLoading(false);
         }
     };
-    
+
     const handleBulkApproveQuestions = async () => {
         if (selectedQuestions.size === 0) return;
         try {
             setBulkLoading(true);
             await ivasApi.batchUpdateQuestions(Array.from(selectedQuestions), { status: "approved" });
-            setQuestions((prev) => prev.map((q) => 
+            setQuestions((prev) => prev.map((q) =>
                 selectedQuestions.has(q.id) ? { ...q, status: "approved" } : q
             ));
             setSelectedQuestions(new Set());
@@ -513,13 +540,13 @@ export default function VivaSetupPage() {
                         </div>
                     ) : (
                         <div>
-                            <h2 className="text-lg font-semibold">{assignment?.title ?? assignmentId}</h2>
-                            {assignment && (
-                                <div className="mt-2 flex flex-wrap gap-1">
-                                    {assignment.competencies.map((c) => (
-                                        <Badge key={c} variant="secondary" className="text-xs">{c}</Badge>
-                                    ))}
-                                </div>
+                            <h2 className="text-lg font-semibold">
+                                {realAssignment?.title ?? assignmentId}
+                            </h2>
+                            {realAssignment?.description && (
+                                <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                                    {realAssignment.description}
+                                </p>
                             )}
                         </div>
                     )}
@@ -614,21 +641,33 @@ export default function VivaSetupPage() {
                                 No criteria yet. Enter the assignment text and click &quot;Generate Grading Criteria&quot;.
                             </div>
                         ) : (
-                            <div className="space-y-3">
-                                {criteria.map((c) => (
-                                    <CriteriaCard 
-                                        key={c.id} 
-                                        criteria={c} 
-                                        onUpdate={handleUpdateCriteria}
-                                        onDelete={handleDeleteCriteria}
-                                        selected={selectedCriteria.has(c.id)}
-                                        onSelectedChange={(checked) => {
-                                            const next = new Set(selectedCriteria);
-                                            if (checked) next.add(c.id); else next.delete(c.id);
-                                            setSelectedCriteria(next);
-                                        }}
-                                    />
-                                ))}
+                            <div className="rounded-xl border border-border/60 overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-muted/50">
+                                        <tr className="border-b border-border/60">
+                                            <th className="w-8 px-3 py-2" />
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Competency</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Difficulty</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Level</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Language</th>
+                                            <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    {criteria.map((c) => (
+                                        <CriteriaRow
+                                            key={c.id}
+                                            criteria={c}
+                                            onUpdate={handleUpdateCriteria}
+                                            onDelete={handleDeleteCriteria}
+                                            selected={selectedCriteria.has(c.id)}
+                                            onSelectedChange={(checked) => {
+                                                const next = new Set(selectedCriteria);
+                                                if (checked) next.add(c.id); else next.delete(c.id);
+                                                setSelectedCriteria(next);
+                                            }}
+                                        />
+                                    ))}
+                                </table>
                             </div>
                         )}
                     </section>
@@ -663,27 +702,40 @@ export default function VivaSetupPage() {
                                 No questions yet. Generate criteria first, then click &quot;Generate Questions&quot;.
                             </div>
                         ) : (
-                            <div className="space-y-3">
-                                {questions.map((q) => (
-                                    <QuestionCard 
-                                        key={q.id} 
-                                        question={q}
-                                        onUpdate={handleUpdateQuestion}
-                                        onDelete={handleDeleteQuestion}
-                                        selected={selectedQuestions.has(q.id)}
-                                        onSelectedChange={(checked) => {
-                                            const next = new Set(selectedQuestions);
-                                            if (checked) next.add(q.id); else next.delete(q.id);
-                                            setSelectedQuestions(next);
-                                        }}
-                                    />
-                                ))}
+                            <div className="rounded-xl border border-border/60 overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-muted/50">
+                                        <tr className="border-b border-border/60">
+                                            <th className="w-8 px-3 py-2" />
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Question</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Competency</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Difficulty</th>
+                                            <th className="px-3 py-2 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pts</th>
+                                            <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                                            <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    {questions.map((q) => (
+                                        <QuestionRow
+                                            key={q.id}
+                                            question={q}
+                                            onUpdate={handleUpdateQuestion}
+                                            onDelete={handleDeleteQuestion}
+                                            selected={selectedQuestions.has(q.id)}
+                                            onSelectedChange={(checked) => {
+                                                const next = new Set(selectedQuestions);
+                                                if (checked) next.add(q.id); else next.delete(q.id);
+                                                setSelectedQuestions(next);
+                                            }}
+                                        />
+                                    ))}
+                                </table>
                             </div>
                         )}
                     </section>
                 </div>
             </div>
-            
+
             {/* Delete Confirmation Dialogs */}
             <ConfirmDialog
                 open={deleteDialog.open && deleteDialog.type === 'criteria'}

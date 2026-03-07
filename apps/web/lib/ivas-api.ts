@@ -50,7 +50,7 @@ async function retryableRequest<T>(
     options: RequestInit = {}
 ): Promise<T> {
     let lastError: Error | null = null;
-    
+
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
             const url = `${IVAS_BASE_URL}${path}`;
@@ -73,21 +73,21 @@ async function retryableRequest<T>(
             return response.json();
         } catch (error) {
             lastError = error instanceof Error ? error : new Error("Unknown error");
-            
+
             // Don't retry on client errors (4xx)
             if (lastError.message.includes("4")) {
                 throw lastError;
             }
-            
+
             // Wait before retrying (exponential backoff)
             if (attempt < MAX_RETRIES) {
-                await new Promise(resolve => 
+                await new Promise(resolve =>
                     setTimeout(resolve, RETRY_DELAY * Math.pow(2, attempt - 1))
                 );
             }
         }
     }
-    
+
     throw lastError || new Error("Request failed after retries");
 }
 
@@ -176,8 +176,8 @@ export const ivasApi = {
     batchDeleteCriteria: (assignmentId: string, criteriaIds: string[]) =>
         ivasRequest<BulkDeleteResponse>(
             `/api/v1/assignments/${encodeURIComponent(assignmentId)}/grading-criteria/batch`,
-            { 
-                method: "DELETE", 
+            {
+                method: "DELETE",
                 body: JSON.stringify({ criteria_ids: criteriaIds })
             }
         ),
@@ -214,8 +214,7 @@ export const ivasApi = {
         if (params?.competency) query.set("competency", params.competency);
         const qs = query.toString();
         return ivasRequest<{ data: IvasQuestion[] }>(
-            `/api/v1/assignments/${encodeURIComponent(assignmentId)}/questions${qs ? `?${qs}` : ""}
-            }`
+            `/api/v1/assignments/${encodeURIComponent(assignmentId)}/questions${qs ? `?${qs}` : ""}`
         ).then((r) => r.data);
     },
     getQuestion: (questionId: string) =>
@@ -235,16 +234,16 @@ export const ivasApi = {
     batchUpdateQuestions: (questionIds: string[], updates: UpdateQuestionRequest) =>
         ivasRequest<BulkUpdateQuestionsResponse>(
             `/api/v1/questions/batch`,
-            { 
-                method: "PATCH", 
+            {
+                method: "PATCH",
                 body: JSON.stringify({ question_ids: questionIds, updates })
             }
         ),
     batchDeleteQuestions: (questionIds: string[]) =>
         ivasRequest<BulkDeleteResponse>(
             `/api/v1/questions/batch`,
-            { 
-                method: "DELETE", 
+            {
+                method: "DELETE",
                 body: JSON.stringify({ question_ids: questionIds })
             }
         ),
@@ -349,13 +348,13 @@ export const ivasApi = {
     uploadCodeContext: (assignmentId: string, code: string, language?: string, fileName?: string) =>
         ivasRequest<CodeContextResponse>(
             `/api/v1/assignments/${encodeURIComponent(assignmentId)}/code-context`,
-            { 
-                method: "POST", 
-                body: JSON.stringify({ 
-                    assignment_id: assignmentId, 
-                    code, 
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    assignment_id: assignmentId,
+                    code,
                     language,
-                    file_name: fileName 
+                    file_name: fileName
                 })
             }
         ),

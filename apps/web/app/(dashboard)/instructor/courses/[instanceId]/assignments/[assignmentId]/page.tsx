@@ -14,6 +14,7 @@ import {
     AlertCircle,
     BookOpen,
     Settings2,
+    Mic2,
 } from "lucide-react";
 import { StatsCard } from "@/components/instructor/stats-card";
 import { SectionHeader } from "@/components/instructor/section-header";
@@ -275,6 +276,27 @@ export default function InstructorAssignmentDetailsPage() {
                                 href={`/instructor/courses/${instanceId}/assignments/${assignmentId}/submissions`}
                             >
                                 Go to Submissions
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                {/* Viva Setup */}
+                <Card className="border-border/60 bg-primary/5 border-primary/20">
+                    <CardContent className="p-6 flex flex-col items-center justify-center text-center h-full gap-4">
+                        <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                            <Mic2 className="h-8 w-8 text-primary" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold font-heading text-xl">Viva Setup</h3>
+                            <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">
+                                Configure questions, grading criteria, and settings for the viva assessment.
+                            </p>
+                        </div>
+                        <Button className="mt-2 w-full max-w-[200px]" asChild>
+                            <Link href={`/instructor/assessments/setup/${assignmentId}`}>
+                                Setup Viva
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Link>
                         </Button>

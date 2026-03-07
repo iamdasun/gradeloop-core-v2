@@ -82,13 +82,15 @@ export interface UpdateGradingCriteriaRequest {
 export interface IvasQuestion {
     id: string;
     assignment_id: string;
-    criteria_id: string;
+    grading_criteria_id: string;
     question_text: string;
     expected_answer: string;
     competency: string;
     difficulty: number;
     max_points: number;
     status: string; // "draft" | "approved"
+    created_at: string;
+    updated_at: string;
 }
 
 export interface GenerateQuestionsResponse {
