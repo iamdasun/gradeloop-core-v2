@@ -69,9 +69,11 @@ type CreateAssignmentRequest struct {
 	AllowGroupSubmission bool `json:"allow_group_submission"`
 	MaxGroupSize         *int `json:"max_group_size"`
 
-	EnableAIAssistant      bool `json:"enable_ai_assistant"`
-	EnableSocraticFeedback bool `json:"enable_socratic_feedback"`
-	AllowRegenerate        bool `json:"allow_regenerate"`
+	// EnableAIAssistant, EnableSocraticFeedback, AllowRegenerate are optional.
+	// When nil the service applies the defaults: AI=true, Socratic=true, Regenerate=false.
+	EnableAIAssistant      *bool `json:"enable_ai_assistant"`
+	EnableSocraticFeedback *bool `json:"enable_socratic_feedback"`
+	AllowRegenerate        *bool `json:"allow_regenerate"`
 
 	// ── Inline content (optional — stored in separate tables on success) ———————
 	RubricCriteria []CreateRubricCriterionRequest `json:"rubric_criteria,omitempty"`

@@ -106,9 +106,6 @@ export default function CourseInstanceAssessmentsPage() {
                 code: languageCode,
                 allow_late_submissions: allowLateSubmissions,
                 allow_group_submission: allowGroupSubmission,
-                enable_ai_assistant: false,
-                enable_socratic_feedback: false,
-                allow_regenerate: false
             });
 
             setAssignments(prev => [created, ...prev]);

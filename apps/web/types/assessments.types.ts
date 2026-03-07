@@ -60,9 +60,9 @@ export interface CreateAssignmentRequest {
     enforce_time_limit?: number | null;
     allow_group_submission: boolean;
     max_group_size?: number | null;
-    enable_ai_assistant: boolean;
-    enable_socratic_feedback: boolean;
-    allow_regenerate: boolean;
+    enable_ai_assistant?: boolean;
+    enable_socratic_feedback?: boolean;
+    allow_regenerate?: boolean;
     assessment_type?: "lab" | "exam";
     objective?: string;
     rubric_criteria?: RubricCriterionDto[];

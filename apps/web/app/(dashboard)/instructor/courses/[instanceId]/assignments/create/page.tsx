@@ -362,8 +362,6 @@ export default function CreateAssignmentPage() {
             : null,
         allow_group_submission: settings.group_submission,
         max_group_size: settings.group_submission ? 5 : null,
-        enable_ai_assistant: true,
-        enable_socratic_feedback: false,
         allow_regenerate: settings.multiple_submissions,
         assessment_type: assignment.type,
         objective: assignment.objective || undefined,

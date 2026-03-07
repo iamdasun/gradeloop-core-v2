@@ -91,6 +91,22 @@ func (s *assignmentService) CreateAssignment(
 		assignmentType = req.AssessmentType
 	}
 
+	// Resolve feature-flag defaults: AI grading and socratic feedback are ON by
+	// default; allow_regenerate is OFF by default. Callers may override by
+	// sending an explicit bool in the request.
+	enableAIAssistant := true
+	if req.EnableAIAssistant != nil {
+		enableAIAssistant = *req.EnableAIAssistant
+	}
+	enableSocratic := true
+	if req.EnableSocraticFeedback != nil {
+		enableSocratic = *req.EnableSocraticFeedback
+	}
+	allowRegenerate := false
+	if req.AllowRegenerate != nil {
+		allowRegenerate = *req.AllowRegenerate
+	}
+
 	assignment := &domain.Assignment{
 		CourseInstanceID: req.CourseInstanceID,
 
@@ -110,9 +126,9 @@ func (s *assignmentService) CreateAssignment(
 		AllowGroupSubmission: req.AllowGroupSubmission,
 		MaxGroupSize:         maxGroupSize,
 
-		EnableAIAssistant:      req.EnableAIAssistant,
-		EnableSocraticFeedback: req.EnableSocraticFeedback,
-		AllowRegenerate:        req.AllowRegenerate,
+		EnableAIAssistant:      enableAIAssistant,
+		EnableSocraticFeedback: enableSocratic,
+		AllowRegenerate:        allowRegenerate,
 
 		IsActive:  true,
 		CreatedBy: createdBy,
@@ -190,9 +206,9 @@ func (s *assignmentService) CreateAssignment(
 		"title":                    req.Title,
 		"allow_group_submission":   req.AllowGroupSubmission,
 		"max_group_size":           maxGroupSize,
-		"enable_ai_assistant":      req.EnableAIAssistant,
-		"enable_socratic_feedback": req.EnableSocraticFeedback,
-		"allow_regenerate":         req.AllowRegenerate,
+		"enable_ai_assistant":      enableAIAssistant,
+		"enable_socratic_feedback": enableSocratic,
+		"allow_regenerate":         allowRegenerate,
 		"is_active":                true,
 	}
 	if auditErr := s.auditClient.LogAction(
