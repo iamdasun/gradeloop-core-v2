@@ -129,7 +129,12 @@ function useCountdown(totalSeconds: number | undefined, started: boolean) {
     const [remaining, setRemaining] = React.useState(totalSeconds ?? 0);
 
     React.useEffect(() => {
-        if (!totalSeconds || !started) return;
+        // Always reset to full time when not started (handles re-open after expiry)
+        if (!started) {
+            setRemaining(totalSeconds ?? 0);
+            return;
+        }
+        if (!totalSeconds) return;
         setRemaining(totalSeconds);
         const id = setInterval(() => {
             setRemaining((t) => {
@@ -251,6 +256,16 @@ export function PhaseRecorderDialog({
         }
     };
 
+    // ── Retry (stress phase) ─────────────────────────────────────────────────────
+    const handleRetry = () => {
+        setTypedText("");
+        setEvents([]);
+        keyDownTimes.current.clear();
+        lastKeyUpTime.current = 0;
+        setSubmitError(null);
+        setTimerStarted(false); // countdown resets via useCountdown effect
+    };
+
     // ── Submit ────────────────────────────────────────────────────────────────
     const handleSubmit = async () => {
         if (!user || events.length < MIN_EVENTS) return;
@@ -280,8 +295,15 @@ export function PhaseRecorderDialog({
     // ── Derived ───────────────────────────────────────────────────────────────
     const eventCount = events.length;
     const progressPct = Math.min((eventCount / MIN_EVENTS) * 100, 100);
-    const canSubmit = eventCount >= MIN_EVENTS && !isSubmitting && !submitted;
     const isStress = !!content.timeLimitSeconds;
+    // Stress phase: once time expires, accept anything ≥ 30 keystrokes
+    const MIN_STRESS_EXPIRED = 30;
+    const canSubmit =
+        !isSubmitting &&
+        !submitted &&
+        ((isStress && expired)
+            ? eventCount >= MIN_STRESS_EXPIRED
+            : eventCount >= MIN_EVENTS);
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
@@ -361,9 +383,24 @@ export function PhaseRecorderDialog({
                         spellCheck={false}
                         autoComplete="off"
                     />
-                    {isStress && expired && !canSubmit && (
+                    {isStress && expired && eventCount < MIN_STRESS_EXPIRED && (
+                        <div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50/60 px-3 py-2.5 dark:border-red-900/40 dark:bg-red-950/30">
+                            <p className="text-xs text-red-700 dark:text-red-400">
+                                ⏱ Time&apos;s up — only <strong>{eventCount}</strong> keystrokes captured (need at least {MIN_STRESS_EXPIRED}). Try again.
+                            </p>
+                            <Button
+                                size="sm"
+                                variant="destructive"
+                                className="h-7 px-3 text-xs flex-shrink-0"
+                                onClick={handleRetry}
+                            >
+                                Retry
+                            </Button>
+                        </div>
+                    )}
+                    {isStress && expired && eventCount >= MIN_STRESS_EXPIRED && !submitted && (
                         <p className="text-xs text-amber-600 dark:text-amber-400">
-                            ⏱ Time&apos;s up — you can still submit what you&apos;ve typed if enough keystrokes were captured.
+                            ⏱ Time&apos;s up — {eventCount} keystrokes captured. You can submit now.
                         </p>
                     )}
                 </div>
