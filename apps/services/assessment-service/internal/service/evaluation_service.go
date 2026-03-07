@@ -162,12 +162,17 @@ func (s *evaluationService) CompareOutputs(expected, actual string) bool {
 
 // normalizeOutput applies normalization rules to output string
 func normalizeOutput(output string) string {
+	// Normalize line endings: convert \r\n to \n
+	output = strings.ReplaceAll(output, "\r\n", "\n")
+	// Also handle stray \r
+	output = strings.ReplaceAll(output, "\r", "\n")
+
 	// Split into lines
 	lines := strings.Split(output, "\n")
 
 	// Trim trailing whitespace from each line
 	for i, line := range lines {
-		lines[i] = strings.TrimRight(line, " \t\r")
+		lines[i] = strings.TrimRight(line, " \t")
 	}
 
 	// Rejoin and trim overall whitespace

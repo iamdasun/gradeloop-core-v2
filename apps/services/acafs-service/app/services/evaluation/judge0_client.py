@@ -63,6 +63,25 @@ class Judge0Client:
 
     # ── batch submission ───────────────────────────────────────────────────
 
+    @staticmethod
+    def _normalize_output(output: str) -> str:
+        """Normalize output for comparison.
+
+        - Normalize line endings (CRLF -> LF)
+        - Split into lines
+        - Strip trailing whitespace from each line
+        - Rejoin with newline
+        - Strip leading/trailing whitespace from the entire output
+        """
+        if not output:
+            return ""
+        # Normalize line endings: CRLF -> LF, and handle stray CR
+        output = output.replace("\r\n", "\n").replace("\r", "\n")
+        lines = output.split("\n")
+        normalized_lines = [line.rstrip() for line in lines]
+        result = "\n".join(normalized_lines)
+        return result.strip()
+
     async def run_batch(
         self,
         language_id: int,
@@ -95,7 +114,7 @@ class Judge0Client:
         results = []
         for tc, raw in zip(test_cases, raw_results):
             tc_id = str(tc.get("id", tc.get("test_case_id", "")))
-            expected = (tc.get("expected_output") or "").rstrip()
+            expected = self._normalize_output(tc.get("expected_output") or "")
 
             if isinstance(raw, Exception):
                 logger.warning(
@@ -120,7 +139,7 @@ class Judge0Client:
 
             status_id: int = raw.get("status", {}).get("id", 0)
             status_desc: str = raw.get("status", {}).get("description", "Unknown")
-            actual: str = (raw.get("stdout") or "").rstrip()
+            actual: str = self._normalize_output(raw.get("stdout") or "")
             passed: bool = status_id == _ACCEPTED_STATUS_ID and actual == expected
 
             results.append(
@@ -166,9 +185,7 @@ class Judge0Client:
             for r in results
             if not r.get("passed")
         ]
-        reason = (
-            f"Passed {passed}/{total} test cases → awarded {score}/{weight}. "
-        )
+        reason = f"Passed {passed}/{total} test cases → awarded {score}/{weight}. "
         if failed_details:
             reason += "Failures: " + "; ".join(failed_details[:3])
             if len(failed_details) > 3:
