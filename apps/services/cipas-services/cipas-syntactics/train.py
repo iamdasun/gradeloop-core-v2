@@ -15,11 +15,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-import yaml
+import pandas as pd
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import precision_score, recall_score, f1_score
 
-from clone_detection.utils.common_setup import setup_logging
-from train_core import train
+from clone_detection.features.syntactic_features import SyntacticFeatureExtractor
+from clone_detection.models.classifiers import SyntacticClassifier
+from clone_detection.utils.common_setup import setup_logging, load_config
 
 logger = setup_logging(__name__)
 
@@ -499,7 +502,7 @@ def train(
     logger.info(f"gamma             : {gamma}")
     logger.info(f"reg_lambda        : {reg_lambda}")
     logger.info(f"scale_pos_weight  : {scale_pos_weight}")
-    logger.info(f"Precision floor   : 0.80 (Type-3 Filter adds extra precision)")
+    logger.info("Precision floor   : 0.80 (Type-3 Filter adds extra precision)")
     logger.info("")
     for csv_name, label, target, weight in DATASET_CONFIG:
         logger.info(f"  {csv_name:<16s}  label={label}  target={target:>6,}  weight={weight}×")
@@ -547,8 +550,8 @@ def train(
     w = np.array(row_weights)
 
     logger.info(f"Feature matrix: {X.shape}  ({len(feature_names)} features)")
-    logger.info(f"  String features      : 6")
-    logger.info(f"  AST core features    : 7  (incl. structural_density ×3)")
+    logger.info("  String features      : 6")
+    logger.info("  AST core features    : 7  (incl. structural_density ×3)")
     logger.info(f"  Node-type dists      : {len(feature_names) - 13}")
 
     # ---- Train/test split ------------------------------------------------
@@ -593,7 +596,7 @@ def train(
     X_train_final = X_train
     X_test_final = X_test
 
-    logger.info(f"\nScaling features with StandardScaler...")
+    logger.info("\nScaling features with StandardScaler...")
     X_train_scaled = classifier.scaler.fit_transform(X_train_final)
     X_test_scaled = classifier.scaler.transform(X_test_final)
     
@@ -658,7 +661,7 @@ def train(
     classifier.model.set_params(early_stopping_rounds=30)
     
     # --- Final Training with Early Stopping ---
-    logger.info(f"\nTraining Final XGBoost Clone Detector with Early Stopping …")
+    logger.info("\nTraining Final XGBoost Clone Detector with Early Stopping …")
     
     classifier.model.fit(
         X_train_scaled, y_train, 
@@ -770,7 +773,7 @@ def train(
     logger.info(f"  poetry run python evaluate.py --threshold {best['threshold']:.2f}")
     logger.info("  or sweep thresholds for the best Type-3 F1:")
     logger.info("  for t in 0.10 0.15 0.20 0.25 0.30; do")
-    logger.info(f"    poetry run python evaluate.py --threshold $t")
+    logger.info("    poetry run python evaluate.py --threshold $t")
     logger.info("  done")
     logger.info("=" * 80)
 

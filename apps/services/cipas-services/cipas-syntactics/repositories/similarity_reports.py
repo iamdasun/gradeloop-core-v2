@@ -6,14 +6,11 @@ Handles CRUD operations for cached assignment cluster reports.
 
 import json
 import logging
-from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-import asyncpg
-
-from database import get_db_connection, get_db_transaction
-from schemas import AssignmentClusterResponse, LanguageEnum
+from database import get_db_connection
+from schemas import AssignmentClusterResponse
 
 logger = logging.getLogger(__name__)
 

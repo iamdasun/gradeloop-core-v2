@@ -187,7 +187,6 @@ Examples:
     model_config = training_config.get("model", {})
     dataset_config = training_config.get("dataset", {})
     gptclonebench_config = training_config.get("gptclonebench", {})
-    features_config = training_config.get("features", {})
     xgboost_config = training_config.get("xgboost", {})
 
     # Build parameters (CLI overrides config)

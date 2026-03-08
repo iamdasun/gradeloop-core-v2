@@ -448,9 +448,6 @@ class SemanticFeatureExtractor:
             stmt_density = self._calculate_statement_density(root, code)
             branching = self._calculate_branching_factor(root)
 
-            # Normalize by code length
-            loc = max(len(code.splitlines()), 1)
-
             return [
                 max_depth / 10.0,  # Normalize assuming max depth ~10
                 avg_depth / 10.0,

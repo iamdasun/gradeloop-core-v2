@@ -3,7 +3,6 @@ AI Detection Model for CIPAS Service.
 Loads and runs the UniXcoder-based classifier for AI code detection.
 """
 
-import os
 from pathlib import Path
 from typing import Tuple
 

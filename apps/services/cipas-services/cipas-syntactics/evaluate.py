@@ -9,14 +9,28 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yaml
-from evaluate_core import evaluate
+import numpy as np
+from tqdm import tqdm
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    classification_report,
+    confusion_matrix
+)
 
-from clone_detection.utils.common_setup import setup_logging
+from clone_detection.features.syntactic_features import SyntacticFeatureExtractor
+from clone_detection.models.classifiers import SyntacticClassifier
+from clone_detection.pipelines import TieredPipeline
+from clone_detection.utils.common_setup import setup_logging, load_config
+from clone_detection.utils.type3_filter import is_type3_clone
 
 logger = setup_logging(__name__)
 
@@ -30,6 +44,9 @@ BCB_BALANCED_PATH = Path(
 
 # Default output model (must match what train.py produced)
 DEFAULT_MODEL_NAME = "clone_detector_xgb.pkl"
+
+# Default config file path
+DEFAULT_CONFIG_PATH = Path("config.yaml")
 
 # Clone types that the SYNTACTIC model should predict as clones (label = 1)
 # Type-4 (semantic) is excluded by default because this model is not trained
@@ -91,11 +108,13 @@ def load_bcb_dataset(
     # Sample if requested (independently per class)
     if sample_size:
         if len(clones) > sample_size:
-            import random; random.seed(0)
+            import random
+            random.seed(0)
             clones = random.sample(clones, sample_size)
             logger.info(f"  Sampled {sample_size} clone pairs")
         if len(non_clones) > sample_size:
-            import random; random.seed(0)
+            import random
+            random.seed(0)
             non_clones = random.sample(non_clones, sample_size)
             logger.info(f"  Sampled {sample_size} non-clone pairs")
 
@@ -355,9 +374,9 @@ def evaluate(
     logger.info("=" * 80)
     logger.info("Two-Stage Clone Detection — Pipeline Evaluation on BigCloneBench Balanced")
     logger.info("=" * 80)
-    logger.info(f"Stage 0 (NiCAD)  : Type-1 / Type-2 via StructuralNormalizer")
+    logger.info("Stage 0 (NiCAD)  : Type-1 / Type-2 via StructuralNormalizer")
     logger.info(f"Stage 1 (XGBoost): Type-3 via {model_name}")
-    logger.info(f"Stage 2          : Type-3 Filter (type3_filter.py)")
+    logger.info("Stage 2          : Type-3 Filter (type3_filter.py)")
     logger.info(f"Dataset          : {BCB_BALANCED_PATH}")
     logger.info(f"Clone types      : {sorted(clone_types)}")
     logger.info(f"Threshold        : {threshold if threshold is not None else 'calibrated (from model)'}")

@@ -66,7 +66,6 @@ import random
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 from sklearn.metrics import adjusted_rand_score
@@ -76,7 +75,6 @@ from clone_detection.cascade_worker import CascadeWorker, IngestionResult, InMem
 from clone_detection.collusion_graph import CollusionGraph, CollusionGroup
 from clone_detection.lsh_index import MinHashIndexer
 from clone_detection.pipelines import TieredPipeline
-from clone_detection.preprocessor import TemplateFilter
 from clone_detection.utils.common_setup import setup_logging
 
 logger = setup_logging(__name__)

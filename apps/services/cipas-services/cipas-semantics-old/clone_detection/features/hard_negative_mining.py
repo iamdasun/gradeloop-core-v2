@@ -16,7 +16,6 @@ Why Hard Negatives Matter:
 """
 
 import json
-import logging
 import random
 from collections import defaultdict
 from pathlib import Path

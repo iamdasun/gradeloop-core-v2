@@ -8,9 +8,7 @@ import logging
 from typing import Optional
 from uuid import UUID
 
-import asyncpg
-
-from database import get_db_connection, get_db_transaction
+from database import get_db_connection
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +120,7 @@ class InstructorAnnotationRepository:
         if not updates:
             return False
             
-        updates.append(f"updated_at = now()")
+        updates.append("updated_at = now()")
         params.append(annotation_id)
         
         query = f"""

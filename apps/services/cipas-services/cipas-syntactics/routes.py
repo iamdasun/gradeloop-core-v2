@@ -23,20 +23,16 @@ from fastapi import HTTPException, status
 
 from clone_detection.cascade_worker import (
     CascadeWorker,
-    CloneMatch,
     InMemoryDB,
-    IngestionResult,
 )
 from clone_detection.collusion_graph import CollusionGraph
 from clone_detection.features.syntactic_features import SyntacticFeatureExtractor
 from clone_detection.lsh_index import MinHashIndexer
 from clone_detection.models.classifiers import SyntacticClassifier
 from clone_detection.normalizers.structural_normalizer import (
-    NormalizationLevel,
     StructuralNormalizer,
 )
 from clone_detection.pipelines import (
-    TieredDetectionResult,
     TieredPipeline,
 )
 from clone_detection.preprocessor import Fragmenter, TemplateFilter

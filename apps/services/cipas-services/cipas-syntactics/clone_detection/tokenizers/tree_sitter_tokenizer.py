@@ -9,14 +9,13 @@ using Tree-sitter Concrete Syntax Trees (CSTs). It supports:
 """
 
 import re
-from typing import Optional
 
 import tree_sitter_c as tsc
 import tree_sitter_java as tsjava
 import tree_sitter_python as tspython
 from tree_sitter import Language, Parser
 
-from ..utils.common_setup import abstract_identifier, get_parsers_dir, get_token_type
+from ..utils.common_setup import abstract_identifier, get_token_type
 
 
 class TreeSitterTokenizer:

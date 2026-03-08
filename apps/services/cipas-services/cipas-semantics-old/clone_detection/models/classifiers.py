@@ -9,7 +9,6 @@ This module implements:
 - Macro-F1 optimized threshold selection for non-clone detection
 """
 
-import json
 import pickle
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple

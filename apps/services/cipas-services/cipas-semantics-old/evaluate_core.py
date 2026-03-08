@@ -6,7 +6,6 @@ This module contains the actual evaluation implementation.
 """
 
 import json
-import logging
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -50,7 +49,7 @@ def extract_features_worker(args):
         extractor = SheneamerFeatureExtractor()
         fused = extractor.extract_fused_features(code1, code2, language)
         return (idx, fused)
-    except Exception as e:
+    except Exception:
         # Return None for failed extractions
         return (idx, None)
 
@@ -239,14 +238,14 @@ def evaluate_model(
     logger.info("\n" + "=" * 80)
     logger.info("EVALUATION RESULTS")
     logger.info("=" * 80)
-    logger.info(f"\nDataset Statistics:")
+    logger.info("\nDataset Statistics:")
     logger.info(f"  Total samples: {len(y_test):,}")
     logger.info(f"  Clones: {sum(y_test):,} ({sum(y_test) / len(y_test) * 100:.1f}%)")
     logger.info(
         f"  Non-clones: {len(y_test) - sum(y_test):,} ({(len(y_test) - sum(y_test)) / len(y_test) * 100:.1f}%)"
     )
 
-    logger.info(f"\nOverall Metrics:")
+    logger.info("\nOverall Metrics:")
     logger.info(f"  Accuracy:     {metrics['accuracy']:.4f}")
     logger.info(f"  Precision:    {metrics['precision']:.4f}")
     logger.info(f"  Recall:       {metrics['recall']:.4f}")
@@ -254,7 +253,7 @@ def evaluate_model(
     logger.info(f"  Macro-F1:     {metrics['macro_f1']:.4f}")
     logger.info(f"  ROC AUC:      {metrics['roc_auc']:.4f}")
 
-    logger.info(f"\nConfusion Matrix:")
+    logger.info("\nConfusion Matrix:")
     logger.info(f"  [[{cm[0][0]:5d}  {cm[0][1]:5d}]   [TN   FP]")
     logger.info(f"   [{cm[1][0]:5d}  {cm[1][1]:5d}]]  [FN   TP]")
 
