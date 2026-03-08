@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+import numpy as np
 import psycopg2
 from psycopg2 import extras
 
@@ -199,9 +200,11 @@ class DatabaseClient:
                     for row in rows:
                         templates[row["enrollment_phase"]] = {
                             "template": pickle.loads(row["template_data"]),
-                            "std": pickle.loads(row["template_std"])
-                            if row["template_std"]
-                            else None,
+                            "std": (
+                                pickle.loads(row["template_std"])
+                                if row["template_std"]
+                                else None
+                            ),
                             "sample_count": row["sample_count"],
                             "created_at": row["created_at"],
                             "updated_at": row["updated_at"],
@@ -244,9 +247,11 @@ class DatabaseClient:
 
                         all_templates[user_id][phase] = {
                             "template": pickle.loads(row["template_data"]),
-                            "std": pickle.loads(row["template_std"])
-                            if row["template_std"]
-                            else None,
+                            "std": (
+                                pickle.loads(row["template_std"])
+                                if row["template_std"]
+                                else None
+                            ),
                             "sample_count": row["sample_count"],
                         }
 
