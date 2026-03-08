@@ -1,0 +1,49 @@
+meta {
+  name: Get Submission Grade
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{ACAFS_BASE_URL}}/api/v1/acafs/grades/{{submissionId}}
+  body: none
+  auth: inherit
+}
+
+vars:pre-request {
+  submissionId: 00000000-0000-0000-0000-000000000000
+}
+
+docs {
+  Fetch the AI-generated grade for a submission.
+
+  Returns 404 with {"detail": "GRADING_PENDING"} while the worker is still
+  processing. Poll with exponential back-off until a 200 is returned.
+
+  Response shape:
+  {
+    "submission_id": "uuid",
+    "assignment_id": "uuid",
+    "total_score": 72.5,
+    "max_total_score": 100,
+    "criteria_scores": [
+      {
+        "name": "Criterion name",
+        "score": 15,
+        "max_score": 20,
+        "grading_mode": "deterministic | llm | llm_ast",
+        "reason": "Instructor-facing justification.",
+        "band_selected": "excellent | good | satisfactory | unsatisfactory",
+        "confidence": 0.92,
+        "instructor_override_score": null,
+        "instructor_override_reason": null
+      }
+    ],
+    "holistic_feedback": "## What you achieved\n...",
+    "graded_at": "2026-03-08T10:00:00Z",
+    "instructor_override_score": null,
+    "instructor_holistic_feedback": null,
+    "override_by": null,
+    "overridden_at": null
+  }
+}

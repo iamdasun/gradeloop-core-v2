@@ -1,0 +1,42 @@
+meta {
+  name: Override Grade
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{ACAFS_BASE_URL}}/api/v1/acafs/grades/{{submissionId}}/override
+  body: json
+  auth: inherit
+}
+
+vars:pre-request {
+  submissionId: 00000000-0000-0000-0000-000000000000
+}
+
+body:json {
+  {
+    "criteria_overrides": [
+      {
+        "criterion_name": "Recursive base case handling",
+        "override_score": 18,
+        "override_reason": "Student demonstrated correct logic in oral examination."
+      }
+    ],
+    "instructor_holistic_feedback": "Well done overall. Pay attention to edge cases with negative inputs.",
+    "override_by": "instructor@university.edu"
+  }
+}
+
+docs {
+  Apply instructor score and/or feedback overrides to an existing AI-generated grade.
+
+  - Original AI scores are NEVER mutated. Overrides are stored in separate columns
+    (instructor_override_score, instructor_holistic_feedback, override_by, overridden_at).
+  - Only include criteria_overrides for criteria you want to change.
+  - All fields are optional — omit any field you do not want to change.
+  - Returns the full updated grade object on success (same shape as Get Submission Grade).
+
+  Requires the grade to already exist (submission must have been graded).
+  Returns 404 if the submission has not been graded yet.
+}
