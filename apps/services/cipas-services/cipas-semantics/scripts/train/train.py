@@ -418,48 +418,64 @@ class Trainer:
                     loss = self.crit(self.model(i1,m1,i2,m2), l) / GRADIENT_ACCUMULATION_STEPS
                 self.scaler.scale(loss).backward()
                 if (step+1) % GRADIENT_ACCUMULATION_STEPS == 0:
-                    self.scaler.unscale_(self.opt); torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-                    self.scaler.step(self.opt); self.scaler.update(); self.sched.step(); self.opt.zero_grad()
-                with autocast(): preds = torch.argmax(self.model(i1,m1,i2,m2), dim=1)
+                    self.scaler.unscale_(self.opt)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                    self.scaler.step(self.opt)
+                    self.scaler.update()
+                    self.sched.step()
+                    self.opt.zero_grad()
+                with autocast():
+                    preds = torch.argmax(self.model(i1,m1,i2,m2), dim=1)
             else:
                 loss = self.crit(self.model(i1,m1,i2,m2), l) / GRADIENT_ACCUMULATION_STEPS
                 loss.backward()
                 if (step+1) % GRADIENT_ACCUMULATION_STEPS == 0:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-                    self.opt.step(); self.sched.step(); self.opt.zero_grad()
+                    self.opt.step()
+                    self.sched.step()
+                    self.opt.zero_grad()
                 preds = torch.argmax(self.model(i1,m1,i2,m2), dim=1)
             tracker.update(preds, l, loss.item()*GRADIENT_ACCUMULATION_STEPS)
         return tracker.compute()
 
     @torch.no_grad()
     def evaluate(self, ld, desc, ep, split='val'):
-        self.model.eval(); tracker = MetricsTracker(); all_l, all_p = [], []
+        self.model.eval()
+        tracker = MetricsTracker()
+        all_l, all_p = [], []
         for b in tqdm(ld, desc=desc):
             logits = self.model(b['input_ids1'].to(self.dev), b['attention_mask1'].to(self.dev),
                                 b['input_ids2'].to(self.dev), b['attention_mask2'].to(self.dev))
             loss = self.crit(logits, b['labels'].to(self.dev))
             preds = torch.argmax(logits, dim=1)
             tracker.update(preds, b['labels'], loss.item())
-            all_l.extend(b['labels'].cpu().numpy().tolist()); all_p.extend(preds.cpu().numpy().tolist())
-        if split=='val' and ep>0: self.saver.save_confusion_matrix(np.array(all_l), np.array(all_p), ep, split)
+            all_l.extend(b['labels'].cpu().numpy().tolist())
+            all_p.extend(preds.cpu().numpy().tolist())
+        if split=='val' and ep>0:
+            self.saver.save_confusion_matrix(np.array(all_l), np.array(all_p), ep, split)
         return tracker.compute()
 
     def train(self):
         hist = {'train_loss':[], 'train_f1':[], 'val_loss':[], 'val_f1':[]}
         start = time.time()
         for ep in range(1, NUM_EPOCHS+1):
-            tm = self.train_epoch(ep); vm = self.evaluate(self.val_ld, f"Ep {ep} Val", ep)
+            tm = self.train_epoch(ep)
+            vm = self.evaluate(self.val_ld, f"Ep {ep} Val", ep)
             self.logger.info(f"Ep {ep}: Train F1={tm['f1']:.4f}, Val F1={vm['f1']:.4f}")
             self.saver.save_epoch_metrics(ep, tm, vm)
-            for k,v in [('train_loss',tm['loss']),('train_f1',tm['f1']),('val_loss',vm['loss']),('val_f1',vm['f1'])]: hist[k].append(v)
+            for k,v in [('train_loss',tm['loss']),('train_f1',tm['f1']),('val_loss',vm['loss']),('val_f1',vm['f1'])]:
+                hist[k].append(v)
             
-            ckpt_dir = self.out_dir / "checkpoints"; ckpt_dir.mkdir(parents=True, exist_ok=True)
+            ckpt_dir = self.out_dir / "checkpoints"
+            ckpt_dir.mkdir(parents=True, exist_ok=True)
             torch.save({'epoch':ep, 'model_state_dict':self.model.state_dict(), 'metrics':vm}, ckpt_dir/f"ckpt_{ep}.pt")
             if vm['f1'] > self.best_f1:
                 self.best_f1, self.best_ep = vm['f1'], ep
                 torch.save({'epoch':ep, 'model_state_dict':self.model.state_dict(), 'metrics':vm}, ckpt_dir/"best_model.pt")
                 self.logger.info(f"  ✓ New Best! F1={self.best_f1:.4f}")
-            if self.early_stop(vm['f1']): self.logger.info("Early Stop"); break
+            if self.early_stop(vm['f1']):
+                self.logger.info("Early Stop")
+                break
         self.saver.save_training_history(hist)
         return hist, time.time()-start
 
