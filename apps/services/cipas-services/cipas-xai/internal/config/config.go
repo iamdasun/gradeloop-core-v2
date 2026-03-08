@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -18,13 +19,14 @@ type ServerConfig struct {
 }
 
 type LLMConfig struct {
-	Provider    string // openai, anthropic, ollama, etc.
-	APIKey      string
-	BaseURL     string
-	Model       string
-	MaxTokens   int
-	Temperature float64
-	Timeout     int // in seconds
+	Provider     string // openai, anthropic, ollama, openrouter, etc.
+	APIKey       string
+	BaseURL      string
+	Model        string
+	MaxTokens    int
+	Temperature  float64
+	Timeout      int               // in seconds
+	ExtraHeaders map[string]string // Extra headers for providers like OpenRouter
 }
 
 // Load loads configuration from environment variables
@@ -34,18 +36,30 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8085"),
+			Port: getEnv("CIPAS_XAI_SVC_PORT", "8085"),
 		},
 		LLM: LLMConfig{
-			Provider:    getEnv("LLM_PROVIDER", "openai"),
-			APIKey:      getEnv("LLM_API_KEY", ""),
-			BaseURL:     getEnv("LLM_BASE_URL", "https://api.openai.com/v1"),
-			Model:       getEnv("LLM_MODEL", "gpt-4o-mini"),
-			MaxTokens:   2048,
-			Temperature: 0.7,
-			Timeout:     60,
+			Provider:     getEnv("LLM_PROVIDER", "openai"),
+			APIKey:       getEnv("LLM_API_KEY", ""),
+			BaseURL:      getEnv("LLM_BASE_URL", "https://api.openai.com/v1"),
+			Model:        getEnv("LLM_MODEL", "gpt-4o-mini"),
+			MaxTokens:    2048,
+			Temperature:  0.7,
+			Timeout:      60,
+			ExtraHeaders: make(map[string]string),
 		},
 		LogLevel: getEnv("LOG_LEVEL", "info"),
+	}
+
+	// Load extra headers for providers like OpenRouter
+	// Format: HTTP-Referer=https://example.com,X-Title=My App
+	if extraHeadersStr := getEnv("LLM_EXTRA_HEADERS", ""); extraHeadersStr != "" {
+		for _, pair := range strings.Split(extraHeadersStr, ",") {
+			parts := strings.SplitN(pair, "=", 2)
+			if len(parts) == 2 {
+				cfg.LLM.ExtraHeaders[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+			}
+		}
 	}
 
 	// Override max tokens if provided

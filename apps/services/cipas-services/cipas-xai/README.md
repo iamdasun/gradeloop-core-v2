@@ -22,10 +22,11 @@ cp .env.example .env
 Edit `.env`:
 
 ```env
-SERVER_PORT=8085
-LLM_API_KEY=your-api-key-here
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_MODEL=gpt-4o-mini
+CIPAS_XAI_SVC_PORT=8085
+LLM_API_KEY=your-openrouter-api-key-here
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL=qwen/qwen3-vl-235b-a22b-thinking
+LLM_EXTRA_HEADERS=HTTP-Referer=http://localhost:3000,X-OpenRouter-Title=GradeLoop CIPAS-XAI
 ```
 
 ### 2. Run the Service
@@ -36,7 +37,7 @@ go run ./cmd/main.go
 
 ### 3. Test the Endpoints
 
-#### Non-streaming Chat
+#### Non-streaming Chat (Text Only)
 
 ```bash
 curl -X POST http://localhost:8085/api/v1/chat \
@@ -45,6 +46,24 @@ curl -X POST http://localhost:8085/api/v1/chat \
     "messages": [
       {"role": "system", "content": "You are a helpful assistant."},
       {"role": "user", "content": "Hello!"}
+    ]
+  }'
+```
+
+#### Non-streaming Chat with Image (Multi-modal)
+
+```bash
+curl -X POST http://localhost:8085/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {"type": "text", "text": "What is in this image?"},
+          {"type": "image_url", "image_url": {"url": "https://live.staticflickr.com/3851/14825276609_098cac593d_b.jpg"}}
+        ]
+      }
     ]
   }'
 ```
@@ -118,17 +137,27 @@ data: {"id":"chatcmpl-123","content":" can I help?","done":true}
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SERVER_PORT` | Server port | `8085` |
+| `CIPAS_XAI_SVC_PORT` | Server port | `8085` |
 | `LOG_LEVEL` | Log level (debug, info, warn, error) | `info` |
-| `LLM_PROVIDER` | LLM provider name | `openai` |
+| `LLM_PROVIDER` | LLM provider name | `openrouter` |
 | `LLM_API_KEY` | API key for LLM provider | *required* |
-| `LLM_BASE_URL` | Base URL for LLM API | `https://api.openai.com/v1` |
-| `LLM_MODEL` | Model to use | `gpt-4o-mini` |
+| `LLM_BASE_URL` | Base URL for LLM API | `https://openrouter.ai/api/v1` |
+| `LLM_MODEL` | Model to use | `qwen/qwen3-vl-235b-a22b-thinking` |
+| `LLM_EXTRA_HEADERS` | Extra headers (comma-separated key=value) | `` |
 | `LLM_MAX_TOKENS` | Maximum tokens in response | `2048` |
 | `LLM_TEMPERATURE` | Response temperature (0.0-2.0) | `0.7` |
 | `LLM_TIMEOUT` | Request timeout in seconds | `60` |
 
 ## Provider Examples
+
+### OpenRouter (with Vision Support)
+
+```env
+LLM_API_KEY=sk-or-...
+LLM_BASE_URL=https://openrouter.ai/api/v1
+LLM_MODEL=qwen/qwen3-vl-235b-a22b-thinking
+LLM_EXTRA_HEADERS=HTTP-Referer=http://localhost:3000,X-OpenRouter-Title=GradeLoop CIPAS-XAI
+```
 
 ### OpenAI
 
