@@ -228,6 +228,13 @@ jobs:
 
             pushd "$d" >/dev/null || true
 
+            # Check if any test files exist
+            if ! find . -maxdepth 2 -name "test_*.py" -o -name "*_test.py" 2>/dev/null | grep -q .; then
+              echo "Skipping tests for $d (no test files found)" >> ci_summary.txt
+              popd >/dev/null || true
+              continue
+            fi
+
             # Install dependencies if requirements.txt, setup.py, or pyproject.toml exists
             if [ -f "requirements.txt" ]; then
               echo "Installing dependencies from requirements.txt for $d" >> ci_summary.txt

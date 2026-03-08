@@ -42,6 +42,8 @@ jobs:
 
             if ls test_*.py 1> /dev/null 2>&1; then
               pytest --cov=. --cov-report=term -v || true
+            else
+              echo "No test files found in $pkg_dir, skipping tests"
             fi
 
             popd > /dev/null || continue
@@ -63,6 +65,8 @@ jobs:
 
               if ls test_*.py 1> /dev/null 2>&1; then
                 pytest -v || true
+              else
+                echo "No test files found in $svc_dir, skipping tests"
               fi
 
               popd > /dev/null || continue
