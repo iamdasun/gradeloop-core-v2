@@ -559,13 +559,13 @@ class SyntacticFeatureExtractor:
             # Filter to only our standardized node types
             filtered_counts = {nt: cst_freqs.get(nt, 0) for nt in self._node_types}
 
-            loc = len([l for l in code.splitlines() if l.strip()])
+            lines_of_code = len([line for line in code.splitlines() if line.strip()])
             return {
                 "node_types": node_types,
                 "node_type_counts": filtered_counts,
                 "max_depth": max_depth,
                 "node_count": node_count,
-                "loc": loc,
+                "loc": lines_of_code,
             }
 
         except Exception:

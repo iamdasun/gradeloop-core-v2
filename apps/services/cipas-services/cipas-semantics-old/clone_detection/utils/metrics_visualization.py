@@ -30,7 +30,6 @@ from sklearn.metrics import (
     confusion_matrix,
     precision_recall_curve,
     roc_curve,
-    roc_auc_score,
 )
 
 # Configure matplotlib for non-interactive backend

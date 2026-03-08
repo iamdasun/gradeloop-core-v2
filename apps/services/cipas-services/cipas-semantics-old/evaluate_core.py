@@ -14,7 +14,6 @@ from typing import Optional
 import numpy as np
 from sklearn.metrics import (
     accuracy_score,
-    classification_report,
     confusion_matrix,
     f1_score,
     precision_score,

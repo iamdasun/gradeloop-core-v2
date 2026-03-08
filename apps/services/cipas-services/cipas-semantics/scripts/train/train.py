@@ -409,7 +409,8 @@ class MetricsSaver:
         pd.DataFrame(h).to_csv(self.m_dir / "history.csv", index=False)
     def save_final_evaluation(self, metrics, labels, preds, probs, ep):
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        with open(self.m_dir / f"final_{ts}.json", 'w') as f: json.dump(metrics, f, indent=2)
+        with open(self.m_dir / f"final_{ts}.json", 'w') as f:
+            json.dump(metrics, f, indent=2)
         pd.DataFrame({'true': labels, 'pred': preds, 'prob': probs}).to_csv(self.m_dir / f"preds_{ts}.csv", index=False)
     def save_summary(self, final_m, best_ep, best_f1, time_mins):
         with open(self.m_dir / "summary.json", 'w') as f:
