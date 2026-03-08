@@ -45,9 +45,9 @@ export function RevokeSessionsDialog({
       onOpenChange={onOpenChange}
       title="Revoke Sessions"
       description={`This will immediately terminate all active sessions for ${user?.full_name ?? "this user"}. They will need to log in again on all devices.`}
-      confirmLabel="Revoke All Sessions"
+      confirmText="Revoke All Sessions"
       onConfirm={handleConfirm}
-      loading={loading}
+      isLoading={loading}
     />
   );
 }
