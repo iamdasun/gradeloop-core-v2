@@ -53,3 +53,72 @@ export interface AssignmentClusterResponse {
   collusion_groups: CollusionGroup[];
   per_submission: SubmissionClusterResult[];
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Instructor Annotations
+// ──────────────────────────────────────────────────────────────────────────
+
+export type AnnotationStatus =
+  | "pending_review"
+  | "confirmed_plagiarism"
+  | "false_positive"
+  | "acceptable_collaboration"
+  | "requires_investigation";
+
+export interface CreateAnnotationRequest {
+  assignment_id: string;
+  instructor_id: string;
+  status: AnnotationStatus;
+  match_id?: string;
+  group_id?: string;
+  comments?: string;
+  action_taken?: string;
+}
+
+export interface UpdateAnnotationRequest {
+  status?: AnnotationStatus;
+  comments?: string;
+  action_taken?: string;
+}
+
+export interface AnnotationResponse {
+  id: string;
+  assignment_id: string;
+  instructor_id: string;
+  status: AnnotationStatus;
+  match_id?: string;
+  group_id?: string;
+  comments?: string;
+  action_taken?: string;
+  created_at: string;  // ISO timestamp
+  updated_at: string;  // ISO timestamp
+}
+
+export interface AnnotationStatsResponse {
+  assignment_id: string;
+  total: number;
+  pending_review: number;
+  confirmed_plagiarism: number;
+  false_positive: number;
+  acceptable_collaboration: number;
+  requires_investigation: number;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Similarity Report Metadata
+// ──────────────────────────────────────────────────────────────────────────
+
+export interface SimilarityReportMetadata {
+  id: string;
+  assignment_id: string;
+  language: string;
+  submission_count: number;
+  processed_count: number;
+  failed_count: number;
+  total_clone_pairs: number;
+  lsh_threshold: number;
+  min_confidence: number;
+  processing_time_seconds?: number;
+  created_at: string;  // ISO timestamp
+  updated_at: string;  // ISO timestamp
+}
