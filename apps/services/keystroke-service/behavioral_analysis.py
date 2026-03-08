@@ -7,7 +7,7 @@ import json
 import os
 import statistics
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import google.generativeai as genai
 from pydantic import BaseModel
@@ -689,15 +689,21 @@ Respond ONLY with valid JSON, no additional text."""
                 for fp in metrics.friction_points[:3]
             ],
             "recommendations": [
-                "Review areas with high deletion rates"
-                if metrics.deletion_rate > 0.2
-                else None,
-                "Consider additional practice with incremental development"
-                if not cognitive.incremental_construction
-                else None,
-                "Work on systematic debugging approach"
-                if cognitive.troubleshooting_style == "erratic"
-                else None,
+                (
+                    "Review areas with high deletion rates"
+                    if metrics.deletion_rate > 0.2
+                    else None
+                ),
+                (
+                    "Consider additional practice with incremental development"
+                    if not cognitive.incremental_construction
+                    else None
+                ),
+                (
+                    "Work on systematic debugging approach"
+                    if cognitive.troubleshooting_style == "erratic"
+                    else None
+                ),
             ],
             "style": cognitive.troubleshooting_style,
         }

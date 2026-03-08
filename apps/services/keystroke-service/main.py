@@ -5,6 +5,8 @@ FastAPI microservice for behavioral biometrics
 
 import asyncio
 import json
+import os
+from datetime import datetime
 from typing import Dict, List, Optional
 
 import pika
@@ -407,9 +409,11 @@ async def get_enrollment_progress(user_id: str):
             "phases_complete": phases_complete,
             "phases_remaining": [p for p in phases if p not in phases_complete],
             "total_sessions": progress.get("total_sessions", 0),
-            "started_at": progress.get("started_at").isoformat()
-            if progress.get("started_at")
-            else None,
+            "started_at": (
+                progress.get("started_at").isoformat()
+                if progress.get("started_at")
+                else None
+            ),
         }
 
     except Exception as e:
@@ -717,9 +721,9 @@ async def get_session_status(user_id: str, session_id: str):
         "session_id": session_id,
         "events_captured": event_count,
         "last_verification": metadata.get("last_verification") if metadata else None,
-        "current_risk_score": float(metadata.get("risk_score", 0.0))
-        if metadata
-        else 0.0,
+        "current_risk_score": (
+            float(metadata.get("risk_score", 0.0)) if metadata else 0.0
+        ),
     }
 
 
@@ -751,9 +755,11 @@ async def get_session_timeline(session_id: str):
             {
                 **e,
                 "event_id": str(e.get("event_id", "")),
-                "event_timestamp": e["event_timestamp"].isoformat()
-                if hasattr(e.get("event_timestamp"), "isoformat")
-                else e.get("event_timestamp", ""),
+                "event_timestamp": (
+                    e["event_timestamp"].isoformat()
+                    if hasattr(e.get("event_timestamp"), "isoformat")
+                    else e.get("event_timestamp", "")
+                ),
             }
             for e in timeline
         ],
@@ -991,9 +997,11 @@ async def websocket_monitor(websocket: WebSocket, user_id: str, session_id: str)
                             {
                                 **e,
                                 "event_id": str(e.get("event_id", "")),
-                                "event_timestamp": e["event_timestamp"].isoformat()
-                                if hasattr(e.get("event_timestamp"), "isoformat")
-                                else str(e.get("event_timestamp", "")),
+                                "event_timestamp": (
+                                    e["event_timestamp"].isoformat()
+                                    if hasattr(e.get("event_timestamp"), "isoformat")
+                                    else str(e.get("event_timestamp", ""))
+                                ),
                             }
                             for e in historical
                         ],
