@@ -21,8 +21,6 @@ import tree_sitter_java as tsjava
 import tree_sitter_python as tspython
 from tree_sitter import Language, Parser
 
-from ..utils.common_setup import abstract_identifier, get_token_type
-
 
 class NormalizationLevel(Enum):
     """Normalization level for clone detection."""

@@ -568,7 +568,7 @@ class SyntacticFeatureExtractor:
                 "loc": loc,
             }
 
-        except Exception as e:
+        except Exception:
             # Return empty AST info on parse failure
             return {
                 "node_types": set(),

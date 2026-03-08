@@ -560,7 +560,6 @@ def evaluate(
         tp = int(np.sum((ct_y == 1) & (ct_pred == 1)))
         fn = int(np.sum((ct_y == 1) & (ct_pred == 0)))
         fp = int(np.sum((ct_y == 0) & (ct_pred == 1)))
-        tn = int(np.sum((ct_y == 0) & (ct_pred == 0)))
 
         recall_ct    = tp / (tp + fn) if (tp + fn) > 0 else 0.0
         precision_ct = tp / (tp + fp) if (tp + fp) > 0 else 0.0
