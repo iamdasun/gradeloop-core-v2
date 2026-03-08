@@ -4,7 +4,6 @@ Configuration settings for Semantic Clone Detection API
 
 import os
 from pathlib import Path
-from typing import Optional
 
 import torch
 

@@ -178,7 +178,7 @@ Examples:
     # Determine languages
     if params["all_languages"]:
         params["languages"] = ["java", "python", "c", "csharp"]
-        logger.info(f"Evaluating on ALL 4 languages...")
+        logger.info("Evaluating on ALL 4 languages...")
     elif params["language"] is None:
         params["languages"] = ["java", "python", "c", "csharp"]
         logger.info("No language specified. Evaluating on ALL 4 languages by default.")

@@ -464,7 +464,7 @@ class SyntacticFeatureExtractor:
         try:
             ast_info1 = self._parse_code_safely(code1)
             ast_info2 = self._parse_code_safely(code2)
-        except Exception as e:
+        except Exception:
             # Return zeros matching the full structural feature count:
             # 4 core AST + 3 structural density + (N node-type dists if enabled)
             n_structural_features = len(STRUCTURAL_FEATURE_NAMES)
@@ -762,11 +762,11 @@ class SyntacticFeatureExtractor:
         Returns:
             Density value (nodes per line), clamped to [0, 50]
         """
-        loc = len([l for l in code.splitlines() if l.strip()])
-        if loc == 0:
+        lines_of_code = len([line for line in code.splitlines() if line.strip()])
+        if lines_of_code == 0:
             return 0.0
         # Clamp to a reasonable maximum to prevent outlier dominance
-        return min(node_count / loc, 50.0)
+        return min(node_count / lines_of_code, 50.0)
 
     def _node_type_distribution_diff(
         self, counts1: dict[str, int], counts2: dict[str, int]

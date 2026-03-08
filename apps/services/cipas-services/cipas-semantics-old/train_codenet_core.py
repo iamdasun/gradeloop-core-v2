@@ -6,7 +6,6 @@ Supports: Java, C, C#, Python
 """
 
 import json
-import logging
 import multiprocessing as mp
 import random
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -51,7 +50,7 @@ def extract_features_worker(args):
         extractor = SheneamerFeatureExtractor()
         fused = extractor.extract_fused_features(code1, code2, language)
         return (idx, fused)
-    except Exception as e:
+    except Exception:
         # Return None for failed extractions - will be handled by caller
         return (idx, None)
 
@@ -411,7 +410,7 @@ class CodeNetDataLoader:
         # 4. Add GPTCloneBench domain mixing (optional)
         # ========================================
         if include_gptclonebench and gptclonebench_path:
-            logger.info(f"Adding GPTCloneBench samples...")
+            logger.info("Adding GPTCloneBench samples...")
             gpt_samples = self._load_gptclonebench_samples(
                 gptclonebench_path, int(sample_size * gptclonebench_ratio)
             )
@@ -430,8 +429,8 @@ class CodeNetDataLoader:
         )
 
         # Label verification
-        clone_pairs = sum(1 for l in labels if l == 1)
-        nonclone_pairs = sum(1 for l in labels if l == 0)
+        clone_pairs = sum(1 for label in labels if label == 1)
+        nonclone_pairs = sum(1 for label in labels if label == 0)
         logger.info(
             f"Label distribution: {clone_pairs} clones ({clone_pairs / len(labels) * 100:.1f}%), "
             f"{nonclone_pairs} non-clones ({nonclone_pairs / len(labels) * 100:.1f}%)"

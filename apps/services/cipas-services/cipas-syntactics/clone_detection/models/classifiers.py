@@ -15,7 +15,7 @@ Pipeline context:
 
 import json
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score

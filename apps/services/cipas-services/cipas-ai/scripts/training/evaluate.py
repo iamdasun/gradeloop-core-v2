@@ -1,6 +1,5 @@
 import os
 import torch
-import numpy as np
 from tqdm import tqdm
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModel

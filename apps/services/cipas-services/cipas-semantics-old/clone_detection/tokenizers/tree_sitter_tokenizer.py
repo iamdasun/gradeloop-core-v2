@@ -11,7 +11,6 @@ using Tree-sitter Concrete Syntax Trees (CSTs). It supports:
 """
 
 import re
-from typing import Optional
 
 try:
     import tree_sitter_c_sharp as tscs
@@ -134,7 +133,6 @@ class TreeSitterTokenizer:
 
     def _get_token_type(self, token: str) -> str:
         """Get the type category for a token."""
-        token_lower = token.lower()
 
         # Check for numbers
         try:

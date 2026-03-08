@@ -3,7 +3,6 @@ API endpoints for semantic clone detection
 """
 
 import logging
-from typing import List
 
 from fastapi import APIRouter, HTTPException, status
 

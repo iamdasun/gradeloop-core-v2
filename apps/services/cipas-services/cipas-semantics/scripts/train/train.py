@@ -12,7 +12,6 @@ Date: March 8, 2026
 # ============================================================================
 # 📦 IMPORTS (ALL IMPORTS FIRST)
 # ============================================================================
-import os
 import sys
 import json
 import random
@@ -23,20 +22,9 @@ import warnings
 import zipfile
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, List, Optional, Any
 from collections import defaultdict
 from itertools import combinations
-
-warnings.filterwarnings('ignore')
-
-# Google Drive download support
-try:
-    import gdown
-    GDOWN_AVAILABLE = True
-except ImportError:
-    GDOWN_AVAILABLE = False
-    gdown = None
-    print("⚠️  WARNING: gdown not installed. Install with: pip install gdown")
 
 # Scientific Computing
 import numpy as np
@@ -49,8 +37,7 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score, precision_recall_fscore_support, confusion_matrix,
-    classification_report, roc_auc_score, roc_curve, precision_recall_curve,
-    average_precision_score
+    roc_auc_score
 )
 
 # PyTorch
@@ -66,7 +53,18 @@ from transformers import (
     get_linear_schedule_with_warmup,
     logging as transformers_logging
 )
+
+warnings.filterwarnings('ignore')
 transformers_logging.set_verbosity_error()
+
+# Google Drive download support
+try:
+    import gdown
+    GDOWN_AVAILABLE = True
+except ImportError:
+    GDOWN_AVAILABLE = False
+    gdown = None
+    print("⚠️  WARNING: gdown not installed. Install with: pip install gdown")
 
 # ============================================================================
 # ⚙️ CONFIGURATION VARIABLES (EDIT THESE)
@@ -164,7 +162,7 @@ class DatasetLoader:
             self.logger.error("❌ gdown library not installed. Install with: pip install gdown")
             return False
         if self.gptclonebench_path.exists():
-            self.logger.info(f"✓ GPTCloneBench already exists")
+            self.logger.info("✓ GPTCloneBench already exists")
             return True
         self.logger.info("📥 Downloading GPTCloneBench...")
         try:
@@ -179,7 +177,8 @@ class DatasetLoader:
                 temp_file.rename(self.gptclonebench_path)
             if not self.gptclonebench_path.exists():
                 jsonl_files = list(self.gptclonebench_path.parent.glob("*.jsonl"))
-                if jsonl_files: jsonl_files[0].rename(self.gptclonebench_path)
+                if jsonl_files:
+                    jsonl_files[0].rename(self.gptclonebench_path)
             return self.gptclonebench_path.exists()
         except Exception as e:
             self.logger.error(f"❌ Download failed: {e}")
@@ -205,7 +204,8 @@ class DatasetLoader:
             if not self.codenet_path.exists():
                 jsonl_files = list(self.codenet_path.parent.glob("*.jsonl"))
                 main_files = [f for f in jsonl_files if 'test' not in f.name.lower()]
-                if main_files: main_files[0].rename(self.codenet_path)
+                if main_files:
+                    main_files[0].rename(self.codenet_path)
             return self.codenet_path.exists()
         except Exception as e:
             self.logger.error(f"❌ Download failed: {e}")
@@ -213,7 +213,8 @@ class DatasetLoader:
     
     def load_gptclonebench(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         if not self.gptclonebench_path.exists():
-            if not self.download_gptclonebench(): return []
+            if not self.download_gptclonebench():
+                return []
         pairs = []
         with open(self.gptclonebench_path, 'r', encoding='utf-8') as f:
             for line in f:
@@ -223,13 +224,16 @@ class DatasetLoader:
                         'code1': data['code1'], 'code2': data['code2'],
                         'label': 1 if data['semantic'] else 0, 'source': 'gptclonebench'
                     })
-                    if limit and len(pairs) >= limit: break
-                except: continue
+                    if limit and len(pairs) >= limit:
+                        break
+                except Exception:
+                    continue
         return pairs
     
     def load_codenet_submissions(self, file_path: Path, limit: Optional[int] = None) -> Dict[str, List[Dict]]:
         if not file_path.exists():
-            if not self.download_codenet(): return {}
+            if not self.download_codenet():
+                return {}
         problems = defaultdict(list)
         count = 0
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -243,8 +247,10 @@ class DatasetLoader:
                             'language': data['language'], 'user_id': data.get('user_id', 'unknown')
                         })
                         count += 1
-                        if limit and count >= limit: break
-                except: continue
+                        if limit and count >= limit:
+                            break
+                except Exception:
+                    continue
         return {pid: subs for pid, subs in problems.items() if len(subs) >= 2}
     
     def create_codenet_pairs(self, problems: Dict[str, List[Dict]], num_positive: int, num_negative: int) -> List[Dict[str, Any]]:
@@ -253,21 +259,26 @@ class DatasetLoader:
         positive_count = 0
         for pid in problem_ids:
             subs = problems[pid]
-            if len(subs) < 2: continue
+            if len(subs) < 2:
+                continue
             sample_size = min(3, len(subs)*(len(subs)-1)//2)
             sampled = random.sample(list(combinations(subs, 2)), min(sample_size, len(subs)*(len(subs)-1)//2))
             for s1, s2 in sampled:
-                if s1['user_id'] == s2['user_id']: continue
+                if s1['user_id'] == s2['user_id']:
+                    continue
                 pairs.append({'code1': s1['code'], 'code2': s2['code'], 'label': 1, 'source': 'codenet'})
                 positive_count += 1
-                if positive_count >= num_positive: break
-            if positive_count >= num_positive: break
+                if positive_count >= num_positive:
+                    break
+            if positive_count >= num_positive:
+                break
         
         negative_count = 0
         attempts = 0
         while negative_count < num_negative and attempts < num_negative * 10:
             attempts += 1
-            if len(problem_ids) < 2: break
+            if len(problem_ids) < 2:
+                break
             p1, p2 = random.sample(problem_ids, 2)
             s1, s2 = random.choice(problems[p1]), random.choice(problems[p2])
             pairs.append({'code1': s1['code'], 'code2': s2['code'], 'label': 0, 'source': 'codenet'})
@@ -293,7 +304,8 @@ class DatasetLoader:
 # ============================================================================
 class CodeAugmenter:
     def augment(self, code: str) -> str:
-        if not DATA_AUGMENTATION or random.random() > 0.3: return code
+        if not DATA_AUGMENTATION or random.random() > 0.3:
+            return code
         lines = code.split('\n')
         if random.random() < 0.5:
             lines.insert(random.randint(0, len(lines)), "// Augmented")
@@ -309,7 +321,8 @@ class SemanticCloneDataset(Dataset):
     def __getitem__(self, idx):
         p = self.pairs[idx]
         c1, c2 = p['code1'], p['code2']
-        if self.augmenter: c1, c2 = self.augmenter.augment(c1), self.augmenter.augment(c2)
+        if self.augmenter:
+            c1, c2 = self.augmenter.augment(c1), self.augmenter.augment(c2)
         e1 = self.tokenizer(c1, max_length=self.max_length, padding='max_length', truncation=True, return_tensors='pt')
         e2 = self.tokenizer(c2, max_length=self.max_length, padding='max_length', truncation=True, return_tensors='pt')
         return {
@@ -352,30 +365,35 @@ class EarlyStopping:
     def __init__(self, patience=5, mode='max'):
         self.patience, self.mode, self.counter, self.best, self.stop = patience, mode, 0, None, False
     def __call__(self, score):
-        if self.best is None: self.best = score; return False
+        if self.best is None:
+            self.best = score
+            return False
         if (self.mode=='max' and score > self.best) or (self.mode=='min' and score < self.best):
             self.best, self.counter = score, 0
         else:
             self.counter += 1
-            if self.counter >= self.patience: self.stop = True
+            if self.counter >= self.patience:
+                self.stop = True
         return self.stop
 
 class MetricsTracker:
-    def __init__(self): self.preds, self.labels, self.losses = [], [], []
-    def update(self, p, l, loss):
-        self.preds.extend(p.cpu().numpy().tolist())
-        self.labels.extend(l.cpu().numpy().tolist())
+    def __init__(self):
+        self.preds, self.labels, self.losses = [], [], []
+    def update(self, preds, labels, loss):
+        self.preds.extend(preds.cpu().numpy().tolist())
+        self.labels.extend(labels.cpu().numpy().tolist())
         self.losses.append(loss)
     def compute(self):
-        p, l = np.array(self.preds), np.array(self.labels)
-        acc = accuracy_score(l, p)
-        _, _, f1, _ = precision_recall_fscore_support(l, p, average='binary', zero_division=0)
+        preds, labels = np.array(self.preds), np.array(self.labels)
+        acc = accuracy_score(labels, preds)
+        _, _, f1, _ = precision_recall_fscore_support(labels, preds, average='binary', zero_division=0)
         return {'loss': np.mean(self.losses), 'accuracy': acc, 'f1': f1}
 
 class MetricsSaver:
     def __init__(self, m_dir, p_dir, logger):
         self.m_dir, self.p_dir, self.logger = m_dir, p_dir, logger
-        m_dir.mkdir(parents=True, exist_ok=True); p_dir.mkdir(parents=True, exist_ok=True)
+        m_dir.mkdir(parents=True, exist_ok=True)
+        p_dir.mkdir(parents=True, exist_ok=True)
     def save_epoch_metrics(self, ep, train_m, val_m):
         with open(self.m_dir / f"epoch_{ep:03d}.json", 'w') as f:
             json.dump({'epoch': ep, 'train': train_m, 'val': val_m}, f, indent=2)
@@ -385,7 +403,8 @@ class MetricsSaver:
             json.dump({'cm': cm.tolist()}, f, indent=2)
         fig, ax = plt.subplots(figsize=(6,6))
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
-        plt.savefig(self.p_dir / f"cm_{ep}_{split}.png"); plt.close()
+        plt.savefig(self.p_dir / f"cm_{ep}_{split}.png")
+        plt.close()
     def save_training_history(self, h):
         pd.DataFrame(h).to_csv(self.m_dir / "history.csv", index=False)
     def save_final_evaluation(self, metrics, labels, preds, probs, ep):
@@ -409,13 +428,14 @@ class Trainer:
         self.best_f1, self.best_ep = 0.0, 0
 
     def train_epoch(self, ep):
-        self.model.train(); tracker = MetricsTracker()
+        self.model.train()
+        tracker = MetricsTracker()
         for step, b in enumerate(tqdm(self.train_ld, desc=f"Ep {ep}")):
-            i1, m1, i2, m2, l = b['input_ids1'].to(self.dev), b['attention_mask1'].to(self.dev), \
+            i1, m1, i2, m2, labels = b['input_ids1'].to(self.dev), b['attention_mask1'].to(self.dev), \
                                 b['input_ids2'].to(self.dev), b['attention_mask2'].to(self.dev), b['labels'].to(self.dev)
             if USE_MIXED_PRECISION:
                 with autocast():
-                    loss = self.crit(self.model(i1,m1,i2,m2), l) / GRADIENT_ACCUMULATION_STEPS
+                    loss = self.crit(self.model(i1,m1,i2,m2), labels) / GRADIENT_ACCUMULATION_STEPS
                 self.scaler.scale(loss).backward()
                 if (step+1) % GRADIENT_ACCUMULATION_STEPS == 0:
                     self.scaler.unscale_(self.opt)
@@ -427,7 +447,7 @@ class Trainer:
                 with autocast():
                     preds = torch.argmax(self.model(i1,m1,i2,m2), dim=1)
             else:
-                loss = self.crit(self.model(i1,m1,i2,m2), l) / GRADIENT_ACCUMULATION_STEPS
+                loss = self.crit(self.model(i1,m1,i2,m2), labels) / GRADIENT_ACCUMULATION_STEPS
                 loss.backward()
                 if (step+1) % GRADIENT_ACCUMULATION_STEPS == 0:
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
@@ -435,7 +455,7 @@ class Trainer:
                     self.sched.step()
                     self.opt.zero_grad()
                 preds = torch.argmax(self.model(i1,m1,i2,m2), dim=1)
-            tracker.update(preds, l, loss.item()*GRADIENT_ACCUMULATION_STEPS)
+            tracker.update(preds, labels, loss.item()*GRADIENT_ACCUMULATION_STEPS)
         return tracker.compute()
 
     @torch.no_grad()
@@ -492,18 +512,22 @@ class Evaluator:
         self.model, self.ld, self.dev, self.saver = model, ld, dev, saver
     @torch.no_grad()
     def evaluate_comprehensive(self, ep):
-        self.model.eval(); all_l, all_p, all_pr = [], [], []
+        self.model.eval()
+        all_labels, all_preds, all_probs = [], [], []
         for b in tqdm(self.ld, desc="Eval"):
             logits = self.model(b['input_ids1'].to(self.dev), b['attention_mask1'].to(self.dev),
                                 b['input_ids2'].to(self.dev), b['attention_mask2'].to(self.dev))
-            probs = F.softmax(logits, dim=1); preds = torch.argmax(logits, dim=1)
-            all_l.extend(b['labels'].cpu().numpy().tolist())
-            all_p.extend(preds.cpu().numpy().tolist())
-            all_pr.extend(probs[:,1].cpu().numpy().tolist())
-        l, p, pr = np.array(all_l), np.array(all_p), np.array(all_pr)
-        metrics = {'accuracy': float(accuracy_score(l,p)), 'f1': float(precision_recall_fscore_support(l,p,average='binary')[2]),
-                   'roc_auc': float(roc_auc_score(l,pr)) if len(np.unique(l))>1 else 0.0}
-        self.saver.save_final_evaluation(metrics, l, p, pr, ep)
+            probs = F.softmax(logits, dim=1)
+            preds = torch.argmax(logits, dim=1)
+            all_labels.extend(b['labels'].cpu().numpy().tolist())
+            all_preds.extend(preds.cpu().numpy().tolist())
+            all_probs.extend(probs[:,1].cpu().numpy().tolist())
+        labels = np.array(all_labels)
+        preds = np.array(all_preds)
+        probs = np.array(all_probs)
+        metrics = {'accuracy': float(accuracy_score(labels, preds)), 'f1': float(precision_recall_fscore_support(labels, preds, average='binary')[2]),
+                   'roc_auc': float(roc_auc_score(labels, probs)) if len(np.unique(labels)) > 1 else 0.0}
+        self.saver.save_final_evaluation(metrics, labels, preds, probs, ep)
         return metrics
 
 # ============================================================================
@@ -526,7 +550,7 @@ class ModelExporter:
             best_ckpt = ckpt_dir / "best_model.pt"
             if best_ckpt.exists():
                 selected_ckpt = best_ckpt
-                self.logger.info(f"Using best_model.pt")
+                self.logger.info("Using best_model.pt")
             else:
                 # Fallback to latest checkpoint
                 ckpts = sorted(ckpt_dir.glob("ckpt_*.pt"), key=lambda x: int(x.stem.split('_')[1]), reverse=True)
@@ -545,7 +569,8 @@ class ModelExporter:
             return
 
         model = SemanticCloneModel(MODEL_NAME, HIDDEN_SIZE, DROPOUT_RATE)
-        model.load_state_dict(ckpt['model_state_dict']); model.eval()
+        model.load_state_dict(ckpt['model_state_dict'])
+        model.eval()
         
         torch.save({'model_state_dict': model.state_dict(), 'epoch': ckpt.get('epoch'), 'metrics': ckpt.get('metrics'),
                     'config': {'model_name': MODEL_NAME, 'max_length': MAX_LENGTH, 'hidden_size': HIDDEN_SIZE, 'dropout_rate': DROPOUT_RATE}},
@@ -564,8 +589,11 @@ class ModelExporter:
 # 🎯 MAIN
 # ============================================================================
 def set_seed(s):
-    random.seed(s); np.random.seed(s); torch.manual_seed(s)
-    if torch.cuda.is_available(): torch.cuda.manual_seed_all(s)
+    random.seed(s)
+    np.random.seed(s)
+    torch.manual_seed(s)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(s)
 
 def parse_args():
     p = argparse.ArgumentParser()
@@ -589,18 +617,22 @@ def main():
     
     device = torch.device('cuda' if torch.cuda.is_available() and not args.no_cuda else 'cpu')
     logger.info(f"Device: {device}")
-    if device.type == 'cuda': optimize_for_rtx6000(logger)
+    if device.type == 'cuda':
+        optimize_for_rtx6000(logger)
 
     if args.mode == 'download-only':
         loader = DatasetLoader(DATASETS_DIR, logger, MAX_SAMPLES)
-        loader.download_gptclonebench(); loader.download_codenet()
+        loader.download_gptclonebench()
+        loader.download_codenet()
         return
 
     # Data Loading
     logger.info("STEP 1: Loading Data")
     loader = DatasetLoader(DATASETS_DIR, logger, MAX_SAMPLES)
     all_pairs = loader.load_and_balance()
-    if not all_pairs: logger.error("No data!"); return
+    if not all_pairs:
+        logger.error("No data!")
+        return
 
     logger.info("STEP 2: Splitting")
     tv, test = train_test_split(all_pairs, test_size=TEST_RATIO, stratify=[p['label'] for p in all_pairs], random_state=RANDOM_SEED)
@@ -610,8 +642,10 @@ def main():
     if args.export_only:
         for n,d in [('train',tr),('val',val),('test',test)]:
             with open(OUTPUT_DIR/f"{n}.jsonl",'w') as f:
-                for x in d: f.write(json.dumps(x)+'\n')
-        logger.info("Exported splits."); return
+                for x in d:
+                    f.write(json.dumps(x)+'\n')
+        logger.info("Exported splits.")
+        return
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     aug = CodeAugmenter() if DATA_AUGMENTATION else None

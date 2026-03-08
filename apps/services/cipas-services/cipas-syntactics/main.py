@@ -17,7 +17,7 @@ Features:
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI, status
+from fastapi import APIRouter, FastAPI, HTTPException, status
 
 from clone_detection.utils.common_setup import setup_logging
 from routes import (
