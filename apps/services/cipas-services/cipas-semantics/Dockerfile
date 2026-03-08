@@ -22,13 +22,16 @@ COPY model/ ./model/
 ENV PYTHONPATH=/app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DEVICE=cpu
+ENV USE_CUDA=false
+ENV API_PORT=8087
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8087
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/api/v1/health', timeout=5)"
+    CMD python -c "import requests; requests.get('http://localhost:8087/api/v1/health', timeout=5)"
 
 # Run the application
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD uvicorn api.main:app --host 0.0.0.0 --port ${API_PORT:-8087}

@@ -51,6 +51,21 @@ async def health_check():
         )
 
 
+@router.get("/ready", response_model=HealthResponse, tags=["Health"])
+async def readiness_check():
+    """
+    Readiness check endpoint
+    """
+    try:
+        det = get_detector()
+        return HealthResponse(status="ready", model_loaded=True, device=det.device)
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Model not loaded",
+        )
+
+
 @router.get("/model/info", response_model=ModelInfoResponse, tags=["Model"])
 async def get_model_info():
     """

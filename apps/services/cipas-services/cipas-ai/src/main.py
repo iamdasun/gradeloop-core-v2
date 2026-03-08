@@ -151,3 +151,4 @@ if __name__ == "__main__":
         host=host,
         port=port,
         reload=os.getenv("ENVIRONMENT", "production") == "development",
+    )

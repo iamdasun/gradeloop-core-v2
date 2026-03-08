@@ -25,14 +25,15 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     CIPAS_AI_MODEL_DIR=/app/model \
     CIPAS_AI_HOST=0.0.0.0 \
-    CIPAS_AI_PORT=8087
+    CIPAS_AI_PORT=8085 \
+    CIPAS_AI_DEVICE=cpu
 
 # Expose port
-EXPOSE 8087
+EXPOSE 8085
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8087/api/v1/ai/ready || exit 1
+    CMD curl -f http://localhost:${CIPAS_AI_PORT:-8085}/api/v1/ai/ready || exit 1
 
 # Run the application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8087"]
+CMD uvicorn src.main:app --host 0.0.0.0 --port ${CIPAS_AI_PORT:-8085}
