@@ -11,9 +11,9 @@ post {
 }
 
 body:json {
-  {
-    "code": "def fibonacci(n):\n    if n <= 1:\n        return n\n    return fibonacci(n-1) + fibonacci(n-2)"
-  }
+  
+  {"code":"#include <stdio.h>\\nint main(){int n; long long a=0,b=1,next; scanf(\"%d\",&n); for(int i=0;i<n;i++){ printf(\"%lld \",a); next=a+b; a=b; b=next;} return 0;}\\n"}
+  
 }
 
 settings {

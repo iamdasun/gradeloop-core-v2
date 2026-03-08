@@ -3,8 +3,9 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
 
-# ML/Transformers
-torch==2.5.1
+# ML/Transformers (CPU-only build)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu
 transformers==4.47.1
 sentencepiece==0.2.0
 

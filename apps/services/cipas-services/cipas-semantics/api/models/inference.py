@@ -55,14 +55,16 @@ class SemanticCloneDetector:
     def _load_tokenizer(self) -> AutoTokenizer:
         """Load the tokenizer"""
         tokenizer_dir = self.model_dir / "tokenizer"
+        model_name = self.config.get("model_name", settings.MODEL_NAME)
 
         if tokenizer_dir.exists():
-            return AutoTokenizer.from_pretrained(str(tokenizer_dir))
-        else:
-            # Fallback to loading from HuggingFace
-            return AutoTokenizer.from_pretrained(
-                self.config.get("model_name", settings.MODEL_NAME)
-            )
+            try:
+                return AutoTokenizer.from_pretrained(str(tokenizer_dir))
+            except Exception:
+                # Local tokenizer files are missing or corrupted – fall back to HuggingFace
+                pass
+
+        return AutoTokenizer.from_pretrained(model_name)
 
     def _tokenize_pair(
         self, code1: str, code2: str, max_length: Optional[int] = None

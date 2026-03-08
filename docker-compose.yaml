@@ -340,12 +340,12 @@ services:
       test:
         [
           "CMD",
-          "curl",
-          "-f",
-          "http://localhost:${CIPAS_SYN_SVC_PORT}/api/v1/syntactics/ready",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8086/api/v1/syntactics/health')",
         ]
       interval: 15s
-      timeout: 5s
+      timeout: 10s
       retries: 5
       start_period: 60s
 
@@ -369,6 +369,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.cipas-semantics.rule=PathPrefix(`/api/v1/semantics`)"
       - "traefik.http.routers.cipas-semantics.entrypoints=web"
+      - "traefik.http.routers.cipas-semantics.service=cipas-semantics-service"
       - "traefik.http.services.cipas-semantics-service.loadbalancer.server.port=${CIPAS_SEM_SVC_PORT}"
       - "traefik.http.middlewares.cipas-semantics-limit.buffering.maxRequestBodyBytes=10485760"
       - "traefik.http.middlewares.cipas-semantics-ratelimit.ratelimit.average=100"
@@ -383,7 +384,7 @@ services:
       - ./apps/services/cipas-services/cipas-semantics/models:/app/models:ro
 
     environment:
-      - CIPAS_SEMANTICS_PORT=${CIPAS_SEM_SVC_PORT}
+      - API_PORT=${CIPAS_SEM_SVC_PORT}
       - CIPAS_SEMANTICS_HOST=0.0.0.0
 
     expose:
@@ -396,14 +397,14 @@ services:
       test:
         [
           "CMD",
-          "curl",
-          "-f",
-          "http://localhost:${CIPAS_SEM_SVC_PORT}/api/v1/semantics/ready",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8087/api/v1/semantics/health')",
         ]
       interval: 15s
-      timeout: 5s
+      timeout: 10s
       retries: 5
-      start_period: 60s
+      start_period: 150s
 
     logging:
       driver: "json-file"

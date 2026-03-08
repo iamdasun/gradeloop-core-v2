@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import settings
-from .endpoints.detection import detector
+from .endpoints import detection as detection_module
 from .endpoints.detection import router as detection_router
 from .models.inference import SemanticCloneDetector
 
@@ -33,28 +33,27 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("=" * 60)
-    logger.info("🚀 Starting Semantic Clone Detection API")
+    logger.info("Starting Semantic Clone Detection API")
     logger.info("=" * 60)
 
     try:
-        logger.info(f"📦 Loading model from: {settings.MODEL_DIR}")
-        logger.info(f"💻 Using device: {settings.DEVICE}")
+        logger.info(f"Loading model from: {settings.MODEL_DIR}")
+        logger.info(f"Using device: {settings.DEVICE}")
 
         # Initialize detector
-        global detector
-        detector = SemanticCloneDetector(
+        detection_module.detector = SemanticCloneDetector(
             model_dir=settings.MODEL_DIR,
             device=settings.DEVICE,
             threshold=settings.CLONE_THRESHOLD,
         )
 
         logger.info("✓ Model loaded successfully")
-        logger.info(f"📊 Model: {detector.config.get('model_name')}")
-        logger.info(f"📏 Max length: {detector.config.get('max_length')}")
-        logger.info(f"🎯 Threshold: {settings.CLONE_THRESHOLD}")
+        logger.info(f"Model: {detection_module.detector.config.get('model_name')}")
+        logger.info(f"Max length: {detection_module.detector.config.get('max_length')}")
+        logger.info(f"Threshold: {settings.CLONE_THRESHOLD}")
 
     except Exception as e:
-        logger.error(f"❌ Failed to load model: {e}")
+        logger.error(f"Failed to load model: {e}")
         raise
 
     yield
@@ -84,7 +83,7 @@ def create_app() -> FastAPI:
     )
 
     # Include routers
-    app.include_router(detection_router, prefix="/api/v1")
+    app.include_router(detection_router, prefix="/api/v1/semantics")
 
     # Root endpoint
     @app.get("/", tags=["Root"])
@@ -94,7 +93,8 @@ def create_app() -> FastAPI:
             "name": settings.API_TITLE,
             "version": settings.API_VERSION,
             "docs": "/docs",
-            "health": "/api/v1/health",
+            "health": "/api/v1/semantics/health",
+            "ready": "/api/v1/semantics/ready",
         }
 
     return app
