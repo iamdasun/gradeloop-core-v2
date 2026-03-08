@@ -66,6 +66,7 @@ import {
   CreateDepartmentDialog,
   EditDepartmentDialog,
 } from "@/components/admin/academics/department-dialogs";
+import { EditFacultyDialog } from "@/components/admin/academics/faculty-dialogs";
 import { AcademicsDetailLayout } from "@/components/admin/academics/AcademicsDetailLayout";
 import { DangerZone } from "@/components/admin/academics/DangerZone";
 import type {
@@ -149,6 +150,7 @@ export default function FacultyDetailPage() {
   const [editDeptTarget, setEditDeptTarget] = React.useState<Department | null>(
     null,
   );
+  const [editFacultyOpen, setEditFacultyOpen] = React.useState(false);
 
   // Settings
   const [activeTab, setActiveTab] = React.useState<
@@ -187,7 +189,7 @@ export default function FacultyDetailPage() {
           fac.leaders.map((l) => ({
             user_id: l.user_id,
             role: l.role,
-          }))
+          })),
         );
       } else {
         setLeaders([{ user_id: "", role: "" }]); // At least one empty leader
@@ -226,17 +228,15 @@ export default function FacultyDetailPage() {
   async function handleSaveFaculty(e: React.FormEvent) {
     e.preventDefault();
     if (!faculty) return;
-    
+
     // Validate leaders
-    const validLeaders = leaders.filter(
-      (l) => l.user_id && l.role
-    );
-    
+    const validLeaders = leaders.filter((l) => l.user_id && l.role);
+
     if (validLeaders.length === 0) {
       toast.error("Validation failed", "At least one leader is required");
       return;
     }
-    
+
     setSaving(true);
     try {
       const updated = await facultiesApi.update(faculty.id, {
@@ -277,10 +277,10 @@ export default function FacultyDetailPage() {
   function setLeader(
     index: number,
     field: keyof CreateLeadershipRequest,
-    value: string
+    value: string,
   ) {
     const next = leaders.map((l, i) =>
-      i === index ? { ...l, [field]: value } : l
+      i === index ? { ...l, [field]: value } : l,
     );
     setLeaders(next);
   }
@@ -865,10 +865,16 @@ export default function FacultyDetailPage() {
                                         className="flex h-9 w-full appearance-none rounded-md border border-zinc-200 bg-white px-3 py-1 pr-8 text-sm text-zinc-900 dark:text-zinc-50 shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-950 dark:border-zinc-800 dark:bg-zinc-950 dark:focus-visible:ring-zinc-300"
                                         value={leader.user_id}
                                         onChange={(e) =>
-                                          setLeader(i, "user_id", e.target.value)
+                                          setLeader(
+                                            i,
+                                            "user_id",
+                                            e.target.value,
+                                          )
                                         }
                                       >
-                                        <option value="">Select instructor…</option>
+                                        <option value="">
+                                          Select instructor…
+                                        </option>
                                         {employees.map((emp) => (
                                           <option key={emp.id} value={emp.id}>
                                             {emp.email}
@@ -995,6 +1001,16 @@ export default function FacultyDetailPage() {
               }}
             />
           )}
+          <EditFacultyDialog
+            open={editFacultyOpen}
+            onOpenChange={setEditFacultyOpen}
+            faculty={faculty}
+            onSuccess={(updated) => {
+              setFaculty(updated);
+              setEditFacultyOpen(false);
+              setEditValues({ name: updated.name, code: updated.code });
+            }}
+          />
         </>
       )}
     </div>

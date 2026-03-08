@@ -15,15 +15,15 @@ export interface User {
 // ── User type constants ───────────────────────────────────────────────────────
 
 export const USER_TYPES = {
-  STUDENT: 'student',
-  INSTRUCTOR: 'instructor',
-  ADMIN: 'admin',
-  SUPER_ADMIN: 'super_admin',
+  STUDENT: "student",
+  INSTRUCTOR: "instructor",
+  ADMIN: "admin",
+  SUPER_ADMIN: "super_admin",
 } as const;
 
 export const USER_TYPES_ARRAY = Object.values(USER_TYPES);
 
-export type UserType = typeof USER_TYPES[keyof typeof USER_TYPES];
+export type UserType = (typeof USER_TYPES)[keyof typeof USER_TYPES];
 
 // ── Auth endpoint types ───────────────────────────────────────────────────────
 
@@ -98,6 +98,27 @@ export interface UserListItem {
   is_active: boolean;
   last_login_at: string | null;
   created_at: string;
+}
+
+// ── RBAC types ────────────────────────────────────────────────────────────────
+
+export interface Permission {
+  id: string;
+  name: string;
+  description?: string;
+  resource: string;
+  action: string;
+  created_at?: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  description?: string;
+  permissions?: Permission[];
+  is_system_role?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ApiError {
