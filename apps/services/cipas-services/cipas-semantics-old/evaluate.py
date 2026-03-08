@@ -155,9 +155,11 @@ Examples:
         or dataset_config.get("path")
         or config.get("datasets", {}).get("gptclonebench", {}).get("path"),
         "language": args.language or eval_config.get("language"),
-        "all_languages": args.all_languages
-        if args.all_languages is not None
-        else eval_config.get("all_languages", False),
+        "all_languages": (
+            args.all_languages
+            if args.all_languages is not None
+            else eval_config.get("all_languages", False)
+        ),
         "sample_size": args.sample_size or eval_config.get("sample_size"),
         "threshold": args.threshold or eval_config.get("threshold"),
         "threshold_sweep": not args.no_threshold_sweep

@@ -35,13 +35,14 @@ logger = setup_logging(__name__)
 # Parallel Feature Extraction Worker
 # =============================================================================
 
+
 def extract_features_worker(args):
     """
     Worker function for parallel feature extraction.
-    
+
     Args:
         args: Tuple of (code1, code2, language, index)
-        
+
     Returns:
         Tuple of (index, features_array) or (index, None) on error
     """
@@ -64,39 +65,38 @@ def extract_features_parallel(
 ) -> np.ndarray:
     """
     Extract features in parallel using multiprocessing.
-    
+
     Args:
         code1_list: List of first code samples
         code2_list: List of second code samples
         language: Programming language
         workers: Number of worker processes (default: CPU count)
         batch_size: Number of samples per progress update
-        
+
     Returns:
         Feature matrix as numpy array
     """
     if workers is None:
         workers = mp.cpu_count()
-    
+
     logger.info(f"Extracting features with {workers} workers...")
-    
+
     # Prepare work items
     work_items = [
         (code1, code2, language, idx)
         for idx, (code1, code2) in enumerate(zip(code1_list, code2_list))
     ]
-    
+
     features = [None] * len(work_items)
     failed_count = 0
-    
+
     # Process in parallel with progress bar
     with ProcessPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks
         futures = {
-            executor.submit(extract_features_worker, item): item
-            for item in work_items
+            executor.submit(extract_features_worker, item): item for item in work_items
         }
-        
+
         # Collect results with progress bar
         with tqdm(total=len(futures), desc="Extracting features") as pbar:
             for future in as_completed(futures):
@@ -112,13 +112,15 @@ def extract_features_parallel(
                         # Will be filled after first successful extraction
                         features[idx] = None
                 pbar.update(1)
-    
+
     # Fill any remaining None values with zeros
     if failed_count > 0:
-        logger.warning(f"Failed to extract features for {failed_count} pairs, using zero vectors")
+        logger.warning(
+            f"Failed to extract features for {failed_count} pairs, using zero vectors"
+        )
         feature_dim = next((f.shape[0] for f in features if f is not None), 0)
         features = [f if f is not None else np.zeros(feature_dim) for f in features]
-    
+
     return np.array(features)
 
 
@@ -548,7 +550,7 @@ def train_codenet(
     logger.info("\nExtracting Sheneamer features in parallel...")
     n_workers = min(mp.cpu_count(), 16)  # Cap at 16 workers
     logger.info(f"Using {n_workers} parallel workers for feature extraction")
-    
+
     X = extract_features_parallel(
         code1_list=all_code1,
         code2_list=all_code2,
@@ -573,16 +575,16 @@ def train_codenet(
     classifier = SemanticClassifier(
         n_estimators=xgboost_params.get("n_estimators", 500) if xgboost_params else 500,
         max_depth=xgboost_params.get("max_depth", 6) if xgboost_params else 6,
-        learning_rate=xgboost_params.get("learning_rate", 0.1)
-        if xgboost_params
-        else 0.1,
+        learning_rate=(
+            xgboost_params.get("learning_rate", 0.1) if xgboost_params else 0.1
+        ),
         subsample=xgboost_params.get("subsample", 0.8) if xgboost_params else 0.8,
-        colsample_bytree=xgboost_params.get("colsample_bytree", 0.8)
-        if xgboost_params
-        else 0.8,
-        min_child_weight=xgboost_params.get("min_child_weight", 1)
-        if xgboost_params
-        else 1,
+        colsample_bytree=(
+            xgboost_params.get("colsample_bytree", 0.8) if xgboost_params else 0.8
+        ),
+        min_child_weight=(
+            xgboost_params.get("min_child_weight", 1) if xgboost_params else 1
+        ),
         reg_lambda=xgboost_params.get("reg_lambda", 1.0) if xgboost_params else 1.0,
         reg_alpha=xgboost_params.get("reg_alpha", 0.1) if xgboost_params else 0.1,
     )

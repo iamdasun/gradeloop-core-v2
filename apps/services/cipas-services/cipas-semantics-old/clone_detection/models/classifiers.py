@@ -333,7 +333,9 @@ class SemanticClassifier:
             else self.isotonic_calibration
         )
 
-        logger.info(f"Training with {X_train.shape[0]} samples, {X_train.shape[1]} features")
+        logger.info(
+            f"Training with {X_train.shape[0]} samples, {X_train.shape[1]} features"
+        )
         logger.info(
             f"Feature pruning: {do_pruning}, Isotonic calibration: {do_calibration}"
         )
@@ -372,7 +374,7 @@ class SemanticClassifier:
 
         # Step 2: Train base model
         logger.info(f"Training XGBoost with {X_train.shape[0]} samples...")
-        
+
         if X_test is not None and y_test is not None:
             eval_set = [(X_test, y_test)]
             self.base_model.fit(X_train, y_train, eval_set=eval_set, verbose=False)
@@ -407,7 +409,7 @@ class SemanticClassifier:
 
         # Step 4: Evaluate on test set (if provided)
         metrics = {}
-        
+
         if X_test is not None and y_test is not None:
             y_pred_default = self.model.predict(X_test)
             y_proba_default = self.model.predict_proba(X_test)[:, 1]
@@ -425,7 +427,9 @@ class SemanticClassifier:
                 # Combine train and test for CV
                 X_cv = np.vstack([X_train, X_test])
                 y_cv = np.concatenate([y_train, y_test])
-                cv_scores = cross_val_score(self.base_model, X_cv, y_cv, cv=5, scoring="f1")
+                cv_scores = cross_val_score(
+                    self.base_model, X_cv, y_cv, cv=5, scoring="f1"
+                )
                 metrics["cv_f1_mean"] = cv_scores.mean()
                 metrics["cv_f1_std"] = cv_scores.std()
                 logger.info(
@@ -446,7 +450,9 @@ class SemanticClassifier:
 
                     # Re-evaluate with optimal threshold
                     y_pred_optimal = self.predict(X_test)
-                    metrics["accuracy_thresholded"] = accuracy_score(y_test, y_pred_optimal)
+                    metrics["accuracy_thresholded"] = accuracy_score(
+                        y_test, y_pred_optimal
+                    )
                     metrics["precision_thresholded"] = precision_score(
                         y_test, y_pred_optimal, zero_division=0
                     )
@@ -467,12 +473,14 @@ class SemanticClassifier:
                         f"(Macro-F1: {metrics.get('macro_f1_thresholded', 0):.4f})"
                     )
 
-        metrics.update({
-            "feature_pruning_applied": do_pruning,
-            "isotonic_calibration_applied": do_calibration,
-            "original_features": self.original_feature_count,
-            "pruned_features": self.pruned_feature_count,
-        })
+        metrics.update(
+            {
+                "feature_pruning_applied": do_pruning,
+                "isotonic_calibration_applied": do_calibration,
+                "original_features": self.original_feature_count,
+                "pruned_features": self.pruned_feature_count,
+            }
+        )
 
         logger.info(f"Training metrics: {metrics}")
 

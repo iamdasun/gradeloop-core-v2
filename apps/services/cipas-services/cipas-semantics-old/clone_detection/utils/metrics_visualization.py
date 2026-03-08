@@ -532,17 +532,21 @@ class MetricsVisualizer:
                     patch_artist=True,
                 )
                 axes[i].set_title(
-                    feature_names[idx][:40] + "..."
-                    if len(feature_names[idx]) > 40
-                    else feature_names[idx],
+                    (
+                        feature_names[idx][:40] + "..."
+                        if len(feature_names[idx]) > 40
+                        else feature_names[idx]
+                    ),
                     fontsize=10,
                 )
             else:
                 axes[i].hist(X[:, idx], bins=30, alpha=0.7, edgecolor="black")
                 axes[i].set_title(
-                    feature_names[idx][:40] + "..."
-                    if len(feature_names[idx]) > 40
-                    else feature_names[idx],
+                    (
+                        feature_names[idx][:40] + "..."
+                        if len(feature_names[idx]) > 40
+                        else feature_names[idx]
+                    ),
                     fontsize=10,
                 )
                 axes[i].set_xlabel("Value")

@@ -47,157 +47,328 @@ from typing import Sequence
 # Tokens that should **not** be replaced (structural punctuation / operators)
 _PASSTHROUGH: frozenset[str] = frozenset(
     [
-        "(", ")", "{", "}", "[", "]",
-        ";", ",", ":", ".",
-        "+", "-", "*", "/", "%",
-        "=", "==", "!=", "<", ">", "<=", ">=",
-        "&&", "||", "!", "&", "|", "^", "~",
-        "<<", ">>", "++", "--",
-        "+=", "-=", "*=", "/=", "%=",
-        "->", "=>", "::", "...", "@",
+        "(",
+        ")",
+        "{",
+        "}",
+        "[",
+        "]",
+        ";",
+        ",",
+        ":",
+        ".",
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+        "=",
+        "==",
+        "!=",
+        "<",
+        ">",
+        "<=",
+        ">=",
+        "&&",
+        "||",
+        "!",
+        "&",
+        "|",
+        "^",
+        "~",
+        "<<",
+        ">>",
+        "++",
+        "--",
+        "+=",
+        "-=",
+        "*=",
+        "/=",
+        "%=",
+        "->",
+        "=>",
+        "::",
+        "...",
+        "@",
     ]
 )
 
 # ── Java ───────────────────────────────────────────────────────────────────
 _JAVA_MAP: dict[str, str] = {
     # VAR_DECL (primitive + reference type keywords + annotations that precede a declaration)
-    "int": "VAR_DECL", "long": "VAR_DECL", "double": "VAR_DECL", "float": "VAR_DECL",
-    "byte": "VAR_DECL", "short": "VAR_DECL", "char": "VAR_DECL", "boolean": "VAR_DECL",
-    "String": "VAR_DECL", "var": "VAR_DECL", "final": "MODIFIER",
+    "int": "VAR_DECL",
+    "long": "VAR_DECL",
+    "double": "VAR_DECL",
+    "float": "VAR_DECL",
+    "byte": "VAR_DECL",
+    "short": "VAR_DECL",
+    "char": "VAR_DECL",
+    "boolean": "VAR_DECL",
+    "String": "VAR_DECL",
+    "var": "VAR_DECL",
+    "final": "MODIFIER",
     # ITERATION
-    "for": "ITERATION", "while": "ITERATION", "do": "ITERATION",
+    "for": "ITERATION",
+    "while": "ITERATION",
+    "do": "ITERATION",
     # CONDITION
-    "if": "CONDITION", "else": "CONDITION", "switch": "CONDITION", "case": "CONDITION",
+    "if": "CONDITION",
+    "else": "CONDITION",
+    "switch": "CONDITION",
+    "case": "CONDITION",
     "default": "CONDITION",
     # RETURN
     "return": "RETURN",
     # IMPORT / PACKAGE
-    "import": "IMPORT", "package": "IMPORT",
+    "import": "IMPORT",
+    "package": "IMPORT",
     # CLASS / INTERFACE
-    "class": "CLASS_DEF", "interface": "CLASS_DEF", "enum": "CLASS_DEF",
-    "extends": "MODIFIER", "implements": "MODIFIER",
+    "class": "CLASS_DEF",
+    "interface": "CLASS_DEF",
+    "enum": "CLASS_DEF",
+    "extends": "MODIFIER",
+    "implements": "MODIFIER",
     # FUNC_DEF related
-    "void": "TYPE", "throws": "MODIFIER", "new": "FUNC_CALL",
+    "void": "TYPE",
+    "throws": "MODIFIER",
+    "new": "FUNC_CALL",
     # MODIFIERS
-    "public": "MODIFIER", "private": "MODIFIER", "protected": "MODIFIER",
-    "static": "MODIFIER", "abstract": "MODIFIER", "synchronized": "MODIFIER",
-    "native": "MODIFIER", "volatile": "MODIFIER", "transient": "MODIFIER",
+    "public": "MODIFIER",
+    "private": "MODIFIER",
+    "protected": "MODIFIER",
+    "static": "MODIFIER",
+    "abstract": "MODIFIER",
+    "synchronized": "MODIFIER",
+    "native": "MODIFIER",
+    "volatile": "MODIFIER",
+    "transient": "MODIFIER",
     # EXCEPTION
-    "try": "CONDITION", "catch": "CONDITION", "finally": "CONDITION",
+    "try": "CONDITION",
+    "catch": "CONDITION",
+    "finally": "CONDITION",
     "throw": "RETURN",
     # MISC CONTROL
-    "break": "CONTROL", "continue": "CONTROL", "assert": "CONTROL",
-    "instanceof": "CONDITION", "super": "FUNC_CALL", "this": "FUNC_CALL",
+    "break": "CONTROL",
+    "continue": "CONTROL",
+    "assert": "CONTROL",
+    "instanceof": "CONDITION",
+    "super": "FUNC_CALL",
+    "this": "FUNC_CALL",
     # LITERALS
-    "true": "LITERAL", "false": "LITERAL", "null": "LITERAL",
+    "true": "LITERAL",
+    "false": "LITERAL",
+    "null": "LITERAL",
 }
 
 # ── Python ─────────────────────────────────────────────────────────────────
 _PYTHON_MAP: dict[str, str] = {
     # VAR_DECL (assignment-related; Python is untyped so we map common builtins)
-    "int": "VAR_DECL", "str": "VAR_DECL", "float": "VAR_DECL", "bool": "VAR_DECL",
-    "list": "VAR_DECL", "dict": "VAR_DECL", "set": "VAR_DECL", "tuple": "VAR_DECL",
+    "int": "VAR_DECL",
+    "str": "VAR_DECL",
+    "float": "VAR_DECL",
+    "bool": "VAR_DECL",
+    "list": "VAR_DECL",
+    "dict": "VAR_DECL",
+    "set": "VAR_DECL",
+    "tuple": "VAR_DECL",
     "bytes": "VAR_DECL",
     # ITERATION
-    "for": "ITERATION", "while": "ITERATION",
+    "for": "ITERATION",
+    "while": "ITERATION",
     # CONDITION
-    "if": "CONDITION", "elif": "CONDITION", "else": "CONDITION",
-    "match": "CONDITION", "case": "CONDITION",
+    "if": "CONDITION",
+    "elif": "CONDITION",
+    "else": "CONDITION",
+    "match": "CONDITION",
+    "case": "CONDITION",
     # RETURN
-    "return": "RETURN", "yield": "RETURN",
+    "return": "RETURN",
+    "yield": "RETURN",
     # IMPORT
-    "import": "IMPORT", "from": "IMPORT", "as": "IMPORT",
+    "import": "IMPORT",
+    "from": "IMPORT",
+    "as": "IMPORT",
     # CLASS / FUNC DEF
-    "class": "CLASS_DEF", "def": "FUNC_DEF", "lambda": "FUNC_DEF",
-    "async": "MODIFIER", "await": "FUNC_CALL",
+    "class": "CLASS_DEF",
+    "def": "FUNC_DEF",
+    "lambda": "FUNC_DEF",
+    "async": "MODIFIER",
+    "await": "FUNC_CALL",
     # EXCEPTION
-    "try": "CONDITION", "except": "CONDITION", "finally": "CONDITION",
-    "raise": "RETURN", "with": "CONDITION",
+    "try": "CONDITION",
+    "except": "CONDITION",
+    "finally": "CONDITION",
+    "raise": "RETURN",
+    "with": "CONDITION",
     # MISC CONTROL
-    "break": "CONTROL", "continue": "CONTROL", "pass": "CONTROL",
-    "del": "CONTROL", "global": "MODIFIER", "nonlocal": "MODIFIER",
+    "break": "CONTROL",
+    "continue": "CONTROL",
+    "pass": "CONTROL",
+    "del": "CONTROL",
+    "global": "MODIFIER",
+    "nonlocal": "MODIFIER",
     # LITERALS
-    "True": "LITERAL", "False": "LITERAL", "None": "LITERAL",
+    "True": "LITERAL",
+    "False": "LITERAL",
+    "None": "LITERAL",
     # OPERATORS (word form)
-    "and": "OPERATOR", "or": "OPERATOR", "not": "OPERATOR",
-    "in": "CONDITION", "is": "CONDITION",
+    "and": "OPERATOR",
+    "or": "OPERATOR",
+    "not": "OPERATOR",
+    "in": "CONDITION",
+    "is": "CONDITION",
     # OBJECT ACCESS
-    "self": "FUNC_CALL", "super": "FUNC_CALL",
+    "self": "FUNC_CALL",
+    "super": "FUNC_CALL",
 }
 
 # ── C ──────────────────────────────────────────────────────────────────────
 _C_MAP: dict[str, str] = {
     # VAR_DECL
-    "int": "VAR_DECL", "long": "VAR_DECL", "short": "VAR_DECL", "char": "VAR_DECL",
-    "float": "VAR_DECL", "double": "VAR_DECL", "unsigned": "VAR_DECL",
-    "signed": "VAR_DECL", "void": "VAR_DECL", "size_t": "VAR_DECL",
-    "bool": "VAR_DECL", "_Bool": "VAR_DECL",
+    "int": "VAR_DECL",
+    "long": "VAR_DECL",
+    "short": "VAR_DECL",
+    "char": "VAR_DECL",
+    "float": "VAR_DECL",
+    "double": "VAR_DECL",
+    "unsigned": "VAR_DECL",
+    "signed": "VAR_DECL",
+    "void": "VAR_DECL",
+    "size_t": "VAR_DECL",
+    "bool": "VAR_DECL",
+    "_Bool": "VAR_DECL",
     # TYPE MODIFIERS
-    "const": "MODIFIER", "extern": "MODIFIER", "static": "MODIFIER",
-    "inline": "MODIFIER", "volatile": "MODIFIER", "register": "MODIFIER",
+    "const": "MODIFIER",
+    "extern": "MODIFIER",
+    "static": "MODIFIER",
+    "inline": "MODIFIER",
+    "volatile": "MODIFIER",
+    "register": "MODIFIER",
     "auto": "MODIFIER",
     # ITERATION
-    "for": "ITERATION", "while": "ITERATION", "do": "ITERATION",
+    "for": "ITERATION",
+    "while": "ITERATION",
+    "do": "ITERATION",
     # CONDITION
-    "if": "CONDITION", "else": "CONDITION", "switch": "CONDITION",
-    "case": "CONDITION", "default": "CONDITION",
+    "if": "CONDITION",
+    "else": "CONDITION",
+    "switch": "CONDITION",
+    "case": "CONDITION",
+    "default": "CONDITION",
     # RETURN
     "return": "RETURN",
     # IMPORT
     "#include": "IMPORT",
     # COMPOUND / TYPE
-    "struct": "CLASS_DEF", "union": "CLASS_DEF", "enum": "CLASS_DEF",
+    "struct": "CLASS_DEF",
+    "union": "CLASS_DEF",
+    "enum": "CLASS_DEF",
     "typedef": "MODIFIER",
     # MEMORY
-    "sizeof": "FUNC_CALL", "malloc": "FUNC_CALL", "calloc": "FUNC_CALL",
-    "free": "FUNC_CALL", "realloc": "FUNC_CALL",
+    "sizeof": "FUNC_CALL",
+    "malloc": "FUNC_CALL",
+    "calloc": "FUNC_CALL",
+    "free": "FUNC_CALL",
+    "realloc": "FUNC_CALL",
     # CONTROL FLOW
-    "break": "CONTROL", "continue": "CONTROL", "goto": "CONTROL",
+    "break": "CONTROL",
+    "continue": "CONTROL",
+    "goto": "CONTROL",
     # LITERALS
-    "NULL": "LITERAL", "true": "LITERAL", "false": "LITERAL",
+    "NULL": "LITERAL",
+    "true": "LITERAL",
+    "false": "LITERAL",
 }
 
 # ── C# ─────────────────────────────────────────────────────────────────────
 _CSHARP_MAP: dict[str, str] = {
     # VAR_DECL
-    "int": "VAR_DECL", "long": "VAR_DECL", "short": "VAR_DECL", "byte": "VAR_DECL",
-    "double": "VAR_DECL", "float": "VAR_DECL", "decimal": "VAR_DECL",
-    "char": "VAR_DECL", "bool": "VAR_DECL", "string": "VAR_DECL",
-    "object": "VAR_DECL", "dynamic": "VAR_DECL", "var": "VAR_DECL",
+    "int": "VAR_DECL",
+    "long": "VAR_DECL",
+    "short": "VAR_DECL",
+    "byte": "VAR_DECL",
+    "double": "VAR_DECL",
+    "float": "VAR_DECL",
+    "decimal": "VAR_DECL",
+    "char": "VAR_DECL",
+    "bool": "VAR_DECL",
+    "string": "VAR_DECL",
+    "object": "VAR_DECL",
+    "dynamic": "VAR_DECL",
+    "var": "VAR_DECL",
     # MODIFIERS
-    "public": "MODIFIER", "private": "MODIFIER", "protected": "MODIFIER",
-    "internal": "MODIFIER", "static": "MODIFIER", "abstract": "MODIFIER",
-    "sealed": "MODIFIER", "override": "MODIFIER", "virtual": "MODIFIER",
-    "readonly": "MODIFIER", "const": "MODIFIER", "volatile": "MODIFIER",
-    "async": "MODIFIER", "partial": "MODIFIER", "unsafe": "MODIFIER",
+    "public": "MODIFIER",
+    "private": "MODIFIER",
+    "protected": "MODIFIER",
+    "internal": "MODIFIER",
+    "static": "MODIFIER",
+    "abstract": "MODIFIER",
+    "sealed": "MODIFIER",
+    "override": "MODIFIER",
+    "virtual": "MODIFIER",
+    "readonly": "MODIFIER",
+    "const": "MODIFIER",
+    "volatile": "MODIFIER",
+    "async": "MODIFIER",
+    "partial": "MODIFIER",
+    "unsafe": "MODIFIER",
     "extern": "MODIFIER",
     # ITERATION
-    "for": "ITERATION", "foreach": "ITERATION", "while": "ITERATION",
+    "for": "ITERATION",
+    "foreach": "ITERATION",
+    "while": "ITERATION",
     "do": "ITERATION",
     # CONDITION
-    "if": "CONDITION", "else": "CONDITION", "switch": "CONDITION",
-    "case": "CONDITION", "default": "CONDITION", "when": "CONDITION",
+    "if": "CONDITION",
+    "else": "CONDITION",
+    "switch": "CONDITION",
+    "case": "CONDITION",
+    "default": "CONDITION",
+    "when": "CONDITION",
     # RETURN
-    "return": "RETURN", "yield": "RETURN",
+    "return": "RETURN",
+    "yield": "RETURN",
     # IMPORT / NAMESPACE
-    "using": "IMPORT", "namespace": "IMPORT",
+    "using": "IMPORT",
+    "namespace": "IMPORT",
     # CLASS / STRUCT / INTERFACE
-    "class": "CLASS_DEF", "struct": "CLASS_DEF", "interface": "CLASS_DEF",
-    "enum": "CLASS_DEF", "record": "CLASS_DEF", "delegate": "CLASS_DEF",
-    "extends": "MODIFIER", "implements": "MODIFIER", "base": "FUNC_CALL",
+    "class": "CLASS_DEF",
+    "struct": "CLASS_DEF",
+    "interface": "CLASS_DEF",
+    "enum": "CLASS_DEF",
+    "record": "CLASS_DEF",
+    "delegate": "CLASS_DEF",
+    "extends": "MODIFIER",
+    "implements": "MODIFIER",
+    "base": "FUNC_CALL",
     # EXCEPTION
-    "try": "CONDITION", "catch": "CONDITION", "finally": "CONDITION",
+    "try": "CONDITION",
+    "catch": "CONDITION",
+    "finally": "CONDITION",
     "throw": "RETURN",
     # CONTROL
-    "break": "CONTROL", "continue": "CONTROL", "goto": "CONTROL",
+    "break": "CONTROL",
+    "continue": "CONTROL",
+    "goto": "CONTROL",
     # MISC
-    "new": "FUNC_CALL", "typeof": "FUNC_CALL", "sizeof": "FUNC_CALL",
-    "this": "FUNC_CALL", "await": "FUNC_CALL", "lock": "CONDITION",
-    "checked": "CONTROL", "unchecked": "CONTROL",
-    "is": "CONDITION", "as": "CONDITION", "in": "CONDITION",
-    "ref": "MODIFIER", "out": "MODIFIER", "params": "MODIFIER",
+    "new": "FUNC_CALL",
+    "typeof": "FUNC_CALL",
+    "sizeof": "FUNC_CALL",
+    "this": "FUNC_CALL",
+    "await": "FUNC_CALL",
+    "lock": "CONDITION",
+    "checked": "CONTROL",
+    "unchecked": "CONTROL",
+    "is": "CONDITION",
+    "as": "CONDITION",
+    "in": "CONDITION",
+    "ref": "MODIFIER",
+    "out": "MODIFIER",
+    "params": "MODIFIER",
     # LITERALS
-    "true": "LITERAL", "false": "LITERAL", "null": "LITERAL",
+    "true": "LITERAL",
+    "false": "LITERAL",
+    "null": "LITERAL",
 }
 
 # Aggregate all maps by language key
@@ -221,22 +392,22 @@ _NODE_TYPE_MAP: dict[str, str] = {
     "assignment_statement": "VAR_DECL",
     "assignment_expression": "VAR_DECL",
     "augmented_assignment": "VAR_DECL",
-    "named_expression": "VAR_DECL",          # Python walrus :=
+    "named_expression": "VAR_DECL",  # Python walrus :=
     "field_declaration": "VAR_DECL",
     # ITERATION
     "for_statement": "ITERATION",
     "while_statement": "ITERATION",
     "do_statement": "ITERATION",
-    "enhanced_for_statement": "ITERATION",   # Java for-each
-    "for_in_clause": "ITERATION",            # Python comprehension
-    "foreach_statement": "ITERATION",        # C#
+    "enhanced_for_statement": "ITERATION",  # Java for-each
+    "for_in_clause": "ITERATION",  # Python comprehension
+    "foreach_statement": "ITERATION",  # C#
     # CONDITION
     "if_statement": "CONDITION",
     "switch_statement": "CONDITION",
-    "switch_expression": "CONDITION",        # Java 14+
+    "switch_expression": "CONDITION",  # Java 14+
     "ternary_expression": "CONDITION",
     "conditional_expression": "CONDITION",
-    "match_statement": "CONDITION",          # Python 3.10+
+    "match_statement": "CONDITION",  # Python 3.10+
     # RETURN
     "return_statement": "RETURN",
     "yield_statement": "RETURN",
@@ -244,12 +415,12 @@ _NODE_TYPE_MAP: dict[str, str] = {
     # FUNC_CALL
     "method_invocation": "FUNC_CALL",
     "call_expression": "FUNC_CALL",
-    "function_call": "FUNC_CALL",            # C
-    "invocation_expression": "FUNC_CALL",    # C#
+    "function_call": "FUNC_CALL",  # C
+    "invocation_expression": "FUNC_CALL",  # C#
     "object_creation_expression": "FUNC_CALL",
     # FUNC_DEF
     "method_declaration": "FUNC_DEF",
-    "function_definition": "FUNC_DEF",       # Python / C
+    "function_definition": "FUNC_DEF",  # Python / C
     "constructor_declaration": "FUNC_DEF",
     "local_function_statement": "FUNC_DEF",  # C#
     "lambda_expression": "FUNC_DEF",
@@ -258,19 +429,19 @@ _NODE_TYPE_MAP: dict[str, str] = {
     "class_declaration": "CLASS_DEF",
     "interface_declaration": "CLASS_DEF",
     "enum_declaration": "CLASS_DEF",
-    "struct_specifier": "CLASS_DEF",         # C
-    "record_declaration": "CLASS_DEF",       # C# / Java 16+
+    "struct_specifier": "CLASS_DEF",  # C
+    "record_declaration": "CLASS_DEF",  # C# / Java 16+
     # IMPORT
     "import_declaration": "IMPORT",
-    "using_directive": "IMPORT",             # C#
-    "preproc_include": "IMPORT",             # C
+    "using_directive": "IMPORT",  # C#
+    "preproc_include": "IMPORT",  # C
     # LITERAL
     "integer_literal": "LITERAL",
     "decimal_integer_literal": "LITERAL",
     "floating_point_literal": "LITERAL",
     "string_literal": "LITERAL",
     "character_literal": "LITERAL",
-    "boolean_value": "LITERAL",              # Python True/False
+    "boolean_value": "LITERAL",  # Python True/False
     "none": "LITERAL",
     "null_literal": "LITERAL",
     # EXCEPTION
@@ -284,10 +455,10 @@ _NODE_TYPE_MAP: dict[str, str] = {
 # Regex patterns for runtime detection
 # ────────────────────────────────────────────────────────────────────────────
 
-_RE_INT   = re.compile(r"^[+-]?\d+[lLuU]*$")
+_RE_INT = re.compile(r"^[+-]?\d+[lLuU]*$")
 _RE_FLOAT = re.compile(r"^[+-]?\d*\.\d+([eE][+-]?\d+)?[fFdD]?$")
-_RE_HEX   = re.compile(r"^0[xX][0-9a-fA-F]+$")
-_RE_STR   = re.compile(r'^(["\']).*\1$')
+_RE_HEX = re.compile(r"^0[xX][0-9a-fA-F]+$")
+_RE_STR = re.compile(r'^(["\']).*\1$')
 _RE_IDENT = re.compile(r"^[_a-zA-Z\u00C0-\uFFFF][_a-zA-Z0-9\u00C0-\uFFFF]*$")
 
 

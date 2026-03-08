@@ -149,9 +149,11 @@ class SyntacticClassifier:
             cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
             # scale all X for CV to accurately reflect pipeline performance
             X_scaled = self.scaler.transform(X)
-            
+
             # evaluate accuracy
-            acc_scores = cross_val_score(self.model, X_scaled, y, cv=cv, scoring="accuracy")
+            acc_scores = cross_val_score(
+                self.model, X_scaled, y, cv=cv, scoring="accuracy"
+            )
             metrics["cv_accuracy_mean"] = acc_scores.mean()
             metrics["cv_accuracy_std"] = acc_scores.std()
 
@@ -159,7 +161,7 @@ class SyntacticClassifier:
             cv_scores = cross_val_score(self.model, X_scaled, y, cv=cv, scoring="f1")
             metrics["cv_f1_mean"] = cv_scores.mean()
             metrics["cv_f1_std"] = cv_scores.std()
-            
+
             logger.info(
                 f"CV Accuracy: {metrics['cv_accuracy_mean']:.4f} (+/- {metrics['cv_accuracy_std']:.4f})"
             )
@@ -219,9 +221,10 @@ class SyntacticClassifier:
         model_path = get_model_path(model_name)
         model_dir = model_path.parent
         model_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Save SyntacticClassifier as a whole (which is the main .pkl)
         import pickle
+
         with open(model_path, "wb") as f:
             pickle.dump(self, f)
 
@@ -229,17 +232,19 @@ class SyntacticClassifier:
         scaler_path = model_dir / "scaler.pkl"
         with open(scaler_path, "wb") as f:
             pickle.dump(self.scaler, f)
-            
+
         threshold_path = model_dir / "threshold.json"
         with open(threshold_path, "w") as f:
             json.dump({"threshold": self.calibrated_threshold}, f, indent=2)
-            
+
         feature_list_path = model_dir / "feature_list.json"
         with open(feature_list_path, "w") as f:
             json.dump({"features": self.feature_names}, f, indent=2)
 
         logger.info(f"Model saved to {model_path}")
-        logger.info(f"Side-car artifacts (scaler, threshold, features) saved to {model_dir}/")
+        logger.info(
+            f"Side-car artifacts (scaler, threshold, features) saved to {model_dir}/"
+        )
         return model_path
 
     @classmethod
@@ -259,6 +264,7 @@ class SyntacticClassifier:
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
         import pickle
+
         with open(model_path, "rb") as f:
             model = pickle.load(f)
 

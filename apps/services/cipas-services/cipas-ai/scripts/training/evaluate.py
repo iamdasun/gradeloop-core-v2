@@ -4,8 +4,11 @@ from tqdm import tqdm
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModel
 from sklearn.metrics import (
-    accuracy_score, precision_recall_fscore_support,
-    roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
+    accuracy_score,
+    precision_recall_fscore_support,
+    roc_auc_score,
+    confusion_matrix,
+    ConfusionMatrixDisplay,
 )
 from torch.utils.data import DataLoader
 import torch.nn as nn
@@ -14,7 +17,9 @@ from pathlib import Path
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-MODEL_DIR = Path("unixcoder-droiddetect-final")  # <-- folder where model/tokenizer are saved
+MODEL_DIR = Path(
+    "unixcoder-droiddetect-final"
+)  # <-- folder where model/tokenizer are saved
 MAX_LEN = 512
 BATCH_SIZE = 64
 
@@ -30,10 +35,7 @@ class CodeClassifier(nn.Module):
         self.classifier = nn.Linear(hidden, 2)
 
     def forward(self, input_ids, attention_mask):
-        outputs = self.encoder(
-            input_ids=input_ids,
-            attention_mask=attention_mask
-        )
+        outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
         cls = outputs.last_hidden_state[:, 0]
         logits = self.classifier(cls)
         return logits
@@ -44,12 +46,7 @@ class CodeClassifier(nn.Module):
 # -----------------------------
 def preprocess(example, tokenizer):
     text = example["code"]
-    enc = tokenizer(
-        text,
-        truncation=True,
-        padding="max_length",
-        max_length=MAX_LEN
-    )
+    enc = tokenizer(text, truncation=True, padding="max_length", max_length=MAX_LEN)
     enc["labels"] = example["label"]
     return enc
 
@@ -75,13 +72,9 @@ def save_confusion_matrix(labels, preds, task_name):
 # -----------------------------
 def evaluate(model, dataset, tokenizer):
     dataset = dataset.map(
-        lambda x: preprocess(x, tokenizer),
-        remove_columns=dataset.column_names
+        lambda x: preprocess(x, tokenizer), remove_columns=dataset.column_names
     )
-    dataset.set_format(
-        type="torch",
-        columns=["input_ids", "attention_mask", "labels"]
-    )
+    dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
     loader = DataLoader(dataset, batch_size=BATCH_SIZE)
     preds, probs, labels = [], [], []
 
@@ -111,7 +104,7 @@ def evaluate(model, dataset, tokenizer):
         "f1": f1,
         "auc": auc,
         "labels": labels,
-        "preds": preds
+        "preds": preds,
     }
 
 

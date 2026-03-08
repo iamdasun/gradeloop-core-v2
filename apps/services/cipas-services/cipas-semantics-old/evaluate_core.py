@@ -33,13 +33,14 @@ logger = setup_logging(__name__)
 # Parallel Feature Extraction Worker
 # =============================================================================
 
+
 def extract_features_worker(args):
     """
     Worker function for parallel feature extraction.
-    
+
     Args:
         args: Tuple of (code1, code2, language, index)
-        
+
     Returns:
         Tuple of (index, features_array) or (index, None) on error
     """
@@ -61,37 +62,36 @@ def extract_features_parallel(
 ) -> np.ndarray:
     """
     Extract features in parallel using multiprocessing.
-    
+
     Args:
         code1_list: List of first code samples
         code2_list: List of second code samples
         language: Programming language
         workers: Number of worker processes (default: CPU count)
-        
+
     Returns:
         Feature matrix as numpy array
     """
     if workers is None:
         workers = min(mp.cpu_count(), 16)
-    
+
     logger.info(f"Extracting features with {workers} workers...")
-    
+
     # Prepare work items
     work_items = [
         (code1, code2, language, idx)
         for idx, (code1, code2) in enumerate(zip(code1_list, code2_list))
     ]
-    
+
     features = [None] * len(work_items)
     failed_count = 0
-    
+
     # Process in parallel with progress bar
     with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = {
-            executor.submit(extract_features_worker, item): item
-            for item in work_items
+            executor.submit(extract_features_worker, item): item for item in work_items
         }
-        
+
         with tqdm(total=len(futures), desc="Extracting features") as pbar:
             for future in as_completed(futures):
                 idx, result = future.result()
@@ -101,13 +101,13 @@ def extract_features_parallel(
                     failed_count += 1
                     features[idx] = None
                 pbar.update(1)
-    
+
     # Fill None values with zeros
     if failed_count > 0:
         logger.warning(f"Failed to extract features for {failed_count} pairs")
         feature_dim = next((f.shape[0] for f in features if f is not None), 0)
         features = [f if f is not None else np.zeros(feature_dim) for f in features]
-    
+
     return np.array(features)
 
 
@@ -195,7 +195,7 @@ def evaluate_model(
     logger.info("Extracting features in parallel...")
     n_workers = min(mp.cpu_count(), 16)  # Cap at 16 workers
     logger.info(f"Using {n_workers} parallel workers")
-    
+
     X_test = extract_features_parallel(
         code1_list=code1_list,
         code2_list=code2_list,

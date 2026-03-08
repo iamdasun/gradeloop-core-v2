@@ -13,7 +13,6 @@ from fastapi.responses import JSONResponse
 from src.models import AIDetectionModel
 from src.schemas import CodeSnippetRequest, AIDetectionResponse, HealthResponse
 
-
 # Configure logging
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),

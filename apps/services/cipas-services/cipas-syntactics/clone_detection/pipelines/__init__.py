@@ -237,14 +237,18 @@ class TieredPipeline:
                 code1, code2, language
             )
         except Exception as exc:
-            self._logger.warning(f"Feature extraction failed: {exc}; using zero features")
+            self._logger.warning(
+                f"Feature extraction failed: {exc}; using zero features"
+            )
             features = np.zeros(len(self.feature_extractor.feature_names))
 
         # ── Classifier path ──────────────────────────────────────────────
         if self.classifier is not None and self.classifier.is_trained:
             try:
                 prediction = self.classifier.predict(features.reshape(1, -1))[0]
-                probabilities = self.classifier.predict_proba(features.reshape(1, -1))[0]
+                probabilities = self.classifier.predict_proba(features.reshape(1, -1))[
+                    0
+                ]
                 is_clone = bool(prediction == 1)
                 confidence = float(probabilities[1]) if len(probabilities) > 1 else 0.0
 
@@ -271,7 +275,9 @@ class TieredPipeline:
         TYPE3_THRESHOLD = 0.6
         is_clone = jaccard >= TYPE3_THRESHOLD and lev_ratio >= 0.70
 
-        confidence = max(jaccard, lev_ratio) if is_clone else 1.0 - max(jaccard, lev_ratio)
+        confidence = (
+            max(jaccard, lev_ratio) if is_clone else 1.0 - max(jaccard, lev_ratio)
+        )
 
         return TieredDetectionResult(
             is_clone=is_clone,

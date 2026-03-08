@@ -77,15 +77,14 @@ logger = setup_logging(__name__)
 # DB interface protocol (duck-typed)
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @runtime_checkable
 class CIPASDatabase(Protocol):
     def save_fragment(self, fragment: Fragment) -> str: ...
     def get_fragment(self, fragment_id: str) -> Optional[Fragment]: ...
     def get_fragments_by_ids(self, ids: list[str]) -> list[Fragment]: ...
     def save_clone_match(self, match: "CloneMatch") -> str: ...
-    def get_assignment_templates(
-        self, assignment_id: str
-    ) -> list[frozenset[str]]: ...
+    def get_assignment_templates(self, assignment_id: str) -> list[frozenset[str]]: ...
     def get_all_fragment_signatures(
         self,
     ) -> Iterable[tuple[str, bytes]]: ...
@@ -96,9 +95,11 @@ class CIPASDatabase(Protocol):
 # Result data classes
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class CloneMatch:
     """Persisted result of the cascade for a candidate fragment pair."""
+
     id: Optional[str] = None
     frag_a_id: str = ""
     frag_b_id: str = ""
@@ -107,7 +108,7 @@ class CloneMatch:
     clone_type: str = "Non-Syntactic"
     confidence: float = 0.0
     is_clone: bool = False
-    features: Optional[dict] = None          # serialised syntactic features
+    features: Optional[dict] = None  # serialised syntactic features
     normalized_code_a: Optional[str] = None
     normalized_code_b: Optional[str] = None
 
@@ -115,6 +116,7 @@ class CloneMatch:
 @dataclass
 class IngestionResult:
     """Summary of a single submission's ingestion."""
+
     submission_id: str
     student_id: str
     assignment_id: str
@@ -131,6 +133,7 @@ class IngestionResult:
 # ────────────────────────────────────────────────────────────────────────────
 # In-memory DB (for tests / standalone use)
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class InMemoryDB:
     """Simple dict-backed store; satisfies ``CIPASDatabase`` protocol."""
@@ -159,9 +162,7 @@ class InMemoryDB:
         self._matches[mid] = match
         return mid
 
-    def get_assignment_templates(
-        self, assignment_id: str
-    ) -> list[frozenset[str]]:
+    def get_assignment_templates(self, assignment_id: str) -> list[frozenset[str]]:
         return self._templates.get(assignment_id, [])
 
     def register_template_tokens(
@@ -191,6 +192,7 @@ class InMemoryDB:
 # ────────────────────────────────────────────────────────────────────────────
 # CascadeWorker
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class CascadeWorker:
     """
@@ -265,7 +267,9 @@ class CascadeWorker:
         result.fragment_count = len(clean_fragments)
         logger.info(
             "[%s] %d fragments after template filter (was %d)",
-            submission_id, len(clean_fragments), len(raw_fragments),
+            submission_id,
+            len(clean_fragments),
+            len(raw_fragments),
         )
 
         # Assign IDs and persist fragments
@@ -288,7 +292,8 @@ class CascadeWorker:
         result.candidate_pair_count = len(candidate_pairs)
         logger.info(
             "[%s] %d candidate pairs generated",
-            submission_id, len(candidate_pairs),
+            submission_id,
+            len(candidate_pairs),
         )
 
         # ── Phase 3: CIPAS Syntactic Cascade ────────────────────────────
@@ -312,7 +317,9 @@ class CascadeWorker:
         confirmed = result.confirmed_clone_count
         logger.info(
             "[%s] cascade complete: %d / %d matches confirmed as clones",
-            submission_id, confirmed, len(candidate_pairs),
+            submission_id,
+            confirmed,
+            len(candidate_pairs),
         )
         return result
 
@@ -388,9 +395,7 @@ class CascadeWorker:
                 language=lang,
             )
         except Exception as exc:
-            logger.warning(
-                "Pipeline error for (%s, %s): %s", frag_a_id, frag_b_id, exc
-            )
+            logger.warning("Pipeline error for (%s, %s): %s", frag_a_id, frag_b_id, exc)
             return None
 
         # Serialise syntactic features for evidence view
@@ -398,7 +403,12 @@ class CascadeWorker:
         if detection.syntactic_features is not None:
             feats = detection.syntactic_features
             feature_names = [
-                "jaccard", "dice", "lev_dist", "lev_ratio", "jaro", "jaro_winkler"
+                "jaccard",
+                "dice",
+                "lev_dist",
+                "lev_ratio",
+                "jaro",
+                "jaro_winkler",
             ]
             features_dict = {
                 name: float(feats[i])

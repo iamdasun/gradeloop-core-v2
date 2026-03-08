@@ -23,22 +23,22 @@ class SimilarityReportRepository:
         report: AssignmentClusterResponse,
         lsh_threshold: float = 0.3,
         min_confidence: float = 0.0,
-        processing_time: Optional[float] = None
+        processing_time: Optional[float] = None,
     ) -> UUID:
         """
         Save or update a similarity report for an assignment.
-        
+
         Args:
             report: The cluster response from the cascade worker
             lsh_threshold: LSH threshold used for clustering
             min_confidence: Minimum confidence threshold used
             processing_time: Processing time in seconds
-            
+
         Returns:
             UUID of the saved report
         """
         report_data = report.model_dump()
-        
+
         query = """
             INSERT INTO similarity_reports (
                 assignment_id, language, submission_count, processed_count,
@@ -59,7 +59,7 @@ class SimilarityReportRepository:
                 updated_at = now()
             RETURNING id
         """
-        
+
         async with get_db_connection() as conn:
             report_id = await conn.fetchval(
                 query,
@@ -72,9 +72,9 @@ class SimilarityReportRepository:
                 json.dumps(report_data),
                 lsh_threshold,
                 min_confidence,
-                processing_time
+                processing_time,
             )
-            
+
         logger.info(
             f"Saved similarity report for assignment {report.assignment_id} "
             f"(report_id={report_id})"
@@ -85,10 +85,10 @@ class SimilarityReportRepository:
     async def get_report(assignment_id: str) -> Optional[AssignmentClusterResponse]:
         """
         Retrieve a cached similarity report for an assignment.
-        
+
         Args:
             assignment_id: Assignment identifier
-            
+
         Returns:
             AssignmentClusterResponse if found, None otherwise
         """
@@ -97,38 +97,38 @@ class SimilarityReportRepository:
             FROM similarity_reports
             WHERE assignment_id = $1
         """
-        
+
         async with get_db_connection() as conn:
             row = await conn.fetchrow(query, assignment_id)
-            
+
         if row is None:
             logger.info(f"No cached report found for assignment {assignment_id}")
             return None
-            
+
         report_data = row["report_data"]
         logger.info(
             f"Retrieved cached report for assignment {assignment_id} "
             f"(updated: {row['updated_at']})"
         )
-        
+
         return AssignmentClusterResponse(**report_data)
 
     @staticmethod
     async def delete_report(assignment_id: str) -> bool:
         """
         Delete a similarity report for an assignment.
-        
+
         Args:
             assignment_id: Assignment identifier
-            
+
         Returns:
             True if report was deleted, False if not found
         """
         query = "DELETE FROM similarity_reports WHERE assignment_id = $1"
-        
+
         async with get_db_connection() as conn:
             result = await conn.execute(query, assignment_id)
-            
+
         deleted = result.endswith("1")
         if deleted:
             logger.info(f"Deleted similarity report for assignment {assignment_id}")
@@ -138,10 +138,10 @@ class SimilarityReportRepository:
     async def get_report_metadata(assignment_id: str) -> Optional[dict]:
         """
         Get metadata about a cached report without loading full data.
-        
+
         Args:
             assignment_id: Assignment identifier
-            
+
         Returns:
             Dictionary with metadata or None if not found
         """
@@ -154,27 +154,24 @@ class SimilarityReportRepository:
             FROM similarity_reports
             WHERE assignment_id = $1
         """
-        
+
         async with get_db_connection() as conn:
             row = await conn.fetchrow(query, assignment_id)
-            
+
         if row is None:
             return None
-            
+
         return dict(row)
 
     @staticmethod
-    async def list_reports(
-        limit: int = 50,
-        offset: int = 0
-    ) -> list[dict]:
+    async def list_reports(limit: int = 50, offset: int = 0) -> list[dict]:
         """
         List all similarity reports (metadata only).
-        
+
         Args:
             limit: Maximum number of reports to return
             offset: Offset for pagination
-            
+
         Returns:
             List of report metadata dictionaries
         """
@@ -186,8 +183,8 @@ class SimilarityReportRepository:
             ORDER BY updated_at DESC
             LIMIT $1 OFFSET $2
         """
-        
+
         async with get_db_connection() as conn:
             rows = await conn.fetch(query, limit, offset)
-            
+
         return [dict(row) for row in rows]

@@ -48,6 +48,7 @@ class TreeSitterTokenizer:
         # Optional: C# support via tree-sitter-c-sharp
         try:
             import tree_sitter_c_sharp as tscsharp  # type: ignore[import]
+
             self.parsers["csharp"] = Parser(Language(tscsharp.language()))
             self.parsers["c#"] = self.parsers["csharp"]
         except (ImportError, Exception):

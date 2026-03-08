@@ -63,9 +63,11 @@ def compute_sum(a, b):
 # Phase 1: UniversalTokenMapper
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestUniversalTokenMapper:
     def test_java_keyword_mapping(self):
         from clone_detection.normalizers.universal_mapper import UniversalTokenMapper
+
         mapper = UniversalTokenMapper("java")
         assert mapper.map_token("for") == "ITERATION"
         assert mapper.map_token("while") == "ITERATION"
@@ -76,6 +78,7 @@ class TestUniversalTokenMapper:
 
     def test_python_keyword_mapping(self):
         from clone_detection.normalizers.universal_mapper import UniversalTokenMapper
+
         mapper = UniversalTokenMapper("python")
         assert mapper.map_token("def") == "FUNC_DEF"
         assert mapper.map_token("for") == "ITERATION"
@@ -84,6 +87,7 @@ class TestUniversalTokenMapper:
 
     def test_c_keyword_mapping(self):
         from clone_detection.normalizers.universal_mapper import UniversalTokenMapper
+
         mapper = UniversalTokenMapper("c")
         assert mapper.map_token("for") == "ITERATION"
         assert mapper.map_token("while") == "ITERATION"
@@ -92,6 +96,7 @@ class TestUniversalTokenMapper:
 
     def test_csharp_keyword_mapping(self):
         from clone_detection.normalizers.universal_mapper import UniversalTokenMapper
+
         mapper = UniversalTokenMapper("csharp")
         assert mapper.map_token("foreach") == "ITERATION"
         assert mapper.map_token("namespace") == "IMPORT"
@@ -99,6 +104,7 @@ class TestUniversalTokenMapper:
 
     def test_literal_detection(self):
         from clone_detection.normalizers.universal_mapper import UniversalTokenMapper
+
         mapper = UniversalTokenMapper("java")
         assert mapper.map_token("42") == "LITERAL"
         assert mapper.map_token("3.14") == "LITERAL"
@@ -107,6 +113,7 @@ class TestUniversalTokenMapper:
 
     def test_identifier_abstracted_to_V(self):
         from clone_detection.normalizers.universal_mapper import UniversalTokenMapper
+
         mapper = UniversalTokenMapper("java")
         assert mapper.map_token("myVariable") == "V"
         assert mapper.map_token("Calculator") == "V"
@@ -114,14 +121,32 @@ class TestUniversalTokenMapper:
 
     def test_passthrough_operators(self):
         from clone_detection.normalizers.universal_mapper import UniversalTokenMapper
+
         mapper = UniversalTokenMapper("java")
         for op in ["(", ")", "{", "}", "+", "-", "==", ";"]:
             assert mapper.map_token(op) == op
 
     def test_stream_mapping(self):
         from clone_detection.normalizers.universal_mapper import UniversalTokenMapper
+
         mapper = UniversalTokenMapper("java")
-        tokens = ["for", "myVar", "(", "int", "i", "=", "0", ";", "i", "<", "10", ";", "i", "++", ")"]
+        tokens = [
+            "for",
+            "myVar",
+            "(",
+            "int",
+            "i",
+            "=",
+            "0",
+            ";",
+            "i",
+            "<",
+            "10",
+            ";",
+            "i",
+            "++",
+            ")",
+        ]
         result = mapper.map_token_stream(tokens)
         assert "ITERATION" in result
         assert "VAR_DECL" in result
@@ -129,16 +154,18 @@ class TestUniversalTokenMapper:
 
     def test_normalize_for_minhash_drops_punctuation(self):
         from clone_detection.normalizers.universal_mapper import UniversalTokenMapper
+
         mapper = UniversalTokenMapper("java")
         tokens = ["int", "x", "=", "42", ";"]
         result = mapper.normalize_for_minhash(tokens)
         assert ";" not in result
         assert "=" not in result
         assert "VAR_DECL" in result  # int → VAR_DECL
-        assert "LITERAL" in result   # 42 → LITERAL
+        assert "LITERAL" in result  # 42 → LITERAL
 
     def test_node_type_mapping(self):
         from clone_detection.normalizers.universal_mapper import UniversalTokenMapper
+
         assert UniversalTokenMapper.map_node_type("for_statement") == "ITERATION"
         assert UniversalTokenMapper.map_node_type("function_definition") == "FUNC_DEF"
         assert UniversalTokenMapper.map_node_type("class_declaration") == "CLASS_DEF"
@@ -150,9 +177,11 @@ class TestUniversalTokenMapper:
 # Phase 1: Fragmenter
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestFragmenter:
     def test_basic_java_segmentation(self):
         from clone_detection.preprocessor import Fragmenter
+
         fragmenter = Fragmenter("java")
         frags = fragmenter.segment(JAVA_CLASS, "sub_001", "stu_01", "hw1")
         assert len(frags) > 0
@@ -166,12 +195,14 @@ class TestFragmenter:
 
     def test_python_segmentation(self):
         from clone_detection.preprocessor import Fragmenter
+
         fragmenter = Fragmenter("python")
         frags = fragmenter.segment(PYTHON_FUNC, "sub_002", "stu_02", "hw2")
         assert len(frags) > 0
 
     def test_sliding_window_generated_for_long_code(self):
         from clone_detection.preprocessor import Fragmenter
+
         fragmenter = Fragmenter("java")
         # Build code with many tokens
         long_method = "public void longMethod() {\n" + "    int x = 0;\n" * 60 + "}"
@@ -181,6 +212,7 @@ class TestFragmenter:
 
     def test_deduplication(self):
         from clone_detection.preprocessor import Fragmenter
+
         fragmenter = Fragmenter("java")
         # Same function repeated should yield unique fragments
         code = JAVA_FUNC_A + "\n" + JAVA_FUNC_A
@@ -191,6 +223,7 @@ class TestFragmenter:
 
     def test_fragment_has_abstract_tokens(self):
         from clone_detection.preprocessor import Fragmenter
+
         fragmenter = Fragmenter("java")
         frags = fragmenter.segment(JAVA_FUNC_A, "sub_005", "stu_05", "hw1")
         for f in frags:
@@ -202,6 +235,7 @@ class TestFragmenter:
 class TestTemplateFilter:
     def test_template_fragments_discarded(self):
         from clone_detection.preprocessor import Fragmenter, TemplateFilter
+
         tpl_filter = TemplateFilter(threshold=0.9)
         # Register template
         tpl_filter.register_template("hw1", JAVA_FUNC_A, "java")
@@ -217,6 +251,7 @@ class TestTemplateFilter:
 
     def test_unrelated_code_not_filtered(self):
         from clone_detection.preprocessor import Fragmenter, TemplateFilter
+
         tpl_filter = TemplateFilter(threshold=0.9)
         tpl_filter.register_template("hw1", JAVA_FUNC_A, "java")
         fragmenter = Fragmenter("java")
@@ -230,9 +265,11 @@ class TestTemplateFilter:
 # Phase 2: MinHashIndexer
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestMinHashIndexer:
     def _make_fragment(self, tokens, fid=None):
         from clone_detection.preprocessor import Fragment
+
         return Fragment(
             submission_id="sub_test",
             student_id="stu_test",
@@ -248,6 +285,7 @@ class TestMinHashIndexer:
 
     def test_index_and_query_same_fragment(self):
         from clone_detection.lsh_index import MinHashIndexer
+
         indexer = MinHashIndexer(num_perm=64, threshold=0.3)
         frag = self._make_fragment(["FUNC_DEF", "V", "ITERATION", "RETURN", "V"] * 5)
         sig_bytes = indexer.index(frag)
@@ -257,6 +295,7 @@ class TestMinHashIndexer:
 
     def test_similar_fragments_share_bucket(self):
         from clone_detection.lsh_index import MinHashIndexer
+
         indexer = MinHashIndexer(num_perm=128, threshold=0.3)
         base_tokens = ["FUNC_DEF", "VAR_DECL", "ITERATION", "CONDITION", "RETURN"] * 10
         frag_a = self._make_fragment(base_tokens)
@@ -277,9 +316,12 @@ class TestMinHashIndexer:
 
     def test_very_different_fragments_not_bucketed_together(self):
         from clone_detection.lsh_index import MinHashIndexer
+
         indexer = MinHashIndexer(num_perm=128, threshold=0.5)
         frag_a = self._make_fragment(["FUNC_DEF", "VAR_DECL", "RETURN"] * 10)
-        frag_b = self._make_fragment(["ITERATION", "CONDITION", "LITERAL", "IMPORT"] * 10)
+        frag_b = self._make_fragment(
+            ["ITERATION", "CONDITION", "LITERAL", "IMPORT"] * 10
+        )
         indexer.index(frag_a)
         indexer.index(frag_b)
         candidates = indexer.query(frag_a)
@@ -288,6 +330,7 @@ class TestMinHashIndexer:
 
     def test_rebuild_from_db(self):
         from clone_detection.lsh_index import MinHashIndexer
+
         indexer = MinHashIndexer(num_perm=64, threshold=0.3)
         tokens = ["VAR_DECL", "FUNC_DEF", "RETURN"] * 8
         frag = self._make_fragment(tokens)
@@ -301,6 +344,7 @@ class TestMinHashIndexer:
 
     def test_jaccard_approximation(self):
         from clone_detection.lsh_index import MinHashIndexer
+
         indexer = MinHashIndexer(num_perm=128, threshold=0.1)
         tokens = ["A", "B", "C", "D", "E"] * 10
         frag_a = self._make_fragment(tokens)
@@ -312,6 +356,7 @@ class TestMinHashIndexer:
 
     def test_deduplicate_pairs(self):
         from clone_detection.lsh_index import deduplicate_pairs
+
         pairs = [("a", "b"), ("b", "a"), ("c", "d"), ("a", "b"), ("a", "a")]
         result = deduplicate_pairs(pairs)
         assert ("a", "b") in result
@@ -323,9 +368,11 @@ class TestMinHashIndexer:
 # Phase 4: CollusionGraph
 # ────────────────────────────────────────────────────────────────────────────
 
+
 class TestCollusionGraph:
     def test_single_edge_two_students(self):
         from clone_detection.collusion_graph import CollusionGraph
+
         g = CollusionGraph()
         g.add_match("alice", "bob", "Type-3", 0.85)
         components = g.connected_components()
@@ -334,6 +381,7 @@ class TestCollusionGraph:
 
     def test_chain_forms_one_group(self):
         from clone_detection.collusion_graph import CollusionGraph
+
         g = CollusionGraph()
         g.add_match("alice", "bob", "Type-2", 0.95)
         g.add_match("bob", "carol", "Type-3", 0.78)
@@ -344,6 +392,7 @@ class TestCollusionGraph:
 
     def test_two_separate_groups(self):
         from clone_detection.collusion_graph import CollusionGraph
+
         g = CollusionGraph()
         g.add_match("alice", "bob", "Type-1", 0.99)
         g.add_match("carol", "dave", "Type-3", 0.75)
@@ -352,6 +401,7 @@ class TestCollusionGraph:
 
     def test_min_confidence_filters_edges(self):
         from clone_detection.collusion_graph import CollusionGraph
+
         g = CollusionGraph()
         g.add_match("alice", "bob", "Type-3", 0.55)
         g.add_match("carol", "dave", "Type-3", 0.90)
@@ -362,12 +412,14 @@ class TestCollusionGraph:
 
     def test_self_match_ignored(self):
         from clone_detection.collusion_graph import CollusionGraph
+
         g = CollusionGraph()
         g.add_match("alice", "alice", "Type-1", 1.0)
         assert g.edge_count() == 0
 
     def test_dominant_type_most_severe(self):
         from clone_detection.collusion_graph import CollusionGraph
+
         g = CollusionGraph()
         g.add_match("alice", "bob", "Type-3", 0.80)
         g.add_match("alice", "carol", "Type-1", 0.99)
@@ -377,6 +429,7 @@ class TestCollusionGraph:
 
     def test_sorted_by_size_descending(self):
         from clone_detection.collusion_graph import CollusionGraph
+
         g = CollusionGraph()
         g.add_match("a", "b", "Type-3", 0.8)
         g.add_match("b", "c", "Type-3", 0.8)
@@ -386,6 +439,7 @@ class TestCollusionGraph:
 
     def test_remove_student(self):
         from clone_detection.collusion_graph import CollusionGraph
+
         g = CollusionGraph()
         g.add_match("alice", "bob", "Type-2", 0.97)
         g.remove_student("alice")
@@ -394,6 +448,7 @@ class TestCollusionGraph:
 
     def test_adjacency_dict(self):
         from clone_detection.collusion_graph import CollusionGraph
+
         g = CollusionGraph()
         g.add_match("alice", "bob", "Type-3", 0.85)
         adj = g.to_adjacency_dict()
@@ -403,6 +458,7 @@ class TestCollusionGraph:
 
     def test_group_summary(self):
         from clone_detection.collusion_graph import CollusionGraph
+
         g = CollusionGraph()
         g.add_match("alice", "bob", "Type-3", 0.88)
         groups = g.connected_components()
@@ -416,6 +472,7 @@ class TestCollusionGraph:
 # ────────────────────────────────────────────────────────────────────────────
 # Phase 3 + Integration: CascadeWorker
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class TestCascadeWorkerInMemory:
     """End-to-end pipeline tests using InMemoryDB (no real DB required)."""
@@ -492,6 +549,7 @@ class TestCascadeWorkerInMemory:
         # Register template
         worker._tpl_filter = None  # reset
         from clone_detection.preprocessor import TemplateFilter
+
         tpl = TemplateFilter(threshold=0.9)
         tpl.register_template("hw1", JAVA_FUNC_A, "java")
         worker._tpl_filter = tpl
