@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """
-Test script for Semantic Clone Detection API
+Manual Integration Test for Semantic Clone Detection API
+
+This is an integration test that requires a running API server.
+It is NOT run automatically during CI/CD unit testing.
+
+To use this test:
+1. Start the API server: uvicorn api.main:app --reload
+2. Run this script: python manual_api_test.py
+
+Note: This file is intentionally named to avoid pytest auto-discovery.
 """
 
 import json
