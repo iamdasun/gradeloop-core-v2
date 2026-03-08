@@ -337,7 +337,13 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${CIPAS_SYN_SVC_PORT}/api/v1/syntactics/ready" ]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:${CIPAS_SYN_SVC_PORT}/api/v1/syntactics/ready",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -387,7 +393,70 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${CIPAS_SEM_SVC_PORT}/api/v1/semantics/ready" ]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:${CIPAS_SEM_SVC_PORT}/api/v1/semantics/ready",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # =============================================================================
+  # CIPAS AI Detection Service (Python FastAPI — AI Code Likelihood Detection)
+  # =============================================================================
+  cipas-ai:
+    build:
+      context: ./apps/services/cipas-services/cipas-ai
+      dockerfile: Dockerfile
+    container_name: cipas-ai
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cipas-ai.rule=PathPrefix(`/api/v1/ai`)"
+      - "traefik.http.routers.cipas-ai.entrypoints=web"
+      - "traefik.http.services.cipas-ai-service.loadbalancer.server.port=${CIPAS_AI_SVC_PORT}"
+      - "traefik.http.middlewares.cipas-ai-limit.buffering.maxRequestBodyBytes=5242880"
+      - "traefik.http.middlewares.cipas-ai-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.cipas-ai-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.cipas-ai-ratelimit.ratelimit.burst=10"
+      - "traefik.http.routers.cipas-ai.middlewares=cipas-ai-limit,cipas-ai-ratelimit"
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./apps/services/cipas-services/cipas-ai/model:/app/model:ro
+
+    environment:
+      - CIPAS_AI_PORT=${CIPAS_AI_SVC_PORT}
+      - CIPAS_AI_HOST=0.0.0.0
+      - CIPAS_AI_DEVICE=${CIPAS_AI_DEVICE:-cpu}
+
+    expose:
+      - "${CIPAS_AI_SVC_PORT}"
+
+    networks:
+      - gradeloop-network
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:${CIPAS_AI_SVC_PORT}/api/v1/ai/ready",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -485,7 +554,13 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/api/v1/acafs/health')" ]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8086/api/v1/acafs/health')",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -574,7 +649,7 @@ services:
     networks:
       - gradeloop-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U keystroke_user -d keystroke-db" ]
+      test: ["CMD-SHELL", "pg_isready -U keystroke_user -d keystroke-db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -635,7 +710,13 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')" ]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -647,7 +728,7 @@ services:
         max-size: "10m"
         max-file: "3"
         compress: "true"
-        
+
   # =============================================================================
   # Redis (for session buffering)
   # =============================================================================
@@ -655,7 +736,7 @@ services:
     image: redis:7-alpine
     container_name: redis
     restart: unless-stopped
-    command: [ "redis-server", "--save", "", "--appendonly", "no" ]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
     ports:
       - "6379:6379"
 
@@ -666,7 +747,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
