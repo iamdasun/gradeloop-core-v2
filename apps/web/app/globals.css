@@ -393,7 +393,7 @@
         background-color: hsl(var(--background));
         color: hsl(var(--foreground));
         font-family:
-            var(--font-inter), ui-sans-serif, system-ui,
+            'Inter', ui-sans-serif, system-ui,
             sans-serif;
         font-feature-settings:
             "rlig" 1,
@@ -403,7 +403,7 @@
     }
 
     .font-body {
-        font-family: var(--font-inter), sans-serif;
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
     }
 
     /* Headings — Montserrat */
@@ -414,7 +414,7 @@
     h5,
     h6,
     .font-heading {
-        font-family: var(--font-montserrat), sans-serif;
+        font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
     }
 
     /* Monospace — code blocks, logs, diffs */
@@ -475,8 +475,8 @@
 
 @theme inline {
     /* Fonts */
-    --font-heading: var(--font-montserrat);
-    --font-body: var(--font-inter);
+    --font-heading: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+    --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
 
     /* Core surfaces */
     --color-background: hsl(var(--background));

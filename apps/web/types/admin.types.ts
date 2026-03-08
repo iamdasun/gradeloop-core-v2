@@ -24,6 +24,8 @@ export interface ListUsersParams {
   limit?: number;
   /** Filter by user type: "all" | "student" | "instructor" | "admin" | "super_admin" */
   user_type?: string;
+  /** Filter by role ID */
+  role_id?: string;
   /** Search by name or email — forwarded as search query to backend */
   search?: string;
 }
