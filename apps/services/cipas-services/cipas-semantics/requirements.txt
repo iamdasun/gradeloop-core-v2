@@ -16,3 +16,8 @@ tokenizers==0.21.0
 
 # Utilities
 python-multipart==0.0.20
+requests==2.32.3
+
+# Testing
+pytest==9.0.2
+pytest-cov==7.0.0
