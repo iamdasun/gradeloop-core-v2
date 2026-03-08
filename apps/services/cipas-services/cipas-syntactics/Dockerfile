@@ -13,7 +13,6 @@ WORKDIR /app
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Install build dependencies
@@ -26,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml ./
 
 # Install dependencies directly (package-mode = false in pyproject.toml)
-RUN pip install --no-cache-dir \
+RUN pip install \
     fastapi \
     uvicorn \
     pydantic \
@@ -105,7 +104,7 @@ FROM builder AS development
 WORKDIR /app
 
 # Install dev dependencies
-RUN pip install --no-cache-dir pytest 2>/dev/null || true
+RUN pip install pytest 2>/dev/null || true
 
 COPY main.py routes.py schemas.py database.py ./
 COPY clone_detection/ ./clone_detection/

@@ -730,6 +730,63 @@ services:
         compress: "true"
 
   # =============================================================================
+  # CIPAS XAI Service (Go Fiber — LLM Integration with OpenRouter)
+  # =============================================================================
+  cipas-xai:
+    build:
+      context: ./apps/services/cipas-services/cipas-xai
+      dockerfile: Dockerfile
+    container_name: cipas-xai
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cipas-xai.rule=PathPrefix(`/api/v1/chat`)"
+      - "traefik.http.routers.cipas-xai.entrypoints=web"
+      - "traefik.http.services.cipas-xai-service.loadbalancer.server.port=8085"
+      # Request Size Limiting (10MB for image uploads)
+      - "traefik.http.middlewares.cipas-xai-limit.buffering.maxRequestBodyBytes=10485760"
+      # Rate Limiting
+      - "traefik.http.middlewares.cipas-xai-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.cipas-xai-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.cipas-xai-ratelimit.ratelimit.burst=20"
+      # CORS
+      - "traefik.http.middlewares.cipas-xai-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
+      - "traefik.http.middlewares.cipas-xai-cors.headers.accesscontrolalloworiginlist=http://localhost:3000,http://localhost:3001"
+      - "traefik.http.middlewares.cipas-xai-cors.headers.accesscontrolallowheaders=Origin,Content-Type,Accept,Authorization,X-Request-ID"
+      - "traefik.http.middlewares.cipas-xai-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.cipas-xai-cors.headers.addvaryheader=true"
+      # Apply middlewares
+      - "traefik.http.routers.cipas-xai.middlewares=cipas-xai-limit,cipas-xai-ratelimit,cipas-xai-cors"
+
+    env_file:
+      - .env
+
+    environment:
+      - CIPAS_XAI_SVC_PORT=8085
+      - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
+      - LLM_API_KEY=${OPENROUTER_API_KEY}
+      - LLM_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - LLM_MODEL=${OPENROUTER_REASONER_MODEL:-qwen/qwen3-vl-235b-a22b-thinking}
+      - LLM_EXTRA_HEADERS=HTTP-Referer=${FRONTEND_URL:-http://localhost:3000},X-OpenRouter-Title=GradeLoop CIPAS-XAI
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-2048}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      - LLM_TIMEOUT=${LLM_TIMEOUT:-60}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+    expose:
+      - "8085"
+
+    networks:
+      - gradeloop-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # =============================================================================
   # Redis (for session buffering)
   # =============================================================================
   redis:

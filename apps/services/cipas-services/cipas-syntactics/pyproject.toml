@@ -5,7 +5,7 @@ description = "Syntactic Code Clone Detection Service (Type-1/2/3) with Tree-sit
 authors = [
     {name = "Dasun Wickramasooriya",email = "dasun.wickramasooriya@gmail.com"}
 ]
-requires-python = "^3.11"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi (>=0.133.0,<0.134.0)",
     "uvicorn (>=0.41.0,<0.42.0)",

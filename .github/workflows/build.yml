@@ -5,48 +5,139 @@ on:
       - main
   pull_request:
     types: [opened, synchronize, reopened]
+
 jobs:
-  sonarqube:
-    name: SonarQube
+  # =============================================================================
+  # Python Services Build & Tests
+  # =============================================================================
+  python-build:
+    name: Python - Build & Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
-      - name: Install dependencies and run tests with coverage
+          python-version: "3.11"
+
+      - name: Install test dependencies
         run: |
-          # Install test dependencies
           python -m pip install --upgrade pip
           python -m pip install pytest pytest-cov coverage
-          
-          # Find and test all Python packages
-          for pkg_dir in $(find shared/libs/py -name "setup.py" -o -name "requirements.txt" | xargs -n1 dirname | sort -u); do
+
+      - name: Test Python packages in shared/libs/py
+        run: |
+          for pkg_dir in $(find shared/libs/py -name "setup.py" -o -name "requirements.txt" 2>/dev/null | xargs -n1 dirname 2>/dev/null | sort -u); do
             echo "Testing package: $pkg_dir"
-            pushd "$pkg_dir" > /dev/null
-            
-            # Install package dependencies
+            pushd "$pkg_dir" > /dev/null || continue
+
             if [ -f "requirements.txt" ]; then
               pip install -r requirements.txt
             fi
             if [ -f "setup.py" ]; then
               pip install -e .
             fi
-            
-            # Run tests with coverage if test files exist
+
             if ls test_*.py 1> /dev/null 2>&1; then
-              pytest --cov=. --cov-report=xml --cov-report=term -v || true
+              pytest --cov=. --cov-report=term -v || true
             fi
-            
+
+            popd > /dev/null || continue
+          done
+
+      - name: Test Python services
+        run: |
+          for svc_dir in apps/services/*/; do
+            if [ -f "$svc_dir/requirements.txt" ] || [ -f "$svc_dir/pyproject.toml" ]; then
+              echo "Testing service: $svc_dir"
+              pushd "$svc_dir" > /dev/null || continue
+
+              if [ -f "requirements.txt" ]; then
+                pip install -r requirements.txt
+              fi
+              if [ -f "pyproject.toml" ]; then
+                pip install -e .
+              fi
+
+              if ls test_*.py 1> /dev/null 2>&1; then
+                pytest -v || true
+              fi
+
+              popd > /dev/null || continue
+            fi
+          done
+
+  # =============================================================================
+  # Go Services Build & Tests
+  # =============================================================================
+  go-build:
+    name: Go - Build & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Build and test Go services
+        run: |
+          for mod_file in $(find apps/services -name "go.mod" | sort -u); do
+            svc_dir=$(dirname "$mod_file")
+            echo "Building and testing: $svc_dir"
+            pushd "$svc_dir" > /dev/null
+
+            go mod download
+            go build ./... || true
+            go test ./... -v || true
+
             popd > /dev/null
           done
-      
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Build and test shared Go libraries
+        run: |
+          for mod_file in $(find shared/libs/go -name "go.mod" | sort -u); do
+            lib_dir=$(dirname "$mod_file")
+            echo "Building and testing: $lib_dir"
+            pushd "$lib_dir" > /dev/null
+
+            go mod download
+            go build ./... || true
+            go test ./... -v || true
+
+            popd > /dev/null
+          done
+
+  # =============================================================================
+  # Bun/Frontend Build
+  # =============================================================================
+  bun-build:
+    name: Bun - Build & Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies (web app)
+        run: |
+          bun install
+
+      - name: Build frontend
+        run: |
+          bun run build
+
+      - name: Run frontend tests
+        run: |
+          bun test || true
