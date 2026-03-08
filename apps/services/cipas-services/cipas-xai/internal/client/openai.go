@@ -22,23 +22,25 @@ type LLMClient interface {
 
 // OpenAIClient implements LLMClient for OpenAI-compatible APIs
 type OpenAIClient struct {
-	apiKey      string
-	baseURL     string
-	model       string
-	maxTokens   int
-	temperature float64
-	httpClient  *http.Client
-	logger      *zap.Logger
+	apiKey       string
+	baseURL      string
+	model        string
+	maxTokens    int
+	temperature  float64
+	extraHeaders map[string]string
+	httpClient   *http.Client
+	logger       *zap.Logger
 }
 
 // NewOpenAIClient creates a new OpenAI-compatible client
-func NewOpenAIClient(apiKey, baseURL, model string, maxTokens int, temperature float64, timeout time.Duration, logger *zap.Logger) *OpenAIClient {
+func NewOpenAIClient(apiKey, baseURL, model string, maxTokens int, temperature float64, extraHeaders map[string]string, timeout time.Duration, logger *zap.Logger) *OpenAIClient {
 	return &OpenAIClient{
-		apiKey:      apiKey,
-		baseURL:     baseURL,
-		model:       model,
-		maxTokens:   maxTokens,
-		temperature: temperature,
+		apiKey:       apiKey,
+		baseURL:      baseURL,
+		model:        model,
+		maxTokens:    maxTokens,
+		temperature:  temperature,
+		extraHeaders: extraHeaders,
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
@@ -48,9 +50,41 @@ func NewOpenAIClient(apiKey, baseURL, model string, maxTokens int, temperature f
 
 // SendChat sends a chat request and returns the complete response
 func (c *OpenAIClient) SendChat(ctx context.Context, messages []dto.ChatMessage) (*dto.ChatResponse, error) {
+	// Convert messages to format suitable for API
+	apiMessages := make([]map[string]interface{}, len(messages))
+	for i, msg := range messages {
+		apiMsg := map[string]interface{}{
+			"role": msg.Role,
+		}
+		// Handle both string content and array content (for multi-modal)
+		if contentArr := msg.GetContentAsArray(); len(contentArr) > 0 {
+			// Multi-modal content
+			contentItems := make([]map[string]interface{}, len(contentArr))
+			for j, item := range contentArr {
+				itemMap := map[string]interface{}{
+					"type": item.Type,
+				}
+				if item.Text != "" {
+					itemMap["text"] = item.Text
+				}
+				if item.ImageURL != nil && item.ImageURL.URL != "" {
+					itemMap["image_url"] = map[string]interface{}{
+						"url": item.ImageURL.URL,
+					}
+				}
+				contentItems[j] = itemMap
+			}
+			apiMsg["content"] = contentItems
+		} else {
+			// Simple text content
+			apiMsg["content"] = msg.GetContentAsString()
+		}
+		apiMessages[i] = apiMsg
+	}
+
 	reqBody := map[string]interface{}{
 		"model":       c.model,
-		"messages":    messages,
+		"messages":    apiMessages,
 		"max_tokens":  c.maxTokens,
 		"temperature": c.temperature,
 		"stream":      false,
@@ -68,6 +102,11 @@ func (c *OpenAIClient) SendChat(ctx context.Context, messages []dto.ChatMessage)
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	// Add extra headers (for OpenRouter, etc.)
+	for key, value := range c.extraHeaders {
+		req.Header.Set(key, value)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -126,9 +165,38 @@ func (c *OpenAIClient) SendChat(ctx context.Context, messages []dto.ChatMessage)
 func (c *OpenAIClient) StreamChat(ctx context.Context, messages []dto.ChatMessage, chunkChan chan<- dto.StreamChunk) error {
 	defer close(chunkChan)
 
+	// Convert messages to format suitable for API (same as SendChat)
+	apiMessages := make([]map[string]interface{}, len(messages))
+	for i, msg := range messages {
+		apiMsg := map[string]interface{}{
+			"role": msg.Role,
+		}
+		if contentArr := msg.GetContentAsArray(); len(contentArr) > 0 {
+			contentItems := make([]map[string]interface{}, len(contentArr))
+			for j, item := range contentArr {
+				itemMap := map[string]interface{}{
+					"type": item.Type,
+				}
+				if item.Text != "" {
+					itemMap["text"] = item.Text
+				}
+				if item.ImageURL != nil && item.ImageURL.URL != "" {
+					itemMap["image_url"] = map[string]interface{}{
+						"url": item.ImageURL.URL,
+					}
+				}
+				contentItems[j] = itemMap
+			}
+			apiMsg["content"] = contentItems
+		} else {
+			apiMsg["content"] = msg.GetContentAsString()
+		}
+		apiMessages[i] = apiMsg
+	}
+
 	reqBody := map[string]interface{}{
 		"model":       c.model,
-		"messages":    messages,
+		"messages":    apiMessages,
 		"max_tokens":  c.maxTokens,
 		"temperature": c.temperature,
 		"stream":      true,
@@ -146,6 +214,11 @@ func (c *OpenAIClient) StreamChat(ctx context.Context, messages []dto.ChatMessag
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	// Add extra headers (for OpenRouter, etc.)
+	for key, value := range c.extraHeaders {
+		req.Header.Set(key, value)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

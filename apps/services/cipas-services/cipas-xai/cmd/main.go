@@ -50,6 +50,7 @@ func run() error {
 		cfg.LLM.Model,
 		cfg.LLM.MaxTokens,
 		cfg.LLM.Temperature,
+		cfg.LLM.ExtraHeaders,
 		time.Duration(cfg.LLM.Timeout)*time.Second,
 		logger,
 	)
