@@ -61,6 +61,7 @@ import {
   CreateDegreeDialog,
   EditDegreeDialog,
 } from "@/components/admin/academics/degree-dialogs";
+import { EditDepartmentDialog } from "@/components/admin/academics/department-dialogs";
 import { AcademicsDetailLayout } from "@/components/admin/academics/AcademicsDetailLayout";
 import { DangerZone } from "@/components/admin/academics/DangerZone";
 import type {
@@ -157,6 +158,8 @@ export default function DepartmentDetailPage() {
   const [editDegreeTarget, setEditDegreeTarget] = React.useState<Degree | null>(
     null,
   );
+  const [editDeptOpen, setEditDeptOpen] = React.useState(false);
+
   // Settings
   const [activeTab, setActiveTab] = React.useState<
     "overview" | "degrees" | "settings"
@@ -877,17 +880,15 @@ export default function DepartmentDetailPage() {
               }}
             />
           )}
-          {canWrite && (
-            <EditDepartmentDialog
-              open={editDeptOpen}
-              onOpenChange={setEditDeptOpen}
-              department={department}
-              onSuccess={(updated) => {
-                setDepartment(updated);
-                setEditDeptOpen(false);
-              }}
-            />
-          )}
+          <EditDepartmentDialog
+            open={editDeptOpen}
+            onOpenChange={setEditDeptOpen}
+            department={department}
+            onSuccess={(updated) => {
+              setDepartment(updated);
+              setEditDeptOpen(false);
+            }}
+          />
         </>
       )}
     </div>
