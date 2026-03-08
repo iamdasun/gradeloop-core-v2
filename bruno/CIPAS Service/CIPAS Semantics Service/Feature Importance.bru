@@ -1,0 +1,23 @@
+meta {
+  name: Similarity Score
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{CIPAS_SEMANTICS_URL_V1}}/similarity
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "code1": "int sum(int a, int b) { return a + b; }",
+    "code2": "int add(int x, int y) { int result = x + y; return result; }"
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
