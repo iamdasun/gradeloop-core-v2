@@ -201,7 +201,10 @@ jobs:
 
           declare -A pdirs
           for f in "${pyfiles[@]}"; do
-            if [[ "$f" =~ ^apps/services/[^/]+ ]]; then
+            if [[ "$f" =~ ^apps/services/cipas-services/[^/]+ ]]; then
+              # For cipas-services, extract to the individual service level (4 levels deep)
+              d=$(printf "%s" "$f" | awk -F'/' '{print $1"/"$2"/"$3"/"$4}')
+            elif [[ "$f" =~ ^apps/services/[^/]+ ]]; then
               d=$(printf "%s" "$f" | awk -F'/' '{print $1"/"$2"/"$3}')
             elif [[ "$f" =~ ^shared/libs/py/([^/]+) ]]; then
               # Extract the package name (e.g., shared/libs/py/secrets)
@@ -225,16 +228,26 @@ jobs:
 
             pushd "$d" >/dev/null || true
 
-            # Install dependencies if requirements.txt or setup.py exists
+            # Install dependencies if requirements.txt, setup.py, or pyproject.toml exists
             if [ -f "requirements.txt" ]; then
               echo "Installing dependencies from requirements.txt for $d" >> ci_summary.txt
               python -m pip install -r requirements.txt >/dev/null || { echo "Failed to install requirements for $d" >> ci_summary.txt; exit 1; }
+              PYTEST_CMD="pytest"
+            elif [ -f "pyproject.toml" ]; then
+              echo "Installing dependencies from pyproject.toml for $d" >> ci_summary.txt
+              python -m pip install --user poetry >/dev/null 2>&1 || true
+              export PATH="$HOME/.local/bin:$PATH"
+              poetry install --with dev >/dev/null || { echo "Failed to install poetry dependencies for $d" >> ci_summary.txt; exit 1; }
+              PYTEST_CMD="poetry run pytest"
             elif [ -f "setup.py" ]; then
               echo "Installing package dependencies from setup.py for $d" >> ci_summary.txt
               python -m pip install -e . >/dev/null || { echo "Failed to install package for $d" >> ci_summary.txt; exit 1; }
+              PYTEST_CMD="pytest"
+            else
+              PYTEST_CMD="pytest"
             fi
 
-            pytest --maxfail=1 --disable-warnings --cov=. --cov-report=xml || { echo "pytest failed for $d" >> ci_summary.txt; exit 1; }
+            $PYTEST_CMD --maxfail=1 --disable-warnings --cov=. --cov-report=xml || { echo "pytest failed for $d" >> ci_summary.txt; exit 1; }
             if [ -f coverage.xml ]; then
               # Extract coverage using grep/sed/awk to avoid inline Python and YAML parsing issues.
               # Try common coverage.xml attribute 'line-rate' first (coverage.py uses this).
