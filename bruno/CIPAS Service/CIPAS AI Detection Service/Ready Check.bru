@@ -1,0 +1,16 @@
+meta {
+  name: Ready Check
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{CIPAS_AI_URL_V1}}/ready
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
