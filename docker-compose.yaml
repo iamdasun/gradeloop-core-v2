@@ -289,8 +289,14 @@ services:
       - "traefik.http.middlewares.assessment-ratelimit.ratelimit.average=500"
       - "traefik.http.middlewares.assessment-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.assessment-ratelimit.ratelimit.burst=50"
+      # CORS Middlewares
+      - "traefik.http.middlewares.assessment-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
+      - "traefik.http.middlewares.assessment-cors.headers.accesscontrolalloworiginlist=http://localhost:3000,http://localhost:3001"
+      - "traefik.http.middlewares.assessment-cors.headers.accesscontrolallowheaders=Origin,Content-Type,Accept,Authorization,X-Request-ID"
+      - "traefik.http.middlewares.assessment-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.assessment-cors.headers.addvaryheader=true"
       # Apply middlewares
-      - "traefik.http.routers.assessment.middlewares=assessment-limit,assessment-ratelimit"
+      - "traefik.http.routers.assessment.middlewares=assessment-limit,assessment-ratelimit,assessment-cors"
 
     env_file:
       - .env
@@ -365,7 +371,12 @@ services:
       - "traefik.http.middlewares.cipas-syntactics-ratelimit.ratelimit.average=100"
       - "traefik.http.middlewares.cipas-syntactics-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.cipas-syntactics-ratelimit.ratelimit.burst=10"
-      - "traefik.http.routers.cipas-syntactics.middlewares=cipas-syntactics-limit,cipas-syntactics-ratelimit"
+      - "traefik.http.middlewares.cipas-syntactics-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
+      - "traefik.http.middlewares.cipas-syntactics-cors.headers.accesscontrolalloworiginlist=http://localhost:3000,http://localhost:3001"
+      - "traefik.http.middlewares.cipas-syntactics-cors.headers.accesscontrolallowheaders=Origin,Content-Type,Accept,Authorization,X-Request-ID"
+      - "traefik.http.middlewares.cipas-syntactics-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.cipas-syntactics-cors.headers.addvaryheader=true"
+      - "traefik.http.routers.cipas-syntactics.middlewares=cipas-syntactics-limit,cipas-syntactics-ratelimit,cipas-syntactics-cors"
 
     env_file:
       - .env
@@ -417,7 +428,12 @@ services:
       - "traefik.http.middlewares.cipas-semantics-ratelimit.ratelimit.average=100"
       - "traefik.http.middlewares.cipas-semantics-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.cipas-semantics-ratelimit.ratelimit.burst=10"
-      - "traefik.http.routers.cipas-semantics.middlewares=cipas-semantics-limit,cipas-semantics-ratelimit"
+      - "traefik.http.middlewares.cipas-semantics-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
+      - "traefik.http.middlewares.cipas-semantics-cors.headers.accesscontrolalloworiginlist=http://localhost:3000,http://localhost:3001"
+      - "traefik.http.middlewares.cipas-semantics-cors.headers.accesscontrolallowheaders=Origin,Content-Type,Accept,Authorization,X-Request-ID"
+      - "traefik.http.middlewares.cipas-semantics-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.cipas-semantics-cors.headers.addvaryheader=true"
+      - "traefik.http.routers.cipas-semantics.middlewares=cipas-semantics-limit,cipas-semantics-ratelimit,cipas-semantics-cors"
 
     env_file:
       - .env
@@ -467,7 +483,12 @@ services:
       - "traefik.http.middlewares.cipas-ai-ratelimit.ratelimit.average=100"
       - "traefik.http.middlewares.cipas-ai-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.cipas-ai-ratelimit.ratelimit.burst=10"
-      - "traefik.http.routers.cipas-ai.middlewares=cipas-ai-limit,cipas-ai-ratelimit"
+      - "traefik.http.middlewares.cipas-ai-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
+      - "traefik.http.middlewares.cipas-ai-cors.headers.accesscontrolalloworiginlist=http://localhost:3000,http://localhost:3001"
+      - "traefik.http.middlewares.cipas-ai-cors.headers.accesscontrolallowheaders=Origin,Content-Type,Accept,Authorization,X-Request-ID"
+      - "traefik.http.middlewares.cipas-ai-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.cipas-ai-cors.headers.addvaryheader=true"
+      - "traefik.http.routers.cipas-ai.middlewares=cipas-ai-limit,cipas-ai-ratelimit,cipas-ai-cors"
 
     env_file:
       - .env
