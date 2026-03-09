@@ -103,8 +103,6 @@ export interface AssignmentResponse {
     ai_grading_config?: {
         plagiarism_check_enabled: boolean;
     };
-    /** Reference implementation provided by the instructor (optional). */
-    sample_answer?: SampleAnswerDto;
 }
 
 export interface ListAssignmentsResponse {

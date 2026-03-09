@@ -25,6 +25,14 @@ export interface CodeIDEProps {
   isGrading?: boolean;
   /** True when the autograder polling has timed out with no result. */
   gradingFailed?: boolean;
+  /** CIPAS analysis results to display alongside the grade. */
+  submissionAnalysis?: {
+    aiLikelihood: number;
+    humanLikelihood: number;
+    semanticSimilarityScore?: number | null;
+  } | null;
+  /** True while CIPAS analysis (AI detection + semantic similarity) is running in the background. */
+  isAnalyzing?: boolean;
 }
 
 export interface ExecutionResult {

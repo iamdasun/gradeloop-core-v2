@@ -11,6 +11,61 @@ import (
 	"gorm.io/datatypes"
 )
 
+// judge0LanguageNames maps Judge0 language IDs to canonical language name strings.
+// Used to fill in the Language field on AssignmentSampleAnswer when the caller
+// omits it (e.g. older clients that only send language_id).
+var judge0LanguageNames = map[int]string{
+	45: "assembly",
+	46: "bash",
+	47: "basic",
+	48: "c",
+	49: "c",
+	50: "c",
+	51: "csharp",
+	52: "cpp",
+	53: "cpp",
+	54: "cpp",
+	55: "cpp",
+	56: "d",
+	57: "elixir",
+	58: "erlang",
+	59: "fortran",
+	60: "go",
+	61: "haskell",
+	62: "java",
+	63: "javascript",
+	64: "lua",
+	65: "ocaml",
+	66: "octave",
+	67: "pascal",
+	68: "php",
+	69: "prolog",
+	70: "python",
+	71: "python",
+	72: "ruby",
+	73: "rust",
+	74: "typescript",
+	75: "c",
+	76: "cpp",
+	78: "kotlin",
+	79: "objectivec",
+	80: "r",
+	81: "scala",
+	82: "sql",
+	83: "swift",
+	84: "vbnet",
+	85: "perl",
+	86: "clojure",
+	87: "fsharp",
+	88: "groovy",
+}
+
+// languageNameFromID returns the canonical lowercase language name for the
+// given Judge0 language ID, or an empty string when the ID is unknown.
+func languageNameFromID(id int) string {
+	return judge0LanguageNames[id]
+}
+
 // AssignmentService defines the business-logic contract for assignment management.
 type AssignmentService interface {
 	CreateAssignment(req *dto.CreateAssignmentRequest, createdBy uuid.UUID, username, ipAddress, userAgent string) (*domain.Assignment, error)
@@ -202,10 +257,14 @@ func (s *assignmentService) CreateAssignment(
 	}
 
 	if req.SampleAnswer != nil {
+		lang := req.SampleAnswer.Language
+		if lang == "" {
+			lang = languageNameFromID(req.SampleAnswer.LanguageID)
+		}
 		answer := &domain.AssignmentSampleAnswer{
 			AssignmentID: assignment.ID,
 			LanguageID:   req.SampleAnswer.LanguageID,
-			Language:     req.SampleAnswer.Language,
+			Language:     lang,
 			Code:         req.SampleAnswer.Code,
 		}
 		if err := s.contentRepo.UpsertSampleAnswer(answer); err != nil {

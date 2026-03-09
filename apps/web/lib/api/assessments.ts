@@ -3,6 +3,7 @@ import type {
     AssignmentResponse,
     ListAssignmentsResponse,
     CreateAssignmentRequest,
+    SampleAnswerDto,
     SubmissionResponse,
     ListSubmissionsResponse,
     SubmissionCodeResponse,
@@ -46,6 +47,15 @@ export const instructorAssessmentsApi = {
     listSubmissions: async (assignmentId: string): Promise<SubmissionResponse[]> => {
         const { data } = await axiosInstance.get<ListSubmissionsResponse>(`/instructor-submissions/assignment/${assignmentId}`);
         return data.submissions || [];
+    },
+
+    /**
+     * Get full submission metadata (including CIPAS analysis fields) for a specific submission.
+     * Backend: GET /submissions/:id
+     */
+    getSubmission: async (submissionId: string): Promise<SubmissionResponse> => {
+        const { data } = await axiosInstance.get<SubmissionResponse>(`/submissions/${submissionId}`);
+        return data;
     },
 
     getRubric: async (assignmentId: string): Promise<ListRubricResponse> => {
@@ -158,6 +168,31 @@ export const studentAssessmentsApi = {
     getSubmissionCode: async (submissionId: string): Promise<SubmissionCodeResponse> => {
         const { data } = await axiosInstance.get<SubmissionCodeResponse>(`/submissions/${submissionId}/code`);
         return data;
+    },
+
+    /**
+     * Get full submission metadata (including CIPAS analysis fields) for a specific submission.
+     * Backend: GET /submissions/:id
+     */
+    getSubmission: async (submissionId: string): Promise<SubmissionResponse> => {
+        const { data } = await axiosInstance.get<SubmissionResponse>(`/submissions/${submissionId}`);
+        return data;
+    },
+
+    /**
+     * Fetch the sample answer for an assignment (used for semantic similarity after submission).
+     * Returns null if no sample answer is configured or on error.
+     * Backend: GET /student-assignments/:id/sample-answer
+     */
+    getAssignmentSampleAnswer: async (assignmentId: string): Promise<SampleAnswerDto | null> => {
+        try {
+            const { data } = await axiosInstance.get<SampleAnswerDto>(
+                `/student-assignments/${assignmentId}/sample-answer`,
+            );
+            return data;
+        } catch {
+            return null;
+        }
     },
 
     /**

@@ -6,6 +6,7 @@ import (
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/domain"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // AssignmentContentRepository handles persistence for the three supplementary
@@ -98,17 +99,16 @@ func (r *assignmentContentRepository) DeleteTestCases(assignmentID uuid.UUID) er
 // Sample answer
 // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-// UpsertSampleAnswer uses an INSERT \u2026 ON CONFLICT DO UPDATE so callers can
-// safely call it regardless of whether a previous answer exists.
+// UpsertSampleAnswer performs a true PostgreSQL INSERT … ON CONFLICT DO UPDATE
+// so the sample answer is always kept in sync with the latest save.
+// There is at most one sample answer per assignment (unique index on assignment_id).
 func (r *assignmentContentRepository) UpsertSampleAnswer(answer *domain.AssignmentSampleAnswer) error {
 	return r.db.
-		Where(domain.AssignmentSampleAnswer{AssignmentID: answer.AssignmentID}).
-		Assign(domain.AssignmentSampleAnswer{
-			LanguageID: answer.LanguageID,
-			Language:   answer.Language,
-			Code:       answer.Code,
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "assignment_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"language_id", "language", "code", "updated_at"}),
 		}).
-		FirstOrCreate(answer).Error
+		Create(answer).Error
 }
 
 func (r *assignmentContentRepository) GetSampleAnswer(assignmentID uuid.UUID) (*domain.AssignmentSampleAnswer, error) {

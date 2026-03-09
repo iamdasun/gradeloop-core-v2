@@ -145,6 +145,53 @@ func (h *StudentHandler) GetAssignment(c fiber.Ctx) error {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /api/v1/student-assignments/:id/sample-answer
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GetAssignmentSampleAnswer returns the sample answer for an assignment.
+// Used by the frontend to compute semantic similarity after a student submits.
+// The authenticated student must be enrolled in the assignment's course instance.
+func (h *StudentHandler) GetAssignmentSampleAnswer(c fiber.Ctx) error {
+	assignmentID, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	assignment, err := h.assignmentService.GetAssignmentByID(assignmentID)
+	if err != nil {
+		return err
+	}
+	if assignment == nil {
+		return utils.ErrNotFound("assignment not found")
+	}
+
+	// Verify the student is enrolled in the course instance that owns this assignment.
+	enrolledIDs, err := h.studentEnrolledCourseIDs(c)
+	if err != nil {
+		return err
+	}
+	if !enrolledIDs[assignment.CourseInstanceID] {
+		return utils.ErrForbidden("you are not enrolled in this course instance")
+	}
+
+	answer, err := h.assignmentService.GetAssignmentSampleAnswer(assignmentID)
+	if err != nil {
+		return err
+	}
+	if answer == nil {
+		return utils.ErrNotFound("no sample answer for this assignment")
+	}
+
+	return c.Status(fiber.StatusOK).JSON(dto.SampleAnswerResponse{
+		ID:           answer.ID.String(),
+		AssignmentID: assignmentID.String(),
+		LanguageID:   answer.LanguageID,
+		Language:     answer.Language,
+		Code:         answer.Code,
+	})
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/v1/student-submissions/me?assignment_id=:id
 // ─────────────────────────────────────────────────────────────────────────────
 

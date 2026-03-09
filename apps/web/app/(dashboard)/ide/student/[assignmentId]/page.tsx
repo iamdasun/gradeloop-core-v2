@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { CodeIDE } from "@/components/ide";
-import { assessmentsApi } from "@/lib/api/assessments";
+import { studentAssessmentsApi } from "@/lib/api/assessments";
 import {
   detectAICode,
   getSemanticSimilarity,
@@ -78,7 +78,7 @@ export default function StudentIDEPage() {
 
       try {
         setIsLoading(true);
-        const data = await assessmentsApi.getAssignment(assignmentId);
+        const data = await studentAssessmentsApi.getAssignment(assignmentId);
         setAssignment(data);
       } catch (err) {
         console.error("Failed to fetch assignment:", err);
@@ -103,9 +103,12 @@ export default function StudentIDEPage() {
     // surfaced as null so they never block the submission flow.
     const [aiRes, semRes] = await Promise.allSettled([
       detectAICode(code),
-      assignment?.sample_answer?.code
-        ? getSemanticSimilarity(code, assignment.sample_answer.code)
-        : Promise.resolve(null),
+      // Fetch the sample answer from its dedicated table endpoint, then compute
+      // semantic similarity only when a sample answer is configured.
+      studentAssessmentsApi
+        .getAssignmentSampleAnswer(assignmentId)
+        .then(sa => (sa?.code ? getSemanticSimilarity(code, sa.code) : null))
+        .catch(() => null),
     ]);
 
     setAiResult(aiRes.status === "fulfilled" ? aiRes.value : null);
@@ -119,7 +122,7 @@ export default function StudentIDEPage() {
     try {
       setIsSubmitting(true);
 
-      const response = await assessmentsApi.submitAssignment({
+      const response = await studentAssessmentsApi.submit({
         assignment_id: assignmentId,
         language: LANGUAGE_ID_TO_NAME[pendingSubmission.language] ?? "python",
         language_id: pendingSubmission.language,

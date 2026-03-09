@@ -6,9 +6,13 @@ import { acafsApi, instructorAssessmentsApi } from "@/lib/api/assessments";
 import type { SubmissionGrade, SubmissionResponse } from "@/types/assessments.types";
 import { GradeResultPanel } from "@/components/assessments/grade-result-panel";
 import { InstructorGradeOverridePanel } from "@/components/instructor/instructor-grade-override-panel";
+import { SemanticSimilarityScore, SemanticSimilarityBar } from "@/components/ui/semantic-similarity-score";
+import { AILikelihoodBadge } from "@/components/clone-detector/AILikelihoodBadge";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { ArrowLeft, BrainCircuit, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
 interface PageProps {
@@ -25,15 +29,21 @@ export default function SubmissionReviewPage({ params }: PageProps) {
     const [pollCount, setPollCount] = useState(0);
     const [gradeError, setGradeError] = useState<string | null>(null);
 
-    // Fetch submission metadata
+    // Fetch full submission metadata (includes CIPAS analysis fields)
     useEffect(() => {
         instructorAssessmentsApi
-            .listSubmissions(assignmentId)
-            .then((resp: SubmissionResponse[]) => {
-                const found = resp.find((s: SubmissionResponse) => s.id === submissionId);
-                if (found) setSubmission(found);
-            })
-            .catch(() => {/* non-critical */});
+            .getSubmission(submissionId)
+            .then((sub) => setSubmission(sub))
+            .catch(() => {
+                // Fallback: search through the list
+                instructorAssessmentsApi
+                    .listSubmissions(assignmentId)
+                    .then((resp: SubmissionResponse[]) => {
+                        const found = resp.find((s: SubmissionResponse) => s.id === submissionId);
+                        if (found) setSubmission(found);
+                    })
+                    .catch(() => {/* non-critical */});
+            });
     }, [assignmentId, submissionId]);
 
     // Poll for grade with exponential back-off
@@ -131,6 +141,49 @@ export default function SubmissionReviewPage({ params }: PageProps) {
                     instructorName={user?.full_name ?? user?.email ?? "Instructor"}
                     onSaved={(updated) => setGrade(updated)}
                 />
+            )}
+
+            {/* ── CIPAS Analysis ──────────────────────────────────────────── */}
+            {submission?.ai_likelihood !== undefined && (
+                <Card className="border-border/60">
+                    <CardContent className="p-5 flex flex-col gap-4">
+                        <div className="flex items-center gap-2">
+                            <BrainCircuit className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                CIPAS Analysis
+                            </p>
+                        </div>
+
+                        <div>
+                            <p className="text-xs text-muted-foreground mb-2">AI Generation Likelihood</p>
+                            <AILikelihoodBadge
+                                aiLikelihood={submission.ai_likelihood}
+                                humanLikelihood={submission.human_likelihood ?? (1 - submission.ai_likelihood)}
+                                showLabel
+                                size="md"
+                            />
+                        </div>
+
+                        {submission.semantic_similarity_score !== undefined && submission.semantic_similarity_score !== null && (
+                            <>
+                                <Separator />
+                                <div className="flex flex-col gap-2">
+                                    <p className="text-xs text-muted-foreground">Similarity to sample answer</p>
+                                    <SemanticSimilarityBar
+                                        score={submission.semantic_similarity_score}
+                                        height="md"
+                                        showLabel
+                                    />
+                                    <SemanticSimilarityScore
+                                        score={submission.semantic_similarity_score}
+                                        size="sm"
+                                        compact={false}
+                                    />
+                                </div>
+                            </>
+                        )}
+                    </CardContent>
+                </Card>
             )}
         </div>
     );
