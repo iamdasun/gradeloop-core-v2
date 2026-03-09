@@ -2,6 +2,7 @@ package migrations
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gradeloop/iam-service/internal/domain"
 	"go.uber.org/zap"
@@ -43,19 +44,41 @@ func (m *Migrator) Run() error {
 	return nil
 }
 
+// isNoColumnError returns true for Postgres "column already exists" errors so
+// we can safely ignore them when using ADD COLUMN without IF NOT EXISTS.
+func isColumnExistsError(err error) bool {
+	return strings.Contains(err.Error(), "already exists") ||
+		strings.Contains(err.Error(), "duplicate column")
+}
+
 func (m *Migrator) migrateUsersToUserType() error {
 	m.logger.Info("migrating existing users to user_type system")
 
-	// First check if user_type column exists, if not create it as nullable
-	if !m.db.Migrator().HasColumn(&domain.User{}, "user_type") {
-		m.logger.Info("creating user_type column as nullable for migration")
-		if err := m.db.Exec("ALTER TABLE users ADD COLUMN user_type VARCHAR(20) DEFAULT NULL").Error; err != nil {
+	// Use IF NOT EXISTS so the statement is always safe to re-run without
+	// requiring an extra introspection round-trip to the database.
+	m.logger.Info("ensuring user_type column exists")
+	if err := m.db.Exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type VARCHAR(20) DEFAULT NULL").Error; err != nil {
+		// Fallback for DBs that don't support IF NOT EXISTS (older Postgres).
+		if !isColumnExistsError(err) {
 			return fmt.Errorf("failed to add user_type column: %w", err)
 		}
 	}
 
-	// Check if we need to migrate from role_id system
-	if !m.db.Migrator().HasColumn(&domain.User{}, "role_id") {
+	// Check if the legacy role_id column is present using a raw query so we
+	// don't block on a Migrator().HasColumn() introspection call.
+	var roleIDExists bool
+	row := m.db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_schema = current_schema()
+			  AND table_name  = 'users'
+			  AND column_name = 'role_id'
+		)`).Row()
+	if err := row.Scan(&roleIDExists); err != nil {
+		return fmt.Errorf("failed to check role_id column: %w", err)
+	}
+
+	if !roleIDExists {
 		m.logger.Info("role_id column does not exist, skipping role-based migration")
 
 		// Just ensure all users have a default user_type
@@ -69,8 +92,21 @@ func (m *Migrator) migrateUsersToUserType() error {
 
 	m.logger.Info("migrating users from role_id to user_type")
 
-	// Update users based on their role names if roles table still exists
-	if m.db.Migrator().HasTable("roles") {
+	// Update users based on their role names if roles table still exists.
+	// Use a raw EXISTS query instead of Migrator().HasTable() to avoid a
+	// second introspection round-trip.
+	var rolesTableExists bool
+	row = m.db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables
+			WHERE table_schema = current_schema()
+			  AND table_name  = 'roles'
+		)`).Row()
+	if err := row.Scan(&rolesTableExists); err != nil {
+		return fmt.Errorf("failed to check roles table: %w", err)
+	}
+
+	if rolesTableExists {
 		// Map role names to user types
 		updateQueries := []struct {
 			RoleName string
@@ -102,8 +138,19 @@ func (m *Migrator) migrateUsersToUserType() error {
 		}
 	}
 
-	// Handle users without roles - set based on profile tables
-	if m.db.Migrator().HasTable("user_profile_students") {
+	// Handle users without roles - set based on profile tables.
+	// Use raw information_schema checks to avoid Migrator().HasTable() calls.
+	var studentsTableExists bool
+	row = m.db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables
+			WHERE table_schema = current_schema()
+			  AND table_name  = 'user_profile_students'
+		)`).Row()
+	if err := row.Scan(&studentsTableExists); err != nil {
+		return fmt.Errorf("failed to check user_profile_students table: %w", err)
+	}
+	if studentsTableExists {
 		result := m.db.Exec(`
 			UPDATE users 
 			SET user_type = 'student'
@@ -116,7 +163,17 @@ func (m *Migrator) migrateUsersToUserType() error {
 		m.logger.Info("set user_type for students based on profile", zap.Int64("affected", result.RowsAffected))
 	}
 
-	if m.db.Migrator().HasTable("user_profile_instructors") {
+	var instructorsTableExists bool
+	row = m.db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables
+			WHERE table_schema = current_schema()
+			  AND table_name  = 'user_profile_instructors'
+		)`).Row()
+	if err := row.Scan(&instructorsTableExists); err != nil {
+		return fmt.Errorf("failed to check user_profile_instructors table: %w", err)
+	}
+	if instructorsTableExists {
 		result := m.db.Exec(`
 			UPDATE users 
 			SET user_type = 'instructor'
