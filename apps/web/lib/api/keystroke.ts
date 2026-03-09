@@ -11,7 +11,7 @@ const GATEWAY_URL = (() => {
     const raw =
         process.env.NEXT_PUBLIC_GATEWAY_URL ||
         process.env.NEXT_PUBLIC_API_URL ||
-        "http://localhost:8000";
+        "http://traefik:8000";
     // Strip trailing "/api/v1" or "/api/v1/" if present
     return raw.replace(/\/api\/v1\/?$/, "");
 })();

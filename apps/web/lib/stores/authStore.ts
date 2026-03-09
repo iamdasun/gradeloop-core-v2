@@ -128,7 +128,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { default: axiosBase } = await import("axios");
           const API_URL =
-            process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+            process.env.NEXT_PUBLIC_API_URL || "http://traefik:8000/api/v1";
 
           // The refresh token lives in an HttpOnly cookie set by the server.
           // withCredentials ensures the browser sends it automatically.

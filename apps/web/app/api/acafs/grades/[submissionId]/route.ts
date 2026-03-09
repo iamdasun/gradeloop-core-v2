@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"
+  process.env.NEXT_PUBLIC_API_URL ?? "http://traefik:8000/api/v1"
 ).replace(/\/+$/, "");
 
 /** Safely parse an upstream response body as JSON, falling back to plain text. */
