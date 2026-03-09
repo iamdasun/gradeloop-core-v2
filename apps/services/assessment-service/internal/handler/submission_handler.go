@@ -220,6 +220,31 @@ func (h *SubmissionHandler) RunCode(c fiber.Ctx) error {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PATCH /submissions/:id/analysis
+// ─────────────────────────────────────────────────────────────────────────────
+
+// PatchAnalysis handles PATCH /submissions/:id/analysis.
+// Stores CIPAS AI detection and semantic similarity scores for a submission.
+// This is a fire-and-forget call from the frontend after code submission.
+func (h *SubmissionHandler) PatchAnalysis(c fiber.Ctx) error {
+	id, err := parseUUID(c, "id")
+	if err != nil {
+		return err
+	}
+
+	var req dto.UpdateAnalysisRequest
+	if err := c.Bind().JSON(&req); err != nil {
+		return utils.ErrBadRequest("invalid request body")
+	}
+
+	if err := h.submissionService.UpdateAnalysis(id, &req); err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusNoContent).Send(nil)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -297,6 +322,16 @@ func toSubmissionResponse(s *domain.Submission) dto.SubmissionResponse {
 				response.TestCaseResults = results
 			}
 		}
+	}
+
+	// Add CIPAS analysis results if present
+	if s.AILikelihood != nil {
+		response.AILikelihood = s.AILikelihood
+		response.HumanLikelihood = s.HumanLikelihood
+		response.IsAIGenerated = s.IsAIGenerated
+		response.AIConfidence = s.AIConfidence
+		response.SemanticSimilarityScore = s.SemanticSimilarityScore
+		response.AnalyzedAt = s.AnalyzedAt
 	}
 
 	return response

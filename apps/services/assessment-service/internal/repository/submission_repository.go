@@ -2,9 +2,11 @@ package repository
 
 import (
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/domain"
+	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/dto"
 	"gorm.io/gorm"
 )
 
@@ -41,6 +43,10 @@ type SubmissionRepository interface {
 	// UpdateExecutionResults updates the submission with Judge0 execution results.
 	// It is called by the queue worker after code execution.
 	UpdateExecutionResults(submission *domain.Submission) error
+
+	// UpdateAnalysis persists the CIPAS AI detection and semantic similarity
+	// scores for a submission.  Called via PATCH /submissions/:id/analysis.
+	UpdateAnalysis(id uuid.UUID, req *dto.UpdateAnalysisRequest) error
 }
 
 // submissionRepository is the concrete GORM-backed implementation.
@@ -230,5 +236,29 @@ func (r *submissionRepository) UpdateExecutionResults(submission *domain.Submiss
 			"total_test_cases":      submission.TotalTestCases,
 			"test_case_results":     submission.TestCaseResults,
 		}).
+		Error
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UpdateAnalysis
+// ─────────────────────────────────────────────────────────────────────────────
+
+// UpdateAnalysis persists CIPAS AI + semantic similarity results on a submission.
+func (r *submissionRepository) UpdateAnalysis(id uuid.UUID, req *dto.UpdateAnalysisRequest) error {
+	now := time.Now().UTC()
+	updates := map[string]interface{}{
+		"ai_likelihood":    req.AILikelihood,
+		"human_likelihood": req.HumanLikelihood,
+		"is_ai_generated":  req.IsAIGenerated,
+		"ai_confidence":    req.AIConfidence,
+		"analyzed_at":      now,
+	}
+	if req.SemanticSimilarityScore != nil {
+		updates["semantic_similarity_score"] = *req.SemanticSimilarityScore
+	}
+	return r.db.
+		Model(&domain.Submission{}).
+		Where("id = ?", id).
+		Updates(updates).
 		Error
 }

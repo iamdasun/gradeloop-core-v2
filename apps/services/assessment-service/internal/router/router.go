@@ -106,6 +106,10 @@ func SetupRoutes(app *fiber.App, cfg Config) {
 	// segment from being swallowed as a UUID param value.
 	submissions.Get("/:id/code", cfg.SubmissionHandler.GetSubmissionCode)
 
+	// PATCH  /api/v1/submissions/:id/analysis   — store CIPAS AI + semantic scores
+	// NOTE: Must be registered BEFORE GET /:id for the same reason as /code above.
+	submissions.Patch("/:id/analysis", cfg.SubmissionHandler.PatchAnalysis)
+
 	// GET    /api/v1/submissions/:id            — get submission metadata
 	submissions.Get("/:id", cfg.SubmissionHandler.GetSubmission)
 

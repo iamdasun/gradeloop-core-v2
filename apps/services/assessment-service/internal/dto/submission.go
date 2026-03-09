@@ -46,6 +46,17 @@ type RunCodeResponse struct {
 	Message       string `json:"message,omitempty"`
 }
 
+// UpdateAnalysisRequest is the payload for PATCH /submissions/:id/analysis.
+// It stores the CIPAS AI detection and semantic similarity scores that were
+// computed on the frontend at submission time.
+type UpdateAnalysisRequest struct {
+	AILikelihood            float64  `json:"ai_likelihood"`
+	HumanLikelihood         float64  `json:"human_likelihood"`
+	IsAIGenerated           bool     `json:"is_ai_generated"`
+	AIConfidence            float64  `json:"ai_confidence"`
+	SemanticSimilarityScore *float64 `json:"semantic_similarity_score,omitempty"`
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Submission Response DTOs
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,6 +95,14 @@ type SubmissionResponse struct {
 	TestCasesPassed   int                     `json:"test_cases_passed,omitempty"`
 	TotalTestCases    int                     `json:"total_test_cases,omitempty"`
 	TestCaseResults   []domain.TestCaseResult `json:"test_case_results,omitempty"`
+
+	// CIPAS analysis results
+	AILikelihood            *float64   `json:"ai_likelihood,omitempty"`
+	HumanLikelihood         *float64   `json:"human_likelihood,omitempty"`
+	IsAIGenerated           *bool      `json:"is_ai_generated,omitempty"`
+	AIConfidence            *float64   `json:"ai_confidence,omitempty"`
+	SemanticSimilarityScore *float64   `json:"semantic_similarity_score,omitempty"`
+	AnalyzedAt              *time.Time `json:"analyzed_at,omitempty"`
 }
 
 // SubmissionCodeResponse wraps the raw source code returned by

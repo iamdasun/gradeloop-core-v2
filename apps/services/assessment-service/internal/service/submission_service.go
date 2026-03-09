@@ -70,6 +70,10 @@ type SubmissionService interface {
 		req *dto.RunCodeRequest,
 		userID uuid.UUID,
 	) (*dto.RunCodeResponse, error)
+
+	// UpdateAnalysis persists the CIPAS AI detection and semantic similarity
+	// scores for a submission.  Called via PATCH /submissions/:id/analysis.
+	UpdateAnalysis(id uuid.UUID, req *dto.UpdateAnalysisRequest) error
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -627,4 +631,20 @@ func (s *submissionService) RunCode(
 		StatusID:      execResult.Status.ID,
 		Message:       execResult.Message,
 	}, nil
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UpdateAnalysis
+// ─────────────────────────────────────────────────────────────────────────────
+
+// UpdateAnalysis stores CIPAS analysis results on an existing submission.
+func (s *submissionService) UpdateAnalysis(id uuid.UUID, req *dto.UpdateAnalysisRequest) error {
+	submission, err := s.submissionRepo.GetSubmission(id)
+	if err != nil {
+		return utils.ErrInternal("failed to load submission", err)
+	}
+	if submission == nil {
+		return utils.ErrNotFound("submission not found")
+	}
+	return s.submissionRepo.UpdateAnalysis(id, req)
 }

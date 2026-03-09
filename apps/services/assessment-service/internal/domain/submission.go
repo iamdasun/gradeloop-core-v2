@@ -87,6 +87,14 @@ type Submission struct {
 	TestCasesPassed     int            `gorm:"" json:"test_cases_passed,omitempty"`
 	TotalTestCases      int            `gorm:"" json:"total_test_cases,omitempty"`
 	TestCaseResults     datatypes.JSON `gorm:"type:jsonb" json:"test_case_results,omitempty"`
+
+	// CIPAS analysis results (populated asynchronously after submission)
+	AILikelihood            *float64   `gorm:"type:numeric(5,4)" json:"ai_likelihood,omitempty"`
+	HumanLikelihood         *float64   `gorm:"type:numeric(5,4)" json:"human_likelihood,omitempty"`
+	IsAIGenerated           *bool      `gorm:"" json:"is_ai_generated,omitempty"`
+	AIConfidence            *float64   `gorm:"type:numeric(5,4)" json:"ai_confidence,omitempty"`
+	SemanticSimilarityScore *float64   `gorm:"type:numeric(6,2)" json:"semantic_similarity_score,omitempty"`
+	AnalyzedAt              *time.Time `gorm:"" json:"analyzed_at,omitempty"`
 }
 
 // TableName overrides the GORM default table name.
