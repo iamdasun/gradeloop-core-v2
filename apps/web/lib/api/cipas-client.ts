@@ -51,8 +51,8 @@ export async function getSimilarityReport(
     headers: { "Content-Type": "application/json" },
   });
 
-  if (res.status === 404) {
-    return null; // No cached report
+  if (res.status === 404 || res.status >= 500) {
+    return null; // No cached report, or persistence layer unavailable
   }
 
   if (!res.ok) {
@@ -76,8 +76,8 @@ export async function getSimilarityReportMetadata(
     headers: { "Content-Type": "application/json" },
   });
 
-  if (res.status === 404) {
-    return null;
+  if (res.status === 404 || res.status >= 500) {
+    return null; // No cached metadata, or persistence layer unavailable
   }
 
   if (!res.ok) {

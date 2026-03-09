@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const CIPAS_SYNTACTICS_URL = process.env.CIPAS_SYNTACTICS_URL || "http://localhost:8086";
+const CIPAS_SYNTACTICS_URL = `${process.env.NEXT_PUBLIC_API_URL}/syntactics`;
 
 export async function GET(
   request: NextRequest,
@@ -21,7 +21,7 @@ export async function GET(
 
     // Forward request to CIPAS Syntactics service
     const response = await fetch(
-      `${CIPAS_SYNTACTICS_URL}/api/v1/syntactics/reports/${assignmentId}/export.csv`,
+      `${CIPAS_SYNTACTICS_URL}/reports/${assignmentId}/export.csv`,
       {
         method: "GET",
         headers: {

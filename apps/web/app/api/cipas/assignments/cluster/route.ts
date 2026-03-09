@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const CIPAS_SYNTACTICS_URL =
-  process.env.CIPAS_SYNTACTICS_URL ||
-  "http://localhost:8086/api/v1/syntactics";
+const CIPAS_SYNTACTICS_URL = `${process.env.NEXT_PUBLIC_API_URL}/syntactics`;
 
 export async function POST(req: NextRequest) {
   try {
