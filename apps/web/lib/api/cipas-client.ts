@@ -9,250 +9,159 @@ import type {
   AIDetectionRequest,
   AIDetectionResponse,
 } from "@/types/cipas";
+import type { UpdateSubmissionAnalysisRequest } from "@/types/assessments.types";
+import { axiosInstance } from "@/lib/api/axios";
 
-// Requests go to the Next.js proxy route — no CORS issues.
-const CLUSTER_ENDPOINT = "/api/cipas/assignments/cluster";
-const REPORTS_ENDPOINT = "/api/cipas/reports";
-const ANNOTATIONS_ENDPOINT = "/api/cipas/annotations";
-const AI_DETECT_ENDPOINT = "/api/v1/ai/detect";
+// Re-export for consumers that previously imported SubmissionAnalysis from here.
+export type { UpdateSubmissionAnalysisRequest as SubmissionAnalysis };
 
-/**
- * Cluster all submissions for an assignment.
- * This runs the full CIPAS syntactic analysis pipeline.
- */
+// Gateway prefixes - all calls go through the Traefik gateway at NEXT_PUBLIC_API_URL.
+// No Next.js proxy routes needed; CORS is handled by Traefik middleware on each service.
+const SYNTACTICS = "/syntactics";
+const AI = "/ai";
+const SEMANTICS = "/semantics";
+
 export async function clusterAssignment(
   request: AssignmentClusterRequest,
 ): Promise<AssignmentClusterResponse> {
-  const res = await fetch(CLUSTER_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(
-      `CIPAS request failed [${res.status}]: ${detail || res.statusText}`,
-    );
-  }
-
-  return res.json() as Promise<AssignmentClusterResponse>;
+  const { data } = await axiosInstance.post<AssignmentClusterResponse>(
+    `${SYNTACTICS}/assignments/cluster`,
+    request,
+  );
+  return data;
 }
 
-/**
- * Get a cached similarity report for an assignment.
- * Returns null if no report exists.
- */
 export async function getSimilarityReport(
   assignmentId: string,
 ): Promise<AssignmentClusterResponse | null> {
-  const res = await fetch(`${REPORTS_ENDPOINT}/${assignmentId}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (res.status === 404 || res.status >= 500) {
-    return null; // No cached report, or persistence layer unavailable
-  }
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(
-      `Failed to fetch similarity report [${res.status}]: ${detail || res.statusText}`,
+  try {
+    const { data } = await axiosInstance.get<AssignmentClusterResponse>(
+      `${SYNTACTICS}/reports/${assignmentId}`,
     );
+    return data;
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 404 || (status !== undefined && status >= 500)) return null;
+    throw err;
   }
-
-  return res.json() as Promise<AssignmentClusterResponse>;
 }
 
-/**
- * Get metadata about a cached similarity report.
- */
 export async function getSimilarityReportMetadata(
   assignmentId: string,
 ): Promise<SimilarityReportMetadata | null> {
-  const res = await fetch(`${REPORTS_ENDPOINT}/${assignmentId}/metadata`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (res.status === 404 || res.status >= 500) {
-    return null; // No cached metadata, or persistence layer unavailable
-  }
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(
-      `Failed to fetch report metadata [${res.status}]: ${detail || res.statusText}`,
+  try {
+    const { data } = await axiosInstance.get<SimilarityReportMetadata>(
+      `${SYNTACTICS}/reports/${assignmentId}/metadata`,
     );
+    return data;
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 404 || (status !== undefined && status >= 500)) return null;
+    throw err;
   }
-
-  return res.json() as Promise<SimilarityReportMetadata>;
 }
 
-/**
- * Create a new instructor annotation for a clone match or group.
- */
 export async function createAnnotation(
   request: CreateAnnotationRequest,
 ): Promise<AnnotationResponse> {
-  const res = await fetch(ANNOTATIONS_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(
-      `Failed to create annotation [${res.status}]: ${detail || res.statusText}`,
-    );
-  }
-
-  return res.json() as Promise<AnnotationResponse>;
+  const { data } = await axiosInstance.post<AnnotationResponse>(
+    `${SYNTACTICS}/annotations`,
+    request,
+  );
+  return data;
 }
 
-/**
- * Update an existing instructor annotation.
- */
 export async function updateAnnotation(
   annotationId: string,
   request: UpdateAnnotationRequest,
 ): Promise<AnnotationResponse> {
-  const res = await fetch(`${ANNOTATIONS_ENDPOINT}/${annotationId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(
-      `Failed to update annotation [${res.status}]: ${detail || res.statusText}`,
-    );
-  }
-
-  return res.json() as Promise<AnnotationResponse>;
+  const { data } = await axiosInstance.patch<AnnotationResponse>(
+    `${SYNTACTICS}/annotations/${annotationId}`,
+    request,
+  );
+  return data;
 }
 
-/**
- * Get all annotations for an assignment.
- */
 export async function getAnnotations(
   assignmentId: string,
   status?: string,
 ): Promise<AnnotationResponse[]> {
-  const url = new URL(
-    `${ANNOTATIONS_ENDPOINT}/assignment/${assignmentId}`,
-    window.location.origin,
+  const params: Record<string, string> = {};
+  if (status) params.status = status;
+  const { data } = await axiosInstance.get<AnnotationResponse[]>(
+    `${SYNTACTICS}/annotations/assignment/${assignmentId}`,
+    { params },
   );
-
-  if (status) {
-    url.searchParams.set("status", status);
-  }
-
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(
-      `Failed to fetch annotations [${res.status}]: ${detail || res.statusText}`,
-    );
-  }
-
-  return res.json() as Promise<AnnotationResponse[]>;
+  return data;
 }
 
-/**
- * Get annotation statistics for an assignment.
- */
 export async function getAnnotationStats(
   assignmentId: string,
 ): Promise<AnnotationStatsResponse> {
-  const res = await fetch(
-    `${ANNOTATIONS_ENDPOINT}/assignment/${assignmentId}/stats`,
-    {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    },
+  const { data } = await axiosInstance.get<AnnotationStatsResponse>(
+    `${SYNTACTICS}/annotations/assignment/${assignmentId}/stats`,
   );
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(
-      `Failed to fetch annotation stats [${res.status}]: ${detail || res.statusText}`,
-    );
-  }
-
-  return res.json() as Promise<AnnotationStatsResponse>;
+  return data;
 }
 
-/**
- * Export a similarity report in the specified format.
- */
 export async function exportSimilarityReport(
   assignmentId: string,
-  format: "pdf" | "csv" = "pdf",
+  _format: "pdf" | "csv" = "csv",
 ): Promise<Blob> {
-  const res = await fetch(
-    `${REPORTS_ENDPOINT}/${assignmentId}/export?format=${format}`,
-    {
-      method: "GET",
-    },
+  const { data } = await axiosInstance.get<Blob>(
+    `${SYNTACTICS}/reports/${assignmentId}/export.csv`,
+    { responseType: "blob" },
   );
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(
-      `Failed to export report [${res.status}]: ${detail || res.statusText}`,
-    );
-  }
-
-  return res.blob();
+  return data;
 }
 
-/**
- * Detect AI-generated code likelihood.
- */
 export async function detectAICode(code: string): Promise<AIDetectionResponse> {
-  const res = await fetch(AI_DETECT_ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code } as AIDetectionRequest),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text();
-    throw new Error(
-      `AI detection failed [${res.status}]: ${detail || res.statusText}`,
-    );
-  }
-
-  return res.json() as Promise<AIDetectionResponse>;
+  const { data } = await axiosInstance.post<AIDetectionResponse>(
+    `${AI}/detect`,
+    { code } as AIDetectionRequest,
+  );
+  return data;
 }
 
-/**
- * Batch detect AI likelihood for multiple submissions.
- * Returns a map of submission_id to AI detection result.
- */
 export async function detectAICodeBatch(
   submissions: Array<{ submission_id: string; source_code: string }>,
 ): Promise<Record<string, AIDetectionResponse>> {
   const results: Record<string, AIDetectionResponse> = {};
-
   await Promise.all(
     submissions.map(async (sub) => {
       try {
-        const result = await detectAICode(sub.source_code);
-        results[sub.submission_id] = result;
+        results[sub.submission_id] = await detectAICode(sub.source_code);
       } catch (error) {
         console.error(`AI detection failed for ${sub.submission_id}:`, error);
       }
     }),
   );
-
   return results;
+}
+
+export async function getSemanticSimilarity(
+  code1: string,
+  code2: string,
+): Promise<number | null> {
+  if (!code1.trim() || !code2.trim()) return null;
+  try {
+    const { data } = await axiosInstance.post<{ similarity_score: number }>(
+      `${SEMANTICS}/similarity`,
+      { code1, code2 },
+    );
+    return Math.round(data.similarity_score * 100);
+  } catch {
+    return null;
+  }
+}
+
+export async function saveSubmissionAnalysis(
+  submissionId: string,
+  analysis: UpdateSubmissionAnalysisRequest,
+): Promise<void> {
+  try {
+    await axiosInstance.patch(`/submissions/${submissionId}/analysis`, analysis);
+  } catch {
+    // Fire-and-forget - failure to persist must not block the submit flow.
+  }
 }
