@@ -10,7 +10,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
@@ -25,12 +24,9 @@ from transformers import (
     AutoTokenizer, 
     Trainer, 
     TrainingArguments, 
-    set_seed,
-    PreTrainedModel,
-    PretrainedConfig
+    set_seed
 )
 from datasets import Dataset, load_dataset
-from typing import Dict, Optional, List, Tuple, Union
 
 warnings.filterwarnings("ignore")
 set_seed(42)
@@ -105,7 +101,8 @@ def supervised_contrastive_loss(features, labels):
 def compute_metrics(p):
     logits = p.predictions
     # Robust unpacking for compiled output
-    if isinstance(logits, tuple): logits = logits[0]
+    if isinstance(logits, tuple):
+        logits = logits[0]
     
     preds = np.argmax(logits, axis=1)
     labels = p.label_ids

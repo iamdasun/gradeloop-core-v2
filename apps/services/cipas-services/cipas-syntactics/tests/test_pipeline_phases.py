@@ -171,7 +171,7 @@ class TestFragmenter:
         assert len(frags) > 0
 
     def test_sliding_window_generated_for_long_code(self):
-        from clone_detection.preprocessor import Fragmenter, SLIDING_WINDOW_MIN_TOKENS
+        from clone_detection.preprocessor import Fragmenter
         fragmenter = Fragmenter("java")
         # Build code with many tokens
         long_method = "public void longMethod() {\n" + "    int x = 0;\n" * 60 + "}"

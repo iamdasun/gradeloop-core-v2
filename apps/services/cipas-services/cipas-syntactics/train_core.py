@@ -6,7 +6,6 @@ This module contains the actual training implementation, separated from CLI hand
 """
 
 import json
-import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -549,7 +548,7 @@ def train(
 
     # Final metrics
     y_pred_best = (y_proba_test >= best["threshold"]).astype(int)
-    from sklearn.metrics import accuracy_score, confusion_matrix, roc_auc_score
+    from sklearn.metrics import accuracy_score, roc_auc_score
 
     test_acc = accuracy_score(y_test, y_pred_best)
     test_prec = precision_score(y_test, y_pred_best, zero_division=0)

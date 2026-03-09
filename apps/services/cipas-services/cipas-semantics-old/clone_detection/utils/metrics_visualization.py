@@ -22,16 +22,15 @@ from typing import Any, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import seaborn as sns
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
-    PrecisionRecallDisplay,
     RocCurveDisplay,
     auc,
     confusion_matrix,
     precision_recall_curve,
     roc_curve,
+    roc_auc_score,
 )
 
 # Configure matplotlib for non-interactive backend

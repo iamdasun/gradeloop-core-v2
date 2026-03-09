@@ -733,8 +733,6 @@ class SheneamerFeatureExtractor:
             control_paths = self._estimate_control_paths(root_node)
             scope_depth = self._calculate_scope_depth(root_node)
 
-            loc = max(len(code.splitlines()), 1)
-
             return [
                 max_depth / 20.0,  # Normalize assuming max depth ~20
                 avg_depth / 20.0,

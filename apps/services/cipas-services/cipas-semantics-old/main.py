@@ -15,10 +15,9 @@ Features:
 - Accurate detection of functionally equivalent code
 """
 
-import logging
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI, status
+from fastapi import APIRouter, FastAPI
 
 from clone_detection.utils.common_setup import setup_logging
 from routes import (
