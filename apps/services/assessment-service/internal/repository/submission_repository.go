@@ -4,9 +4,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/domain"
 	"github.com/4yrg/gradeloop-core-v2/assessment-service/internal/dto"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -224,17 +224,17 @@ func (r *submissionRepository) UpdateExecutionResults(submission *domain.Submiss
 		Model(&domain.Submission{}).
 		Where("id = ?", submission.ID).
 		Updates(map[string]interface{}{
-			"status":                submission.Status,
-			"execution_stdout":      submission.ExecutionStdout,
-			"execution_stderr":      submission.ExecutionStderr,
-			"compile_output":        submission.CompileOutput,
-			"execution_status":      submission.ExecutionStatus,
-			"execution_status_id":   submission.ExecutionStatusID,
-			"execution_time":        submission.ExecutionTime,
-			"memory_used":           submission.MemoryUsed,
-			"test_cases_passed":     submission.TestCasesPassed,
-			"total_test_cases":      submission.TotalTestCases,
-			"test_case_results":     submission.TestCaseResults,
+			"status":              submission.Status,
+			"execution_stdout":    submission.ExecutionStdout,
+			"execution_stderr":    submission.ExecutionStderr,
+			"compile_output":      submission.CompileOutput,
+			"execution_status":    submission.ExecutionStatus,
+			"execution_status_id": submission.ExecutionStatusID,
+			"execution_time":      submission.ExecutionTime,
+			"memory_used":         submission.MemoryUsed,
+			"test_cases_passed":   submission.TestCasesPassed,
+			"total_test_cases":    submission.TotalTestCases,
+			"test_case_results":   submission.TestCaseResults,
 		}).
 		Error
 }

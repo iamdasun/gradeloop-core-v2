@@ -77,16 +77,16 @@ type Submission struct {
 	SubmittedAt time.Time `gorm:"not null"          json:"submitted_at"`
 
 	// Judge0 execution results
-	ExecutionStdout     string         `gorm:"type:text" json:"execution_stdout,omitempty"`
-	ExecutionStderr     string         `gorm:"type:text" json:"execution_stderr,omitempty"`
-	CompileOutput       string         `gorm:"type:text" json:"compile_output,omitempty"`
-	ExecutionStatus     string         `gorm:"type:varchar(50)" json:"execution_status,omitempty"`
-	ExecutionStatusID   int            `gorm:"" json:"execution_status_id,omitempty"`
-	ExecutionTime       string         `gorm:"type:varchar(20)" json:"execution_time,omitempty"`
-	MemoryUsed          int            `gorm:"" json:"memory_used,omitempty"`
-	TestCasesPassed     int            `gorm:"" json:"test_cases_passed,omitempty"`
-	TotalTestCases      int            `gorm:"" json:"total_test_cases,omitempty"`
-	TestCaseResults     datatypes.JSON `gorm:"type:jsonb" json:"test_case_results,omitempty"`
+	ExecutionStdout   string         `gorm:"type:text" json:"execution_stdout,omitempty"`
+	ExecutionStderr   string         `gorm:"type:text" json:"execution_stderr,omitempty"`
+	CompileOutput     string         `gorm:"type:text" json:"compile_output,omitempty"`
+	ExecutionStatus   string         `gorm:"type:varchar(50)" json:"execution_status,omitempty"`
+	ExecutionStatusID int            `gorm:"" json:"execution_status_id,omitempty"`
+	ExecutionTime     string         `gorm:"type:varchar(20)" json:"execution_time,omitempty"`
+	MemoryUsed        int            `gorm:"" json:"memory_used,omitempty"`
+	TestCasesPassed   int            `gorm:"" json:"test_cases_passed,omitempty"`
+	TotalTestCases    int            `gorm:"" json:"total_test_cases,omitempty"`
+	TestCaseResults   datatypes.JSON `gorm:"type:jsonb" json:"test_case_results,omitempty"`
 
 	// CIPAS analysis results (populated asynchronously after submission)
 	AILikelihood            *float64   `gorm:"type:numeric(5,4)" json:"ai_likelihood,omitempty"`
