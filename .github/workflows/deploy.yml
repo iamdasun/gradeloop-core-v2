@@ -25,7 +25,7 @@ jobs:
             git pull origin main
 
             # Build and deploy microservices and frontend using docker-compose.prod.yaml
-            docker-compose -f docker-compose.prod.yaml up --build -d
+            docker compose -f docker-compose.prod.yaml up --build -d
 
             # Prune old Docker layers to save disk space
             docker system prune -f

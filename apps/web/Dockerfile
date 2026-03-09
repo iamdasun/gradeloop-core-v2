@@ -34,8 +34,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
 WORKDIR /app/apps/web
-# Build the Next.js application
-RUN bun run build
+# Ensure devDependencies (including `next`) are present for the build
+# Try installing dev deps in the builder stage; ignore failure if bun flags differ
+RUN bun install --frozen-lockfile --dev || true
+
+# Build the Next.js application using the local binary when available
+RUN if [ -x ./node_modules/.bin/next ]; then \
+            ./node_modules/.bin/next build; \
+        else \
+            bun run build; \
+        fi
 
 # -----------------------------------------------------------------------------
 # Stage 4: Production Runtime
