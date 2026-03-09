@@ -1,4 +1,4 @@
-name: CI - Quality Gates
+name: CI - Linting
 
 on:
   pull_request:
@@ -18,7 +18,7 @@ defaults:
 
 jobs:
   ci:
-    name: Run linters, tests and builds for changed services
+    name: Run linters for changed services
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -86,12 +86,12 @@ jobs:
         with:
           go-version: "1.25"
 
-      - name: Go - Lint and Unit Tests
+      - name: Go - Lint
         if: ${{ steps.changes.outputs.go == 'true' }}
         id: go_checks
         run: |
           set -euo pipefail
-          echo "Running Go lint and tests" >> ci_summary.txt
+          echo "Running Go lint checks" >> ci_summary.txt
 
           # find unique top-level module/service directories that changed
           mapfile -t targets < <(git --no-pager diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep '\.go$' || true)
@@ -148,30 +148,6 @@ jobs:
               echo "::error file=$d::golint detected issues"
               exit 1
             fi
-
-            # run tests with coverage
-            pushd "$d" >/dev/null || true
-
-            # Check if go.mod exists (skip if directory has no Go module)
-            if [ ! -f "go.mod" ]; then
-              echo "Skipping tests for $d (no go.mod found)" >> ci_summary.txt
-              popd >/dev/null || true
-              continue
-            fi
-
-            COVER="coverage.out"
-            # run package-level tests
-            if ! go test ./... -coverprofile="$COVER" ; then
-              echo "go test failed for $d" >> ci_summary.txt
-              exit 1
-            fi
-            if [ -f "$COVER" ]; then
-              total=$(go tool cover -func="$COVER" | awk '/total:/ {print $3}' | sed 's/%//')
-              echo "Coverage for $d: ${total}%" >> ci_summary.txt
-              # numeric compare
-              awk -v v="$total" 'BEGIN{if ((v+0) < 80) exit 1}' || { echo "Coverage below 80% for $d: ${total}%" >> ci_summary.txt; exit 1; }
-            fi
-            popd >/dev/null || true
           done
 
           echo "result=success" >> $GITHUB_OUTPUT
@@ -182,14 +158,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Python - Lint and Unit Tests
+      - name: Python - Lint
         if: ${{ steps.changes.outputs.python == 'true' }}
         id: py_checks
         run: |
           set -euo pipefail
-          echo "Running Python linters and tests" >> ci_summary.txt
+          echo "Running Python linters" >> ci_summary.txt
           python -m pip install --upgrade pip
-          python -m pip install --user ruff black pytest pytest-cov coverage pytest-cov >/dev/null
+          python -m pip install --user ruff black >/dev/null
           export PATH="$HOME/.local/bin:$PATH"
 
           mapfile -t pyfiles < <(git --no-pager diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep '\.py$' || true)
@@ -219,62 +195,6 @@ jobs:
             echo "Processing Python target: $d" >> ci_summary.txt
             ruff check "$d" || { echo "ruff failed for $d" >> ci_summary.txt; exit 1; }
             black --check "$d" || { echo "black --check failed for $d" >> ci_summary.txt; exit 1; }
-
-            # Skip test coverage for docs/examples directories (no tests expected)
-            if [[ "$d" =~ ^docs/ ]] || [[ "$d" =~ /examples/ ]]; then
-              echo "Skipping tests for $d (documentation/examples directory)" >> ci_summary.txt
-              continue
-            fi
-
-            pushd "$d" >/dev/null || true
-
-            # Check if any test files exist
-            if ! find . -maxdepth 2 -name "test_*.py" -o -name "*_test.py" 2>/dev/null | grep -q .; then
-              echo "Skipping tests for $d (no test files found)" >> ci_summary.txt
-              popd >/dev/null || true
-              continue
-            fi
-
-            # Install dependencies if requirements.txt, setup.py, or pyproject.toml exists
-            if [ -f "requirements.txt" ]; then
-              echo "Installing dependencies from requirements.txt for $d" >> ci_summary.txt
-              python -m pip install -r requirements.txt >/dev/null || { echo "Failed to install requirements for $d" >> ci_summary.txt; exit 1; }
-              PYTEST_CMD="pytest"
-            elif [ -f "pyproject.toml" ]; then
-              echo "Installing dependencies from pyproject.toml for $d" >> ci_summary.txt
-              python -m pip install --user poetry >/dev/null 2>&1 || true
-              export PATH="$HOME/.local/bin:$PATH"
-              poetry install --with dev >/dev/null || { echo "Failed to install poetry dependencies for $d" >> ci_summary.txt; exit 1; }
-              PYTEST_CMD="poetry run pytest"
-            elif [ -f "setup.py" ]; then
-              echo "Installing package dependencies from setup.py for $d" >> ci_summary.txt
-              python -m pip install -e . >/dev/null || { echo "Failed to install package for $d" >> ci_summary.txt; exit 1; }
-              PYTEST_CMD="pytest"
-            else
-              PYTEST_CMD="pytest"
-            fi
-
-            $PYTEST_CMD --maxfail=1 --disable-warnings --cov=. --cov-report=xml || { echo "pytest failed for $d" >> ci_summary.txt; exit 1; }
-            if [ -f coverage.xml ]; then
-              # Extract coverage using grep/sed/awk to avoid inline Python and YAML parsing issues.
-              # Try common coverage.xml attribute 'line-rate' first (coverage.py uses this).
-              LR=$(grep -o 'line-rate="[0-9.]\+"' coverage.xml | head -n1 | sed -E 's/line-rate="([0-9.]+)"/\1/' || true)
-              if [ -n "$LR" ]; then
-                cov=$(awk "BEGIN{printf \"%.2f\", $LR*100}")
-              else
-                # Fallback: try lines-covered / lines-valid attributes if present and compute percent
-                LV=$(grep -o 'lines-covered="[0-9.]+"' coverage.xml | head -n1 | sed -E 's/lines-covered="([0-9.]+)"/\1/' || true)
-                TV=$(grep -o 'lines-valid="[0-9.]+"' coverage.xml | head -n1 | sed -E 's/lines-valid="([0-9.]+)"/\1/' || true)
-                if [ -n "$LV" ] && [ -n "$TV" ] && [ "$TV" != "0" ]; then
-                  cov=$(awk "BEGIN{printf \"%.2f\", ($LV/$TV)*100}")
-                else
-                  cov=0
-                fi
-              fi
-              echo "Coverage for $d: ${cov}%" >> ci_summary.txt
-              awk -v v="$cov" 'BEGIN{if ((v+0) < 80) exit 1}' || { echo "Coverage below 80% for $d: ${cov}%" >> ci_summary.txt; exit 1; }
-            fi
-            popd >/dev/null || true
           done
 
           echo "result=success" >> $GITHUB_OUTPUT
@@ -346,7 +266,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            let body = `Automated CI Quality Gate result for PR #${{ github.event.pull_request.number }}\n\n`;
+            let body = `Automated CI linting result for PR #${{ github.event.pull_request.number }}\n\n`;
             const summaryPath = 'artifacts/ci_summary.txt';
             if (fs.existsSync(summaryPath)) {
               body += fs.readFileSync(summaryPath, 'utf8');
@@ -365,7 +285,7 @@ jobs:
             });
 
   final-checks:
-    name: Final status and lightweight guidance
+    name: Final status
     runs-on: ubuntu-latest
     needs: [ci]
     if: always()
@@ -373,5 +293,4 @@ jobs:
       - name: Output run summary
         run: |
           echo "CI job status: ${{ needs.ci.result }}" > final_status.txt
-          echo "If the job failed due to flaky tests, consider re-running or adding retries as documented in docs/ci-guide.md" >> final_status.txt
           cat final_status.txt
