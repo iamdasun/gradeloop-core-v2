@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .core.config import settings
+from .endpoints import detection as detection_module
 from .endpoints.detection import router as detection_router
 from .models.inference import SemanticCloneDetector
 

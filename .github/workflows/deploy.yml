@@ -19,16 +19,13 @@ jobs:
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           passphrase: ${{ secrets.AZURE_VM_SSH_PASSPHRASE }} # Optional
           script: |
-            cd /home/iamdasun/Projects/4yrg/gradeloop-core-v2
-            
+            cd /home/azureuser/Projects/4yrg/gradeloop-core-v2
+
             # Pull latest changes
             git pull origin main
-            
-            # Use production environment config
-            cp .env.production .env
-            
+
             # Build and deploy microservices and frontend using docker-compose.prod.yaml
             docker-compose -f docker-compose.prod.yaml up --build -d
-            
+
             # Prune old Docker layers to save disk space
             docker system prune -f
