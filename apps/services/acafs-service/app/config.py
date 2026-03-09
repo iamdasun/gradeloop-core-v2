@@ -59,17 +59,7 @@ class Settings(BaseSettings):
     ast_max_lines: int = Field(default=5000, alias="AST_MAX_LINES")
     ast_timeout_seconds: int = Field(default=2, alias="AST_TIMEOUT_SECONDS")
 
-    # ── LLM: Gemini (rubric grading) ──────────────────────────────────────────
-    gemini_api_key: str = Field(
-        default="SET_YOUR_API_KEY_HERE",
-        alias="GEMINI_API_KEY",
-    )
-    gemini_model: str = Field(
-        default="gemini-2.5-flash",
-        alias="GEMINI_MODEL",
-    )
-
-    # ── LLM: OpenRouter (Socratic chat + reasoning pass) ────────────────────
+    # ── LLM: OpenRouter (Pass-1 reasoning + Pass-2 grading + Socratic chat) ──
     openrouter_api_key: str = Field(
         default="SET_YOUR_API_KEY_HERE",
         alias="OPENROUTER_API_KEY",
@@ -86,6 +76,11 @@ class Settings(BaseSettings):
     openrouter_reasoner_model: str = Field(
         default="qwen/qwen3-vl-235b-a22b-thinking",
         alias="OPENROUTER_REASONER_MODEL",
+    )
+    # Pass-2 structured grading model — Qwen3 235B (non-thinking) by default
+    openrouter_grader_model: str = Field(
+        default="qwen/qwen3-235b-a22b",
+        alias="OPENROUTER_GRADER_MODEL",
     )
 
     # ── Judge0 (test-case execution) ──────────────────────────────────────────

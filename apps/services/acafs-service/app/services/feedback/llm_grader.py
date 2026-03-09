@@ -7,31 +7,29 @@ every rubric criterion.  It reasons in plain prose — no JSON, no scores.
 For deterministic criteria it interprets test-case evidence (including partial
 runs) and for LLM/AST criteria it reasons about code quality and patterns.
 
-Pass 2 — Gemini grading (google-genai)
-=======================================
-Gemini 2.5 Flash receives the full grading prompt PLUS the Qwen reasoning chain
-as a [PRIOR DEEP ANALYSIS] block.  It uses that reasoning as grounding context
-to produce the final structured JSON grade.
+Pass 2 — Qwen grading (OpenRouter)
+=====================================
+A second Qwen model receives the full grading prompt PLUS the Pass-1 reasoning
+chain as a [PRIOR DEEP ANALYSIS] block.  JSON mode is requested so the response
+conforms directly to the grade schema without needing a separate parser.
 
 Fallback
 =========
 If Pass 1 fails (timeout, API error, etc.) the grader logs a warning and
-continues with Pass 2 alone (Gemini without prior reasoning), preserving the
-pre-existing behaviour.
+continues with Pass 2 alone (Qwen grader without prior reasoning), preserving
+the pre-existing behaviour.
 
 Grading-mode routing:
   deterministic  → test-case pass/fail counts (authoritative).  Qwen reasons
-                   about evidence quality; Gemini scores; Judge0 overrides.
-  llm            → Gemini reasons over student code vs sample answer.
+                   about evidence quality; Qwen grader scores; Judge0 overrides.
+  llm            → Qwen grader reasons over student code vs sample answer.
   llm_ast        → Same as llm but with AST blueprint injected.
 """
 
-import asyncio
 import json
 from typing import Any
 
 import httpx
-from google import genai
 
 from app.config import Settings
 from app.logging_config import get_logger
@@ -47,25 +45,19 @@ _OPENROUTER_TIMEOUT = 120.0  # seconds — Qwen thinking can be slow
 
 
 class LLMGrader:
-    """Two-pass rubric grader: Qwen reasoning (OpenRouter) → Gemini scoring."""
+    """Two-pass rubric grader: Qwen reasoning (OpenRouter) → Qwen grader (OpenRouter)."""
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self._client: genai.Client | None = None
 
     @property
     def _is_mock(self) -> bool:
-        return self.settings.gemini_api_key in _MOCK_PLACEHOLDERS
+        return self.settings.openrouter_api_key in _MOCK_PLACEHOLDERS
 
     @property
     def _has_reasoner(self) -> bool:
         """True when a valid OpenRouter key is configured for Pass 1."""
         return self.settings.openrouter_api_key not in _MOCK_PLACEHOLDERS
-
-    def _get_client(self) -> genai.Client:
-        if self._client is None:
-            self._client = genai.Client(api_key=self.settings.gemini_api_key)
-        return self._client
 
     # ── public API ─────────────────────────────────────────────────────────
 
@@ -85,8 +77,8 @@ class LLMGrader:
           - LLM/AST: analyses code quality, patterns, gaps.
           - Skipped (with warning) if OPENROUTER_API_KEY is not configured.
 
-        Pass 2 (Gemini): produces structured JSON grade, optionally grounded
-          in the Pass-1 reasoning chain.
+        Pass 2 (Qwen via OpenRouter): produces structured JSON grade, optionally
+          grounded in the Pass-1 reasoning chain.
 
         Returns a dict with keys:
           criteria_scores  – list of {name, analysis, band_selected,
@@ -96,7 +88,7 @@ class LLMGrader:
           holistic_feedback – single string with three \n\n-separated paragraphs
         """
         if self._is_mock:
-            logger.warning("llm_grading_mock", reason="GEMINI_API_KEY not configured")
+            logger.warning("llm_grading_mock", reason="OPENROUTER_API_KEY not configured")
             return self._mock_response(rubric_data)
 
         # ── Pass 1: Qwen reasoning ──────────────────────────────────────────
@@ -124,7 +116,7 @@ class LLMGrader:
                     "reasoning_pass_failed",
                     model=self.settings.openrouter_reasoner_model,
                     error=str(e),
-                    fallback="proceeding with Gemini-only grading",
+                    fallback="proceeding with Qwen grader without prior reasoning",
                 )
                 prior_reasoning = None
         else:
@@ -133,7 +125,7 @@ class LLMGrader:
                 reason="OPENROUTER_API_KEY not configured",
             )
 
-        # ── Pass 2: Gemini grading ──────────────────────────────────────────
+        # ── Pass 2: Qwen grading (OpenRouter) ──────────────────────────────
         grading_prompt = build_rubric_evaluation_prompt(
             rubric_data=rubric_data,
             student_code=student_code,
@@ -142,7 +134,7 @@ class LLMGrader:
             assignment_context=assignment_context,
             prior_reasoning=prior_reasoning,
         )
-        return await self._call_gemini(grading_prompt, rubric_data)
+        return await self._call_openrouter_grader(grading_prompt, rubric_data)
 
     # ── private: Pass-1 OpenRouter call ────────────────────────────────────
 
@@ -171,22 +163,31 @@ class LLMGrader:
             data = response.json()
         return data["choices"][0]["message"]["content"]
 
-    # ── private: Pass-2 Gemini call ─────────────────────────────────────────
+    # ── private: Pass-2 Qwen grader call (OpenRouter) ──────────────────────
 
-    async def _call_gemini(
+    async def _call_openrouter_grader(
         self, prompt: str, rubric_data: list[dict[str, Any]]
     ) -> dict[str, Any]:
-        """Call Gemini with the grading prompt and parse the JSON response."""
+        """Call the Qwen grader via OpenRouter and parse the structured JSON response."""
         try:
-            client = self._get_client()
-            response = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: client.models.generate_content(
-                    model=self.settings.gemini_model,
-                    contents=prompt,
-                ),
-            )
-            text = response.text.strip()
+            headers = {
+                "Authorization": f"Bearer {self.settings.openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://gradeloop.app",
+                "X-Title": "GradeLoop ACAFS Grader",
+            }
+            payload = {
+                "model": self.settings.openrouter_grader_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"},
+                "provider": {"allow_fallbacks": False},
+            }
+            url = self.settings.openrouter_base_url.rstrip("/") + "/chat/completions"
+            async with httpx.AsyncClient(timeout=_OPENROUTER_TIMEOUT) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                data = response.json()
+            text = data["choices"][0]["message"]["content"].strip()
             if text.startswith("```json"):
                 text = text[7:]
             if text.startswith("```"):
@@ -197,6 +198,7 @@ class LLMGrader:
             result = self._normalise_feedback(result)
             logger.info(
                 "llm_grading_complete",
+                model=self.settings.openrouter_grader_model,
                 total_score=result.get("total_score"),
                 criteria_count=len(result.get("criteria_scores", [])),
             )
@@ -262,7 +264,7 @@ class LLMGrader:
                 "score": partial,
                 "max_score": weight,
                 "grading_mode": c.get("grading_mode", "llm"),
-                "reason": "Mock evaluation — Gemini API key not configured.",
+                "reason": "Mock evaluation — OpenRouter API key not configured.",
                 "confidence": 0.0,
             })
         return {
