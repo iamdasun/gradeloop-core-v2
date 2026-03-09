@@ -6,7 +6,6 @@ This module contains the actual evaluation implementation.
 """
 
 import json
-import logging
 import random
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,8 +14,6 @@ from typing import Optional
 import numpy as np
 from sklearn.metrics import (
     accuracy_score,
-    classification_report,
-    confusion_matrix,
     f1_score,
     precision_score,
     recall_score,

@@ -8,11 +8,18 @@
  * - Green  = only in right submission
  * - Arrows on each panel header to cycle through submissions independently
  * - Jump prev/next buttons to navigate between clone blocks
+ * - AI likelihood badges shown in panel headers
  */
 
 import { useRef, useState, useCallback } from "react";
-import { ChevronLeft, ChevronRight, ChevronsDown, ChevronsUp } from "lucide-react";
-import type { SubmissionItem } from "@/types/cipas";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+} from "lucide-react";
+import type { SubmissionItem, AIDetectionResponse } from "@/types/cipas";
+import { AILikelihoodBadge } from "./AILikelihoodBadge";
 
 type LineTag = "equal" | "insert" | "delete";
 
@@ -26,7 +33,7 @@ function computeLCS(a: string[], b: string[]): boolean[][] {
   const m = a.length;
   const n = b.length;
   const dp: number[][] = Array.from({ length: m + 1 }, () =>
-    new Array(n + 1).fill(0)
+    new Array(n + 1).fill(0),
   );
   for (let i = m - 1; i >= 0; i--) {
     for (let j = n - 1; j >= 0; j--) {
@@ -39,7 +46,7 @@ function computeLCS(a: string[], b: string[]): boolean[][] {
   }
   // Backtrack to mark matching pairs
   const matched: boolean[][] = Array.from({ length: m }, () =>
-    new Array(n).fill(false)
+    new Array(n).fill(false),
   );
   let i = 0;
   let j = 0;
@@ -121,7 +128,10 @@ function cloneBlockIndices(lines: DiffLine[]): number[] {
   let inBlock = false;
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].tag === "equal") {
-      if (!inBlock) { starts.push(i); inBlock = true; }
+      if (!inBlock) {
+        starts.push(i);
+        inBlock = true;
+      }
     } else {
       inBlock = false;
     }
@@ -136,15 +146,26 @@ interface PanelHeaderProps {
   onPrev: () => void;
   onNext: () => void;
   side: "left" | "right";
+  aiDetection?: AIDetectionResponse;
 }
 
-function PanelHeader({ label, index, total, onPrev, onNext, side }: PanelHeaderProps) {
+function PanelHeader({
+  label,
+  index,
+  total,
+  onPrev,
+  onNext,
+  side,
+  aiDetection,
+}: PanelHeaderProps) {
   const base =
     side === "left"
       ? "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
       : "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400";
   return (
-    <div className={`flex items-center gap-1 px-2 py-1.5 ${base} border-b border-zinc-200 dark:border-zinc-700`}>
+    <div
+      className={`flex items-center gap-2 px-2 py-1.5 ${base} border-b border-zinc-200 dark:border-zinc-700`}
+    >
       <button
         onClick={onPrev}
         disabled={total <= 1}
@@ -153,7 +174,10 @@ function PanelHeader({ label, index, total, onPrev, onNext, side }: PanelHeaderP
       >
         <ChevronLeft className="h-3.5 w-3.5" />
       </button>
-      <span className="flex-1 text-xs font-semibold truncate text-center" title={label}>
+      <span
+        className="flex-1 text-xs font-semibold truncate text-center"
+        title={label}
+      >
         {label}
         {total > 1 && (
           <span className="ml-1 font-normal opacity-60">
@@ -161,6 +185,14 @@ function PanelHeader({ label, index, total, onPrev, onNext, side }: PanelHeaderP
           </span>
         )}
       </span>
+      {aiDetection && (
+        <AILikelihoodBadge
+          aiLikelihood={aiDetection.ai_likelihood}
+          humanLikelihood={aiDetection.human_likelihood}
+          showLabel={false}
+          size="sm"
+        />
+      )}
       <button
         onClick={onNext}
         disabled={total <= 1}
@@ -178,15 +210,28 @@ export interface DiffViewerProps {
   submissions: SubmissionItem[];
   initialLeftId: string;
   initialRightId: string;
+  /** Optional AI detection results map keyed by submission_id */
+  aiDetectionMap?: Record<string, AIDetectionResponse>;
 }
 
-export function DiffViewer({ submissions, initialLeftId, initialRightId }: DiffViewerProps) {
+export function DiffViewer({
+  submissions,
+  initialLeftId,
+  initialRightId,
+  aiDetectionMap,
+}: DiffViewerProps) {
   // initialLeftId / initialRightId are student_id values (from edge.student_a/b)
-  const [leftIdx, setLeftIdx] = useState(
-    () => Math.max(0, submissions.findIndex((s) => s.student_id === initialLeftId))
+  const [leftIdx, setLeftIdx] = useState(() =>
+    Math.max(
+      0,
+      submissions.findIndex((s) => s.student_id === initialLeftId),
+    ),
   );
-  const [rightIdx, setRightIdx] = useState(
-    () => Math.max(0, submissions.findIndex((s) => s.student_id === initialRightId))
+  const [rightIdx, setRightIdx] = useState(() =>
+    Math.max(
+      0,
+      submissions.findIndex((s) => s.student_id === initialRightId),
+    ),
   );
   const [cloneBlockCursor, setCloneBlockCursor] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -198,9 +243,10 @@ export function DiffViewer({ submissions, initialLeftId, initialRightId }: DiffV
   const cycle = (cur: number, delta: number) =>
     (cur + delta + submissions.length) % submissions.length;
 
-  const lines = leftSub && rightSub
-    ? diffLines(leftSub.source_code, rightSub.source_code)
-    : [];
+  const lines =
+    leftSub && rightSub
+      ? diffLines(leftSub.source_code, rightSub.source_code)
+      : [];
 
   const cloneStarts = cloneBlockIndices(lines);
 
@@ -215,7 +261,7 @@ export function DiffViewer({ submissions, initialLeftId, initialRightId }: DiffV
       const row = rowRefs.current[cloneStarts[next]];
       row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     },
-    [cloneBlockCursor, cloneStarts]
+    [cloneBlockCursor, cloneStarts],
   );
 
   if (!leftSub || !rightSub) {
@@ -237,6 +283,7 @@ export function DiffViewer({ submissions, initialLeftId, initialRightId }: DiffV
           total={submissions.length}
           onPrev={() => setLeftIdx((i) => cycle(i, -1))}
           onNext={() => setLeftIdx((i) => cycle(i, 1))}
+          aiDetection={aiDetectionMap?.[leftSub.submission_id]}
         />
         <div className="border-l border-zinc-200 dark:border-zinc-700">
           <PanelHeader
@@ -246,6 +293,7 @@ export function DiffViewer({ submissions, initialLeftId, initialRightId }: DiffV
             total={submissions.length}
             onPrev={() => setRightIdx((i) => cycle(i, -1))}
             onNext={() => setRightIdx((i) => cycle(i, 1))}
+            aiDetection={aiDetectionMap?.[rightSub.submission_id]}
           />
         </div>
       </div>
@@ -254,7 +302,8 @@ export function DiffViewer({ submissions, initialLeftId, initialRightId }: DiffV
       {cloneStarts.length > 0 && (
         <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400">
           <span className="text-xs font-medium flex-1">
-            {cloneStarts.length} clone block{cloneStarts.length !== 1 ? "s" : ""} detected
+            {cloneStarts.length} clone block
+            {cloneStarts.length !== 1 ? "s" : ""} detected
           </span>
           <button
             onClick={() => jumpToBlock("prev")}
@@ -280,7 +329,9 @@ export function DiffViewer({ submissions, initialLeftId, initialRightId }: DiffV
             return (
               <div
                 key={idx}
-                ref={(el) => { rowRefs.current[idx] = el; }}
+                ref={(el) => {
+                  rowRefs.current[idx] = el;
+                }}
                 className="grid grid-cols-2 bg-amber-50 dark:bg-amber-950/25"
               >
                 <div className="px-3 py-0.5 whitespace-pre-wrap break-all text-amber-900 dark:text-amber-200 border-l-2 border-amber-400 dark:border-amber-600">
@@ -296,7 +347,9 @@ export function DiffViewer({ submissions, initialLeftId, initialRightId }: DiffV
             return (
               <div
                 key={idx}
-                ref={(el) => { rowRefs.current[idx] = el; }}
+                ref={(el) => {
+                  rowRefs.current[idx] = el;
+                }}
                 className="grid grid-cols-2"
               >
                 <div className="px-3 py-0.5 whitespace-pre-wrap break-all bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border-l-2 border-red-400 dark:border-red-600">
@@ -309,7 +362,9 @@ export function DiffViewer({ submissions, initialLeftId, initialRightId }: DiffV
           return (
             <div
               key={idx}
-              ref={(el) => { rowRefs.current[idx] = el; }}
+              ref={(el) => {
+                rowRefs.current[idx] = el;
+              }}
               className="grid grid-cols-2"
             >
               <div className="px-3 py-0.5 bg-zinc-50 dark:bg-zinc-800/40" />

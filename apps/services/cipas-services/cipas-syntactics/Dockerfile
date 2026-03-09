@@ -13,7 +13,6 @@ WORKDIR /app
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Install build dependencies
@@ -26,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml ./
 
 # Install dependencies directly (package-mode = false in pyproject.toml)
-RUN pip install --no-cache-dir \
+RUN pip install \
     fastapi \
     uvicorn \
     pydantic \
@@ -44,11 +43,13 @@ RUN pip install --no-cache-dir \
     networkx \
     tqdm \
     textual \
-    rich
+    rich \
+    asyncpg
 
 # Copy application code
-COPY main.py routes.py schemas.py ./
+COPY main.py routes.py schemas.py database.py ./
 COPY clone_detection/ ./clone_detection/
+COPY repositories/ ./repositories/
 
 # Verify tree-sitter tokenizer installation
 RUN python -c "from clone_detection.tokenizers.tree_sitter_tokenizer import TreeSitterTokenizer; TreeSitterTokenizer(); print('Tree-sitter parsers loaded successfully')" 2>/dev/null || true
@@ -75,8 +76,9 @@ COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY --from=builder /app/main.py /app/routes.py /app/schemas.py ./
+COPY --from=builder /app/main.py /app/routes.py /app/schemas.py /app/database.py ./
 COPY --from=builder /app/clone_detection ./clone_detection
+COPY --from=builder /app/repositories ./repositories
 
 # Create models directory and non-root user
 RUN mkdir -p /app/models \
@@ -102,10 +104,11 @@ FROM builder AS development
 WORKDIR /app
 
 # Install dev dependencies
-RUN pip install --no-cache-dir pytest 2>/dev/null || true
+RUN pip install pytest 2>/dev/null || true
 
-COPY main.py routes.py schemas.py ./
+COPY main.py routes.py schemas.py database.py ./
 COPY clone_detection/ ./clone_detection/
+COPY repositories/ ./repositories/
 
 EXPOSE 8086
 

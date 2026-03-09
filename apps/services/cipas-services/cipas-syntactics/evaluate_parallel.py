@@ -33,7 +33,6 @@ import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 from sklearn.metrics import (
@@ -470,9 +469,6 @@ def evaluate_parallel(
     y_proba_final = []
     clone_type_data = {}  # For per-clone-type metrics
 
-    nicad_routes = 0
-    xgb_routes = 0
-
     # Use ProcessPoolExecutor for parallel processing
     with ProcessPoolExecutor(max_workers=workers) as executor:
         # Submit all tasks
@@ -524,8 +520,6 @@ def evaluate_parallel(
 
         tp = int(np.sum((ct_y == 1) & (ct_pred == 1)))
         fn = int(np.sum((ct_y == 1) & (ct_pred == 0)))
-        fp = 0  # Not tracked per-type in this simplified version
-        tn = 0
 
         recall_ct = tp / (tp + fn) if (tp + fn) > 0 else 0.0
         precision_ct = 1.0  # Simplified

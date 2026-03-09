@@ -13,31 +13,44 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SubmissionsForm } from "@/components/clone-detector/SubmissionsForm";
 import { CollusionGroupCard } from "@/components/clone-detector/CollusionGroupCard";
-import { clusterAssignment } from "@/lib/api/cipas-client";
+import { AILikelihoodCompact } from "@/components/clone-detector/AILikelihoodBadge";
+import { clusterAssignment, detectAICodeBatch } from "@/lib/api/cipas-client";
 import type {
   AssignmentClusterRequest,
   AssignmentClusterResponse,
   SubmissionItem,
+  AIDetectionResponse,
 } from "@/types/cipas";
 
 export default function CloneDetectorPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isAiLoading, setIsAiLoading] = useState(false);
   const [result, setResult] = useState<AssignmentClusterResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastSubmissions, setLastSubmissions] = useState<SubmissionItem[]>([]);
+  const [aiDetectionMap, setAiDetectionMap] = useState<
+    Record<string, AIDetectionResponse>
+  >({});
 
   const handleSubmit = async (req: AssignmentClusterRequest) => {
     setIsLoading(true);
     setError(null);
     setResult(null);
+    setAiDetectionMap({});
     setLastSubmissions(req.submissions);
     try {
       const res = await clusterAssignment(req);
       setResult(res);
+
+      // Run AI detection on all submissions
+      setIsAiLoading(true);
+      const aiResults = await detectAICodeBatch(req.submissions);
+      setAiDetectionMap(aiResults);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
+      setIsAiLoading(false);
     }
   };
 
@@ -48,7 +61,9 @@ export default function CloneDetectorPage() {
         <div className="max-w-5xl mx-auto flex items-center gap-3">
           <ShieldCheck className="h-6 w-6 text-orange-500" />
           <div>
-            <h1 className="text-lg font-semibold leading-tight">Clone Detector</h1>
+            <h1 className="text-lg font-semibold leading-tight">
+              Clone Detector
+            </h1>
             <p className="text-xs text-zinc-500">
               CIPAS Syntactics · Plagiarism &amp; Collusion Analysis
             </p>
@@ -152,6 +167,7 @@ export default function CloneDetectorPage() {
                     group={group}
                     submissions={lastSubmissions}
                     index={idx}
+                    aiDetectionMap={aiDetectionMap}
                   />
                 ))}
               </div>
@@ -159,51 +175,81 @@ export default function CloneDetectorPage() {
 
             {/* Per-submission breakdown */}
             <div className="space-y-3">
-              <h2 className="text-base font-semibold">Per-Submission Breakdown</h2>
+              <h2 className="text-base font-semibold">
+                Per-Submission Breakdown
+              </h2>
               <div className="overflow-x-auto rounded-md border border-zinc-200 dark:border-zinc-700">
                 <table className="w-full text-sm">
                   <thead className="bg-zinc-50 dark:bg-zinc-800/50 text-xs text-zinc-500 uppercase tracking-wide">
                     <tr>
-                      <th className="px-4 py-2.5 text-left font-medium">Submission</th>
-                      <th className="px-4 py-2.5 text-left font-medium">Student</th>
-                      <th className="px-4 py-2.5 text-right font-medium">Fragments</th>
-                      <th className="px-4 py-2.5 text-right font-medium">Candidates</th>
-                      <th className="px-4 py-2.5 text-right font-medium">Confirmed Clones</th>
-                      <th className="px-4 py-2.5 text-left font-medium">Errors</th>
+                      <th className="px-4 py-2.5 text-left font-medium">
+                        Submission
+                      </th>
+                      <th className="px-4 py-2.5 text-left font-medium">
+                        Student
+                      </th>
+                      <th className="px-4 py-2.5 text-right font-medium">
+                        Fragments
+                      </th>
+                      <th className="px-4 py-2.5 text-right font-medium">
+                        Candidates
+                      </th>
+                      <th className="px-4 py-2.5 text-right font-medium">
+                        Confirmed Clones
+                      </th>
+                      <th className="px-4 py-2.5 text-left font-medium">
+                        AI Likelihood
+                      </th>
+                      <th className="px-4 py-2.5 text-left font-medium">
+                        Errors
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                    {result.per_submission.map((ps) => (
-                      <tr
-                        key={ps.submission_id}
-                        className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
-                      >
-                        <td className="px-4 py-2.5 font-mono text-xs text-zinc-600 dark:text-zinc-400">
-                          {ps.submission_id}
-                        </td>
-                        <td className="px-4 py-2.5">{ps.student_id}</td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
-                          {ps.fragment_count}
-                        </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
-                          {ps.candidate_pair_count}
-                        </td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
-                          {ps.confirmed_clone_count > 0 ? (
-                            <span className="text-red-500 font-semibold">
-                              {ps.confirmed_clone_count}
-                            </span>
-                          ) : (
-                            <span className="text-green-600 dark:text-green-400">0</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 text-xs text-red-500">
-                          {ps.errors.length > 0
-                            ? ps.errors.join("; ")
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))}
+                    {result.per_submission.map((ps) => {
+                      const aiDetection = aiDetectionMap[ps.submission_id];
+                      return (
+                        <tr
+                          key={ps.submission_id}
+                          className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30"
+                        >
+                          <td className="px-4 py-2.5 font-mono text-xs text-zinc-600 dark:text-zinc-400">
+                            {ps.submission_id}
+                          </td>
+                          <td className="px-4 py-2.5">{ps.student_id}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">
+                            {ps.fragment_count}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">
+                            {ps.candidate_pair_count}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">
+                            {ps.confirmed_clone_count > 0 ? (
+                              <span className="text-red-500 font-semibold">
+                                {ps.confirmed_clone_count}
+                              </span>
+                            ) : (
+                              <span className="text-green-600 dark:text-green-400">
+                                0
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {aiDetection ? (
+                              <AILikelihoodCompact
+                                aiLikelihood={aiDetection.ai_likelihood}
+                                humanLikelihood={aiDetection.human_likelihood}
+                              />
+                            ) : (
+                              <span className="text-xs text-zinc-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-red-500">
+                            {ps.errors.length > 0 ? ps.errors.join("; ") : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

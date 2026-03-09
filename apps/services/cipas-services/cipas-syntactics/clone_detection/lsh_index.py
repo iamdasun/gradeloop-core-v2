@@ -48,15 +48,16 @@ logger = setup_logging(__name__)
 # Constants
 # ────────────────────────────────────────────────────────────────────────────
 
-DEFAULT_NUM_PERM: int = 128      # signature length (hash count)
-DEFAULT_THRESHOLD: float = 0.3   # minimum Jaccard for bucket sharing
-                                  # low enough to catch Type-3; ~95 % reduction
+DEFAULT_NUM_PERM: int = 128  # signature length (hash count)
+DEFAULT_THRESHOLD: float = 0.3  # minimum Jaccard for bucket sharing
+# low enough to catch Type-3; ~95 % reduction
 DEFAULT_BANDS: Optional[int] = None  # let datasketch choose b/r split
 
 
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def _build_minhash(tokens: list[str], num_perm: int = DEFAULT_NUM_PERM) -> MinHash:
     """Create a MinHash signature from an abstract token list."""
@@ -79,6 +80,7 @@ def deserialize_minhash(data: bytes) -> MinHash:
 # ────────────────────────────────────────────────────────────────────────────
 # MinHashIndexer
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class MinHashIndexer:
     """
@@ -205,9 +207,7 @@ class MinHashIndexer:
 
     # ── Rebuild from persisted signatures ──────────────────────────────────
 
-    def rebuild_from_db(
-        self, records: Iterable[tuple[str, bytes]]
-    ) -> int:
+    def rebuild_from_db(self, records: Iterable[tuple[str, bytes]]) -> int:
         """
         Rebuild the in-memory LSH index from persisted signature bytes.
 
@@ -244,9 +244,7 @@ class MinHashIndexer:
 
     def clear(self) -> None:
         """Reset the entire index (useful in tests)."""
-        self._lsh = MinHashLSH(
-            threshold=self._threshold, num_perm=self._num_perm
-        )
+        self._lsh = MinHashLSH(threshold=self._threshold, num_perm=self._num_perm)
         self._store.clear()
 
 
@@ -254,9 +252,8 @@ class MinHashIndexer:
 # Candidate pair deduplification helper
 # ────────────────────────────────────────────────────────────────────────────
 
-def deduplicate_pairs(
-    pairs: Iterable[tuple[str, str]]
-) -> list[tuple[str, str]]:
+
+def deduplicate_pairs(pairs: Iterable[tuple[str, str]]) -> list[tuple[str, str]]:
     """
     Deduplicate (a, b) / (b, a) candidate pairs and drop self-pairs.
 

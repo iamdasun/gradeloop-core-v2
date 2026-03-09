@@ -130,27 +130,32 @@ def is_type3_clone(
     if clone_probability < prob_floor:
         logger.debug(
             "Type-3 filter: REJECT (prob=%.3f < floor=%.2f)",
-            clone_probability, prob_floor,
+            clone_probability,
+            prob_floor,
         )
         return False
 
     if levenshtein > lev_upper:
         logger.debug(
             "Type-3 filter: REJECT (lev=%.3f > %.2f → likely Type-1/2)",
-            levenshtein, lev_upper,
+            levenshtein,
+            lev_upper,
         )
         return False
 
     if ast_sim > ast_upper:
         logger.debug(
             "Type-3 filter: REJECT (ast_jaccard=%.3f > %.2f → likely Type-1/2)",
-            ast_sim, ast_upper,
+            ast_sim,
+            ast_upper,
         )
         return False
 
     logger.debug(
         "Type-3 filter: ACCEPT (prob=%.3f, lev=%.3f, ast=%.3f)",
-        clone_probability, levenshtein, ast_sim,
+        clone_probability,
+        levenshtein,
+        ast_sim,
     )
     return True
 

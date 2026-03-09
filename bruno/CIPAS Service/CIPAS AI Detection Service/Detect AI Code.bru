@@ -1,0 +1,22 @@
+meta {
+  name: Detect AI Code
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{CIPAS_AI_URL_V1}}/detect
+  body: json
+  auth: inherit
+}
+
+body:json {
+  
+  {"code":"#include <stdio.h>\\nint main(){int n; long long a=0,b=1,next; scanf(\"%d\",&n); for(int i=0;i<n;i++){ printf(\"%lld \",a); next=a+b; a=b; b=next;} return 0;}\\n"}
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

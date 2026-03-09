@@ -43,18 +43,19 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Optional
 
-
 # ────────────────────────────────────────────────────────────────────────────
 # Data classes
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class CloneEdge:
     """Weighted edge between two students."""
+
     student_a: str
     student_b: str
-    clone_type: str          # "Type-1" | "Type-2" | "Type-3"
-    confidence: float        # max confidence across fragment pairs
+    clone_type: str  # "Type-1" | "Type-2" | "Type-3"
+    confidence: float  # max confidence across fragment pairs
     frag_a_ids: list[str] = field(default_factory=list)
     frag_b_ids: list[str] = field(default_factory=list)
     match_count: int = 1
@@ -63,11 +64,12 @@ class CloneEdge:
 @dataclass
 class CollusionGroup:
     """A connected component in the student graph."""
+
     group_id: int
     member_ids: list[str]
     edges: list[CloneEdge] = field(default_factory=list)
     max_confidence: float = 0.0
-    dominant_type: str = "Unknown"   # most severe clone type in the group
+    dominant_type: str = "Unknown"  # most severe clone type in the group
 
     @property
     def size(self) -> int:
@@ -87,6 +89,7 @@ class CollusionGroup:
 # ────────────────────────────────────────────────────────────────────────────
 # Union-Find (Disjoint Set Union)
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class _UnionFind:
     def __init__(self) -> None:
@@ -175,7 +178,9 @@ class CollusionGraph:
         if key in self._edges:
             existing = self._edges[key]
             # Keep the most severe type
-            if _TYPE_SEVERITY.get(clone_type, 0) > _TYPE_SEVERITY.get(existing.clone_type, 0):
+            if _TYPE_SEVERITY.get(clone_type, 0) > _TYPE_SEVERITY.get(
+                existing.clone_type, 0
+            ):
                 existing.clone_type = clone_type
             # Keep max confidence
             existing.confidence = max(existing.confidence, confidence)
@@ -219,7 +224,9 @@ class CollusionGraph:
         Returns list of groups sorted by size (descending), then by max
         confidence (descending).
         """
-        threshold = min_confidence if min_confidence is not None else self._min_confidence
+        threshold = (
+            min_confidence if min_confidence is not None else self._min_confidence
+        )
         uf = _UnionFind()
 
         # Ensure every node is registered even if it has no edges
@@ -242,7 +249,8 @@ class CollusionGraph:
 
             member_set = set(members)
             group_edges = [
-                e for e in active_edges
+                e
+                for e in active_edges
                 if e.student_a in member_set or e.student_b in member_set
             ]
 
@@ -254,13 +262,15 @@ class CollusionGraph:
                     key=lambda e: (_TYPE_SEVERITY.get(e.clone_type, 0), e.confidence),
                 ).clone_type
 
-            groups.append(CollusionGroup(
-                group_id=gid,
-                member_ids=sorted(members),
-                edges=group_edges,
-                max_confidence=max_conf,
-                dominant_type=dominant,
-            ))
+            groups.append(
+                CollusionGroup(
+                    group_id=gid,
+                    member_ids=sorted(members),
+                    edges=group_edges,
+                    max_confidence=max_conf,
+                    dominant_type=dominant,
+                )
+            )
 
         groups.sort(key=lambda g: (-g.size, -g.max_confidence))
         # Re-number after sort

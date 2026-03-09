@@ -41,7 +41,7 @@ Usage
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, Sequence
 
 from .normalizers.universal_mapper import UniversalTokenMapper
@@ -54,58 +54,62 @@ logger = setup_logging(__name__)
 # Constants
 # ────────────────────────────────────────────────────────────────────────────
 
-SLIDING_WINDOW_MIN_TOKENS: int = 50   # emit windows for blocks longer than this
+SLIDING_WINDOW_MIN_TOKENS: int = 50  # emit windows for blocks longer than this
 WINDOW_SIZE: int = 40
 WINDOW_STRIDE: int = 10
 TEMPLATE_JACCARD_THRESHOLD: float = 0.90  # discard if ≥ this similarity vs template
 
 # CST node types treated as "top-level structural blocks"
-_STRUCTURAL_BLOCK_TYPES: frozenset[str] = frozenset([
-    # Functions / methods
-    "function_definition",        # Python, C
-    "method_declaration",         # Java
-    "constructor_declaration",    # Java
-    "local_function_statement",   # C#
-    "arrow_function",
-    "lambda_expression",
-    # Classes
-    "class_declaration",          # Java, Python, C#
-    "class_definition",           # Python
-    "interface_declaration",
-    "enum_declaration",
-    "struct_specifier",           # C
-    "record_declaration",
-    # Control blocks (standalone)
-    "if_statement",
-    "for_statement",
-    "enhanced_for_statement",
-    "foreach_statement",
-    "while_statement",
-    "do_statement",
-    "switch_statement",
-    "switch_expression",
-    "try_statement",
-    "with_statement",
-    "match_statement",
-])
+_STRUCTURAL_BLOCK_TYPES: frozenset[str] = frozenset(
+    [
+        # Functions / methods
+        "function_definition",  # Python, C
+        "method_declaration",  # Java
+        "constructor_declaration",  # Java
+        "local_function_statement",  # C#
+        "arrow_function",
+        "lambda_expression",
+        # Classes
+        "class_declaration",  # Java, Python, C#
+        "class_definition",  # Python
+        "interface_declaration",
+        "enum_declaration",
+        "struct_specifier",  # C
+        "record_declaration",
+        # Control blocks (standalone)
+        "if_statement",
+        "for_statement",
+        "enhanced_for_statement",
+        "foreach_statement",
+        "while_statement",
+        "do_statement",
+        "switch_statement",
+        "switch_expression",
+        "try_statement",
+        "with_statement",
+        "match_statement",
+    ]
+)
 
 
 # ────────────────────────────────────────────────────────────────────────────
 # Data model
 # ────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class Fragment:
     """A single code fragment extracted from a submission."""
+
     submission_id: str
     student_id: str
     assignment_id: str
     language: str
-    raw_source: str            # Original source text of this fragment
-    abstract_tokens: list[str] # Universal-mapped token stream (for MinHash)
+    raw_source: str  # Original source text of this fragment
+    abstract_tokens: list[str]  # Universal-mapped token stream (for MinHash)
     token_count: int
-    byte_offset: int           # Byte offset in the original file
-    fragment_type: str         # "structural" | "window" | "whole_file"
+    byte_offset: int  # Byte offset in the original file
+    fragment_type: str  # "structural" | "window" | "whole_file"
     node_type: Optional[str] = None  # CST node type if structural
     is_template: bool = False
     # Populated after LSH indexing:
@@ -116,6 +120,7 @@ class Fragment:
 # ────────────────────────────────────────────────────────────────────────────
 # Fragmenter
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class Fragmenter:
     """
@@ -167,10 +172,14 @@ class Fragmenter:
                         fragments.append(frag)
                         # Slide if block is long
                         fragments.extend(
-                            self._slide_over(frag, submission_id, student_id, assignment_id)
+                            self._slide_over(
+                                frag, submission_id, student_id, assignment_id
+                            )
                         )
             except Exception as exc:
-                logger.warning("Tree-sitter segmentation failed for %s: %s", ts_lang, exc)
+                logger.warning(
+                    "Tree-sitter segmentation failed for %s: %s", ts_lang, exc
+                )
 
         # ── 2. Regex fallback for C# or when Tree-sitter produced nothing ──
         if not fragments or ts_lang is None:
@@ -248,7 +257,9 @@ class Fragmenter:
         results: list[tuple[str, str, int]],
     ) -> None:
         if node.type in _STRUCTURAL_BLOCK_TYPES:
-            text = code_bytes[node.start_byte: node.end_byte].decode("utf-8", errors="ignore")
+            text = code_bytes[node.start_byte : node.end_byte].decode(
+                "utf-8", errors="ignore"
+            )
             if text.strip():
                 results.append((text, node.type, node.start_byte))
             # Don't recurse inside a matched block to avoid double-counting;
@@ -257,9 +268,7 @@ class Fragmenter:
         for child in node.children:
             self._walk(child, code_bytes, results)
 
-    def _extract_blocks_regex(
-        self, source: str
-    ) -> list[tuple[str, int]]:
+    def _extract_blocks_regex(self, source: str) -> list[tuple[str, int]]:
         """
         Fallback block extractor using brace matching.
 
@@ -345,7 +354,7 @@ class Fragmenter:
         windows: list[Fragment] = []
         start = 0
         while start + WINDOW_SIZE <= len(tokens):
-            window_tokens = tokens[start: start + WINDOW_SIZE]
+            window_tokens = tokens[start : start + WINDOW_SIZE]
             # Reconstruct a rough raw_source slice (best-effort)
             raw_approx = " ".join(window_tokens)
             w = Fragment(
@@ -369,6 +378,7 @@ class Fragmenter:
 # ────────────────────────────────────────────────────────────────────────────
 # Template Filter
 # ────────────────────────────────────────────────────────────────────────────
+
 
 class TemplateFilter:
     """
@@ -446,7 +456,8 @@ class TemplateFilter:
                 f.is_template = True
                 logger.debug(
                     "Fragment (sub=%s, off=%d) discarded: matches instructor template",
-                    f.submission_id, f.byte_offset,
+                    f.submission_id,
+                    f.byte_offset,
                 )
             else:
                 clean.append(f)
@@ -456,6 +467,7 @@ class TemplateFilter:
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ────────────────────────────────────────────────────────────────────────────
+
 
 def _jaccard(a: frozenset[str], b: frozenset[str]) -> float:
     if not a and not b:

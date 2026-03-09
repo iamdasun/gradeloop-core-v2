@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CheckSquare, Settings } from "lucide-react";
+import { LayoutDashboard, CheckSquare, Settings, BarChart3 } from "lucide-react";
 import { instructorAssessmentsApi } from "@/lib/api/assessments";
 import { useUIStore } from "@/lib/stores/uiStore";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,7 @@ export default function AssignmentLayout({
             items: [
                 { name: "Overview", href: basePath },
                 { name: "Submissions", href: `${basePath}/submissions` },
+                { name: "Similarity", href: `${basePath}/similarity` },
                 { name: "Settings", href: `${basePath}/settings` },
             ],
         });
@@ -77,6 +78,7 @@ export default function AssignmentLayout({
             items: [
                 { name: "Overview", href: basePath },
                 { name: "Submissions", href: `${basePath}/submissions` },
+                { name: "Similarity", href: `${basePath}/similarity` },
                 { name: "Settings", href: `${basePath}/settings` },
             ],
         });
@@ -86,6 +88,7 @@ export default function AssignmentLayout({
     const mobileTabs = [
         { name: "Overview", href: basePath, icon: LayoutDashboard },
         { name: "Submissions", href: `${basePath}/submissions`, icon: CheckSquare },
+        { name: "Similarity", href: `${basePath}/similarity`, icon: BarChart3 },
         { name: "Settings", href: `${basePath}/settings`, icon: Settings },
     ];
 

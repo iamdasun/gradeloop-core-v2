@@ -5,7 +5,7 @@ meta {
 }
 
 post {
-  url: {{CIPAS_SEMANTICS_URL_V1}}/compare
+  url: {{CIPAS_SEMANTICS_URL_V1}}/detect
   body: json
   auth: inherit
 }
@@ -13,9 +13,7 @@ post {
 body:json {
   {
     "code1": "int sum(int a, int b) { return a + b; }",
-    "code2": "int add(int x, int y) { int result = x + y; return result; }",
-    "language": "java"
-  }
+    "code2": "int add(int x, int y) { int result = x + y; return result; }"
 }
 
 settings {

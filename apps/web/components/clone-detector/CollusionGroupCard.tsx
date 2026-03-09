@@ -5,9 +5,18 @@ import { AlertTriangle, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DiffViewer } from "./DiffViewer";
-import type { CollusionGroup, CollusionEdge, SubmissionItem } from "@/types/cipas";
+import { AILikelihoodBadge } from "./AILikelihoodBadge";
+import type {
+  CollusionGroup,
+  CollusionEdge,
+  SubmissionItem,
+  AIDetectionResponse,
+} from "@/types/cipas";
 
-const CLONE_TYPE_VARIANT: Record<string, "destructive" | "secondary" | "outline"> = {
+const CLONE_TYPE_VARIANT: Record<
+  string,
+  "destructive" | "secondary" | "outline"
+> = {
   "Type-1": "destructive",
   "Type-2": "destructive",
   "Type-3": "secondary",
@@ -23,9 +32,16 @@ interface CollusionGroupCardProps {
   group: CollusionGroup;
   submissions: SubmissionItem[];
   index: number;
+  /** Optional AI detection results map keyed by submission_id */
+  aiDetectionMap?: Record<string, AIDetectionResponse>;
 }
 
-export function CollusionGroupCard({ group, submissions, index }: CollusionGroupCardProps) {
+export function CollusionGroupCard({
+  group,
+  submissions,
+  index,
+  aiDetectionMap,
+}: CollusionGroupCardProps) {
   // group.member_ids contain student_id values (set by cascade_worker from frag.student_id)
   const groupSubs = group.member_ids
     .map((id) => submissions.find((s) => s.student_id === id))
@@ -33,7 +49,7 @@ export function CollusionGroupCard({ group, submissions, index }: CollusionGroup
 
   const firstEdge = group.edges[0];
   const [activeEdge, setActiveEdge] = useState<CollusionEdge | null>(
-    firstEdge ?? null
+    firstEdge ?? null,
   );
 
   const members = groupSubs
@@ -59,7 +75,9 @@ export function CollusionGroupCard({ group, submissions, index }: CollusionGroup
           <span>·</span>
           <span>{group.edge_count} clone pairs</span>
           <span>·</span>
-          <span className={`font-semibold ${CONFIDENCE_COLOR(group.max_confidence)}`}>
+          <span
+            className={`font-semibold ${CONFIDENCE_COLOR(group.max_confidence)}`}
+          >
             max confidence {(group.max_confidence * 100).toFixed(0)}%
           </span>
         </div>
@@ -82,10 +100,10 @@ export function CollusionGroupCard({ group, submissions, index }: CollusionGroup
             <div className="flex flex-wrap gap-2">
               {group.edges.map((edge, i) => {
                 const subA = submissions.find(
-                  (s) => s.submission_id === edge.student_a
+                  (s) => s.submission_id === edge.student_a,
                 );
                 const subB = submissions.find(
-                  (s) => s.submission_id === edge.student_b
+                  (s) => s.submission_id === edge.student_b,
                 );
                 const isActive =
                   activeEdge?.student_a === edge.student_a &&
@@ -110,7 +128,9 @@ export function CollusionGroupCard({ group, submissions, index }: CollusionGroup
                     >
                       {edge.clone_type}
                     </Badge>
-                    <span className={`font-mono ${CONFIDENCE_COLOR(edge.confidence)}`}>
+                    <span
+                      className={`font-mono ${CONFIDENCE_COLOR(edge.confidence)}`}
+                    >
                       {(edge.confidence * 100).toFixed(0)}%
                     </span>
                   </button>
@@ -127,6 +147,7 @@ export function CollusionGroupCard({ group, submissions, index }: CollusionGroup
             submissions={groupSubs}
             initialLeftId={activeEdge.student_a}
             initialRightId={activeEdge.student_b}
+            aiDetectionMap={aiDetectionMap}
           />
         ) : (
           <p className="text-sm text-zinc-400 text-center py-4">

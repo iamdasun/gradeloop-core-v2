@@ -23,20 +23,16 @@ from fastapi import HTTPException, status
 
 from clone_detection.cascade_worker import (
     CascadeWorker,
-    CloneMatch,
     InMemoryDB,
-    IngestionResult,
 )
 from clone_detection.collusion_graph import CollusionGraph
 from clone_detection.features.syntactic_features import SyntacticFeatureExtractor
 from clone_detection.lsh_index import MinHashIndexer
 from clone_detection.models.classifiers import SyntacticClassifier
 from clone_detection.normalizers.structural_normalizer import (
-    NormalizationLevel,
     StructuralNormalizer,
 )
 from clone_detection.pipelines import (
-    TieredDetectionResult,
     TieredPipeline,
 )
 from clone_detection.preprocessor import Fragmenter, TemplateFilter
@@ -151,6 +147,7 @@ def _get_model_status() -> dict[str, ModelStatus]:
 
 # ── Phase 1–4 singleton accessors ──────────────────────────────────────────
 
+
 def _get_db() -> InMemoryDB:
     global _db
     if _db is None:
@@ -241,9 +238,7 @@ def compare_codes(
             is_clone=detection_result.is_clone,
             confidence=detection_result.confidence,
             clone_type=(
-                detection_result.clone_type
-                if detection_result.is_clone
-                else None
+                detection_result.clone_type if detection_result.is_clone else None
             ),
             pipeline_used="Syntactic Cascade (Type-1 → Type-2 → Type-3)",
             normalization_level=detection_result.normalization_level,
@@ -436,7 +431,12 @@ def ingest_submission(request: SubmissionIngestRequest) -> IngestionResponse:
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Ingestion failed for submission %s: %s", request.submission_id, exc, exc_info=True)
+        logger.error(
+            "Ingestion failed for submission %s: %s",
+            request.submission_id,
+            exc,
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ingestion failed: {exc}",
@@ -460,6 +460,7 @@ def register_template(request: TemplateRegisterRequest) -> TemplateRegisterRespo
         # Persist token sets in the DB for persistence across restarts
         db = _get_db()
         from clone_detection.preprocessor import Fragmenter
+
         fragmenter = Fragmenter(request.language.value)
         frags = fragmenter.segment(
             request.source_code,
@@ -574,7 +575,12 @@ def cluster_assignment(request: AssignmentClusterRequest) -> AssignmentClusterRe
     2. Ingest each submission: segment → template-filter → LSH index → cascade → graph.
     3. Compute connected components of the resulting collusion graph.
     4. Return per-submission summaries + collusion groups.
+    5. Persist report to database for future retrieval.
     """
+    import time
+
+    start_time = time.time()
+
     try:
         # ── Isolated pipeline ─────────────────────────────────────────────
         isolated_db = InMemoryDB()
@@ -610,7 +616,8 @@ def cluster_assignment(request: AssignmentClusterRequest) -> AssignmentClusterRe
                 )
                 logger.info(
                     "Registered instructor template for %s (%d fragments)",
-                    request.assignment_id, len(tpl_frags),
+                    request.assignment_id,
+                    len(tpl_frags),
                 )
             except Exception as exc:
                 logger.warning("Template registration failed (continuing): %s", exc)
@@ -645,7 +652,8 @@ def cluster_assignment(request: AssignmentClusterRequest) -> AssignmentClusterRe
             except Exception as exc:
                 logger.warning(
                     "Submission %s failed during clustering: %s",
-                    sub.submission_id, exc,
+                    sub.submission_id,
+                    exc,
                 )
                 per_submission.append(
                     SubmissionClusterResult(
@@ -691,11 +699,16 @@ def cluster_assignment(request: AssignmentClusterRequest) -> AssignmentClusterRe
 
         logger.info(
             "Assignment %s clustered: %d/%d submissions, %d clone pairs, %d groups",
-            request.assignment_id, processed, len(request.submissions),
-            total_clone_pairs, len(groups_out),
+            request.assignment_id,
+            processed,
+            len(request.submissions),
+            total_clone_pairs,
+            len(groups_out),
         )
 
-        return AssignmentClusterResponse(
+        processing_time = time.time() - start_time
+
+        response = AssignmentClusterResponse(
             assignment_id=request.assignment_id,
             language=request.language.value,
             submission_count=len(request.submissions),
@@ -706,11 +719,403 @@ def cluster_assignment(request: AssignmentClusterRequest) -> AssignmentClusterRe
             per_submission=per_submission,
         )
 
+        # Persist report to database (best effort - don't fail if DB is unavailable)
+        try:
+            from repositories import SimilarityReportRepository
+            import asyncio
+
+            # Run the async save in a new event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(
+                    SimilarityReportRepository.save_report(
+                        report=response,
+                        lsh_threshold=request.lsh_threshold,
+                        min_confidence=request.min_confidence,
+                        processing_time=processing_time,
+                    )
+                )
+                logger.info(
+                    f"Persisted similarity report for assignment {request.assignment_id}"
+                )
+            finally:
+                loop.close()
+        except Exception as exc:
+            logger.warning(
+                f"Failed to persist similarity report for {request.assignment_id}: {exc}. "
+                "Report is still returned to caller."
+            )
+
+        return response
+
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Assignment clustering failed for %s: %s", request.assignment_id, exc, exc_info=True)
+        logger.error(
+            "Assignment clustering failed for %s: %s",
+            request.assignment_id,
+            exc,
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Assignment clustering failed: {exc}",
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Similarity Reports & Annotations
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+async def get_similarity_report(assignment_id: str):
+    """
+    Retrieve a cached similarity report from the database.
+
+    Args:
+        assignment_id: Assignment identifier
+
+    Returns:
+        AssignmentClusterResponse if found
+
+    Raises:
+        HTTPException: 404 if report not found, 500 on database error
+    """
+    try:
+        from repositories import SimilarityReportRepository
+
+        report = await SimilarityReportRepository.get_report(assignment_id)
+
+        if report is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No similarity report found for assignment {assignment_id}",
+            )
+
+        return report
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "Failed to retrieve report for %s: %s", assignment_id, exc, exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve similarity report: {exc}",
+        )
+
+
+async def create_annotation(request):
+    """
+    Create a new instructor annotation.
+
+    Args:
+        request: CreateAnnotationRequest
+
+    Returns:
+        AnnotationResponse with the created annotation
+
+    Raises:
+        HTTPException: 400 on invalid request, 500 on database error
+    """
+    try:
+        from repositories import InstructorAnnotationRepository
+        from uuid import UUID
+
+        # Convert string UUIDs to UUID objects if provided
+        match_id = UUID(request.match_id) if request.match_id else None
+        group_id = UUID(request.group_id) if request.group_id else None
+
+        annotation_id = await InstructorAnnotationRepository.create_annotation(
+            assignment_id=request.assignment_id,
+            instructor_id=request.instructor_id,
+            status=request.status.value,
+            match_id=match_id,
+            group_id=group_id,
+            comments=request.comments,
+            action_taken=request.action_taken,
+        )
+
+        # Retrieve the created annotation
+        annotation = await InstructorAnnotationRepository.get_annotation(annotation_id)
+
+        from schemas import AnnotationResponse
+
+        return AnnotationResponse(
+            id=str(annotation["id"]),
+            assignment_id=annotation["assignment_id"],
+            instructor_id=annotation["instructor_id"],
+            status=annotation["status"],
+            match_id=str(annotation["match_id"]) if annotation["match_id"] else None,
+            group_id=str(annotation["group_id"]) if annotation["group_id"] else None,
+            comments=annotation["comments"],
+            action_taken=annotation["action_taken"],
+            created_at=annotation["created_at"].isoformat(),
+            updated_at=annotation["updated_at"].isoformat(),
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid UUID format: {exc}",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Failed to create annotation: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create annotation: {exc}",
+        )
+
+
+async def update_annotation(annotation_id: str, request):
+    """
+    Update an existing instructor annotation.
+
+    Args:
+        annotation_id: Annotation UUID as string
+        request: UpdateAnnotationRequest
+
+    Returns:
+        AnnotationResponse with the updated annotation
+
+    Raises:
+        HTTPException: 404 if not found, 500 on database error
+    """
+    try:
+        from repositories import InstructorAnnotationRepository
+        from uuid import UUID
+
+        annotation_uuid = UUID(annotation_id)
+
+        # Update the annotation
+        updated = await InstructorAnnotationRepository.update_annotation(
+            annotation_id=annotation_uuid,
+            status=request.status.value if request.status else None,
+            comments=request.comments,
+            action_taken=request.action_taken,
+        )
+
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Annotation {annotation_id} not found",
+            )
+
+        # Retrieve the updated annotation
+        annotation = await InstructorAnnotationRepository.get_annotation(
+            annotation_uuid
+        )
+
+        from schemas import AnnotationResponse
+
+        return AnnotationResponse(
+            id=str(annotation["id"]),
+            assignment_id=annotation["assignment_id"],
+            instructor_id=annotation["instructor_id"],
+            status=annotation["status"],
+            match_id=str(annotation["match_id"]) if annotation["match_id"] else None,
+            group_id=str(annotation["group_id"]) if annotation["group_id"] else None,
+            comments=annotation["comments"],
+            action_taken=annotation["action_taken"],
+            created_at=annotation["created_at"].isoformat(),
+            updated_at=annotation["updated_at"].isoformat(),
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid UUID format: {exc}",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "Failed to update annotation %s: %s", annotation_id, exc, exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update annotation: {exc}",
+        )
+
+
+async def get_annotations(assignment_id: str, status_filter: str | None = None):
+    """
+    Get all annotations for an assignment.
+
+    Args:
+        assignment_id: Assignment identifier
+        status_filter: Optional status filter
+
+    Returns:
+        List of AnnotationResponse objects
+
+    Raises:
+        HTTPException: 500 on database error
+    """
+    try:
+        from repositories import InstructorAnnotationRepository
+
+        annotations = (
+            await InstructorAnnotationRepository.get_annotations_for_assignment(
+                assignment_id=assignment_id,
+                status=status_filter,
+            )
+        )
+
+        from schemas import AnnotationResponse
+
+        return [
+            AnnotationResponse(
+                id=str(ann["id"]),
+                assignment_id=ann["assignment_id"],
+                instructor_id=ann["instructor_id"],
+                status=ann["status"],
+                match_id=str(ann["match_id"]) if ann["match_id"] else None,
+                group_id=str(ann["group_id"]) if ann["group_id"] else None,
+                comments=ann["comments"],
+                action_taken=ann["action_taken"],
+                created_at=ann["created_at"].isoformat(),
+                updated_at=ann["updated_at"].isoformat(),
+            )
+            for ann in annotations
+        ]
+
+    except Exception as exc:
+        logger.error(
+            "Failed to get annotations for %s: %s", assignment_id, exc, exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve annotations: {exc}",
+        )
+
+
+async def get_annotation_stats(assignment_id: str):
+    """
+    Get annotation statistics for an assignment.
+
+    Args:
+        assignment_id: Assignment identifier
+
+    Returns:
+        AnnotationStatsResponse with counts by status
+
+    Raises:
+        HTTPException: 500 on database error
+    """
+    try:
+        from repositories import InstructorAnnotationRepository
+
+        stats = await InstructorAnnotationRepository.get_annotation_stats(assignment_id)
+
+        from schemas import AnnotationStatsResponse
+
+        return AnnotationStatsResponse(
+            assignment_id=assignment_id,
+            total=stats.get("total", 0),
+            pending_review=stats.get("pending_review", 0),
+            confirmed_plagiarism=stats.get("confirmed_plagiarism", 0),
+            false_positive=stats.get("false_positive", 0),
+            acceptable_collaboration=stats.get("acceptable_collaboration", 0),
+            requires_investigation=stats.get("requires_investigation", 0),
+        )
+
+    except Exception as exc:
+        logger.error(
+            "Failed to get annotation stats for %s: %s",
+            assignment_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve annotation statistics: {exc}",
+        )
+
+
+async def export_similarity_report_csv(assignment_id: str):
+    """
+    Export similarity report as CSV format.
+
+    Args:
+        assignment_id: Assignment identifier
+
+    Returns:
+        CSV file with cluster and edge data
+
+    Raises:
+        HTTPException: 404 if report not found, 500 on database error
+    """
+    try:
+        from repositories import SimilarityReportRepository
+        from fastapi.responses import StreamingResponse
+        import io
+        import csv
+
+        # Fetch the report
+        report = await SimilarityReportRepository.get_report(assignment_id)
+        if not report:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No similarity report found for assignment {assignment_id}",
+            )
+
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Write headers
+        writer.writerow(
+            [
+                "Cluster ID",
+                "Student A",
+                "Student B",
+                "Similarity Score",
+                "Clone Type",
+                "Match Count",
+                "Cluster Size",
+                "Dominant Type",
+            ]
+        )
+
+        # Write cluster data
+        for group in report.collusion_groups:
+            cluster_letter = chr(64 + group.group_id)
+            for edge in group.edges:
+                writer.writerow(
+                    [
+                        cluster_letter,
+                        edge.student_a,
+                        edge.student_b,
+                        f"{edge.confidence * 100:.2f}%",
+                        edge.clone_type,
+                        edge.match_count,
+                        group.member_count,
+                        group.dominant_type,
+                    ]
+                )
+
+        # Return CSV response
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=similarity_report_{assignment_id}.csv"
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "Failed to export report for %s: %s", assignment_id, exc, exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to export report: {exc}",
         )

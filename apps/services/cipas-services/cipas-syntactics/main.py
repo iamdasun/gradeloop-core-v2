@@ -14,10 +14,9 @@ Features:
 - Fast (~65x faster than neural approaches)
 """
 
-import logging
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI, status
+from fastapi import APIRouter, FastAPI, HTTPException, status
 
 from clone_detection.utils.common_setup import setup_logging
 from routes import (
@@ -31,6 +30,12 @@ from routes import (
     ingest_submission,
     register_template,
     tokenize_code,
+    get_similarity_report,
+    create_annotation,
+    get_annotations,
+    update_annotation,
+    get_annotation_stats,
+    export_similarity_report_csv,
 )
 from schemas import (
     AssignmentClusterRequest,
@@ -49,6 +54,11 @@ from schemas import (
     TemplateRegisterResponse,
     TokenizeRequest,
     TokenizeResponse,
+    CreateAnnotationRequest,
+    UpdateAnnotationRequest,
+    AnnotationResponse,
+    AnnotationStatsResponse,
+    SimilarityReportMetadata,
 )
 
 # Configure logging
@@ -62,11 +72,21 @@ async def lifespan(app: FastAPI):
 
     Runs setup on startup and cleanup on shutdown.
     """
-    # Startup: Load models
+    # Startup: Load models and initialize database
     logger.info("Starting CIPAS Syntactics Service...")
     logger.info("Loading pre-trained syntactic model...")
 
     from routes import _get_model_status, _load_syntactic_model
+    from database import init_db_pool, close_db_pool
+
+    # Initialize database connection pool
+    try:
+        await init_db_pool()
+        logger.info("Database connection pool initialized successfully")
+    except Exception as e:
+        logger.warning(
+            f"Failed to initialize database pool: {e}. Running without persistence."
+        )
 
     # Force load syntactic model
     _load_syntactic_model()
@@ -84,6 +104,11 @@ async def lifespan(app: FastAPI):
 
     # Shutdown: Cleanup
     logger.info("Shutting down CIPAS Syntactics Service...")
+    try:
+        await close_db_pool()
+        logger.info("Database connection pool closed successfully")
+    except Exception as e:
+        logger.warning(f"Error closing database pool: {e}")
 
 
 app = FastAPI(
@@ -324,6 +349,7 @@ async def readiness_check():
 
 # ── Phase 1–4 Pipeline Endpoints ────────────────────────────────────────────
 
+
 @api_router.post(
     "/submissions/ingest",
     response_model=IngestionResponse,
@@ -388,7 +414,9 @@ async def collusion_report_endpoint(
     - ``min_confidence`` — filter out low-confidence edges (e.g. set 0.7 to
       see only high-confidence Type-3 matches).
     """
-    return get_collusion_report(assignment_id=assignment_id, min_confidence=min_confidence)
+    return get_collusion_report(
+        assignment_id=assignment_id, min_confidence=min_confidence
+    )
 
 
 @api_router.get(
@@ -452,6 +480,173 @@ async def cluster_assignment_endpoint(request: AssignmentClusterRequest):
     - `per_submission` — fragment / candidate / clone counts per student.
     """
     return cluster_assignment(request)
+
+
+# ── Similarity Reports & Annotations ────────────────────────────────────────
+
+
+@api_router.get(
+    "/reports/{assignment_id}",
+    response_model=AssignmentClusterResponse,
+    tags=["Reports"],
+    summary="Get cached similarity report",
+    responses={
+        200: {"description": "Cached report retrieved successfully"},
+        404: {"description": "Report not found"},
+        500: {"description": "Database error"},
+    },
+)
+async def get_similarity_report_endpoint(assignment_id: str):
+    """
+    Retrieve a cached similarity report for an assignment.
+
+    Returns the full AssignmentClusterResponse if a report has been
+    previously generated and persisted. If no report exists, returns 404.
+
+    Use this endpoint to avoid re-running expensive clustering analysis
+    when displaying the similarity dashboard to instructors.
+    """
+    return await get_similarity_report(assignment_id)
+
+
+@api_router.get(
+    "/reports/{assignment_id}/metadata",
+    response_model=SimilarityReportMetadata,
+    tags=["Reports"],
+    summary="Get similarity report metadata",
+    responses={
+        200: {"description": "Report metadata retrieved"},
+        404: {"description": "Report not found"},
+    },
+)
+async def get_report_metadata_endpoint(assignment_id: str):
+    """
+    Get metadata about a cached similarity report without loading
+    the full report data.
+
+    Returns summary information like submission count, clone pairs,
+    processing time, etc. Useful for dashboard previews.
+    """
+    from repositories import SimilarityReportRepository
+
+    metadata = await SimilarityReportRepository.get_report_metadata(assignment_id)
+    if metadata is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No similarity report found for assignment {assignment_id}",
+        )
+    return metadata
+
+
+@api_router.post(
+    "/annotations",
+    response_model=AnnotationResponse,
+    tags=["Annotations"],
+    summary="Create instructor annotation",
+    responses={
+        201: {"description": "Annotation created successfully"},
+        400: {"description": "Invalid request"},
+        500: {"description": "Database error"},
+    },
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_annotation_endpoint(request: CreateAnnotationRequest):
+    """
+    Create a new instructor annotation for a clone match or plagiarism group.
+
+    Instructors can mark matches as:
+    - **Pending Review**: Needs further investigation
+    - **Confirmed Plagiarism**: Academic integrity violation confirmed
+    - **False Positive**: Not actually plagiarism
+    - **Acceptable Collaboration**: Within allowed collaboration guidelines
+    - **Requires Investigation**: Flagged for deeper review
+
+    Either `match_id` or `group_id` must be provided.
+    """
+    return await create_annotation(request)
+
+
+@api_router.patch(
+    "/annotations/{annotation_id}",
+    response_model=AnnotationResponse,
+    tags=["Annotations"],
+    summary="Update instructor annotation",
+    responses={
+        200: {"description": "Annotation updated successfully"},
+        404: {"description": "Annotation not found"},
+        500: {"description": "Database error"},
+    },
+)
+async def update_annotation_endpoint(
+    annotation_id: str, request: UpdateAnnotationRequest
+):
+    """
+    Update an existing instructor annotation.
+
+    Can update status, comments, and/or action taken.
+    """
+    return await update_annotation(annotation_id, request)
+
+
+@api_router.get(
+    "/annotations/assignment/{assignment_id}",
+    response_model=list[AnnotationResponse],
+    tags=["Annotations"],
+    summary="Get annotations for assignment",
+    responses={
+        200: {"description": "Annotations retrieved successfully"},
+        500: {"description": "Database error"},
+    },
+)
+async def get_annotations_for_assignment_endpoint(
+    assignment_id: str, status: str | None = None
+):
+    """
+    Get all instructor annotations for an assignment.
+
+    Optionally filter by annotation status (e.g., 'confirmed_plagiarism').
+    """
+    return await get_annotations(assignment_id, status)
+
+
+@api_router.get(
+    "/annotations/assignment/{assignment_id}/stats",
+    response_model=AnnotationStatsResponse,
+    tags=["Annotations"],
+    summary="Get annotation statistics",
+    responses={
+        200: {"description": "Statistics retrieved successfully"},
+        500: {"description": "Database error"},
+    },
+)
+async def get_annotation_stats_endpoint(assignment_id: str):
+    """
+    Get statistics about annotations for an assignment.
+
+    Returns counts by status: pending_review, confirmed_plagiarism,
+    false_positive, acceptable_collaboration, requires_investigation.
+    """
+    return await get_annotation_stats(assignment_id)
+
+
+@api_router.get(
+    "/reports/{assignment_id}/export.csv",
+    summary="Export similarity report as CSV",
+    tags=["Similarity Reports"],
+    responses={
+        200: {"description": "CSV file downloaded", "content": {"text/csv": {}}},
+        404: {"description": "Report not found"},
+        500: {"description": "Export failed"},
+    },
+)
+async def export_report_csv_endpoint(assignment_id: str):
+    """
+    Export the similarity report for an assignment as a CSV file.
+
+    The CSV includes cluster information and all edges with their
+    similarity scores, clone types, and related metadata.
+    """
+    return await export_similarity_report_csv(assignment_id)
 
 
 # Include router in app

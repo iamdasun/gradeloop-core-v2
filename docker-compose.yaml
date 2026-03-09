@@ -337,9 +337,15 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${CIPAS_SYN_SVC_PORT}/api/v1/syntactics/ready" ]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8086/api/v1/syntactics/health')",
+        ]
       interval: 15s
-      timeout: 5s
+      timeout: 10s
       retries: 5
       start_period: 60s
 
@@ -363,6 +369,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.cipas-semantics.rule=PathPrefix(`/api/v1/semantics`)"
       - "traefik.http.routers.cipas-semantics.entrypoints=web"
+      - "traefik.http.routers.cipas-semantics.service=cipas-semantics-service"
       - "traefik.http.services.cipas-semantics-service.loadbalancer.server.port=${CIPAS_SEM_SVC_PORT}"
       - "traefik.http.middlewares.cipas-semantics-limit.buffering.maxRequestBodyBytes=10485760"
       - "traefik.http.middlewares.cipas-semantics-ratelimit.ratelimit.average=100"
@@ -377,7 +384,7 @@ services:
       - ./apps/services/cipas-services/cipas-semantics/models:/app/models:ro
 
     environment:
-      - CIPAS_SEMANTICS_PORT=${CIPAS_SEM_SVC_PORT}
+      - API_PORT=${CIPAS_SEM_SVC_PORT}
       - CIPAS_SEMANTICS_HOST=0.0.0.0
 
     expose:
@@ -387,7 +394,70 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:${CIPAS_SEM_SVC_PORT}/api/v1/semantics/ready" ]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8087/api/v1/semantics/health')",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 150s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  # =============================================================================
+  # CIPAS AI Detection Service (Python FastAPI — AI Code Likelihood Detection)
+  # =============================================================================
+  cipas-ai:
+    build:
+      context: ./apps/services/cipas-services/cipas-ai
+      dockerfile: Dockerfile
+    container_name: cipas-ai
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cipas-ai.rule=PathPrefix(`/api/v1/ai`)"
+      - "traefik.http.routers.cipas-ai.entrypoints=web"
+      - "traefik.http.services.cipas-ai-service.loadbalancer.server.port=${CIPAS_AI_SVC_PORT}"
+      - "traefik.http.middlewares.cipas-ai-limit.buffering.maxRequestBodyBytes=5242880"
+      - "traefik.http.middlewares.cipas-ai-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.cipas-ai-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.cipas-ai-ratelimit.ratelimit.burst=10"
+      - "traefik.http.routers.cipas-ai.middlewares=cipas-ai-limit,cipas-ai-ratelimit"
+
+    env_file:
+      - .env
+
+    volumes:
+      - ./apps/services/cipas-services/cipas-ai/model:/app/model:ro
+
+    environment:
+      - CIPAS_AI_PORT=${CIPAS_AI_SVC_PORT}
+      - CIPAS_AI_HOST=0.0.0.0
+      - CIPAS_AI_DEVICE=${CIPAS_AI_DEVICE:-cpu}
+
+    expose:
+      - "${CIPAS_AI_SVC_PORT}"
+
+    networks:
+      - gradeloop-network
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:${CIPAS_AI_SVC_PORT}/api/v1/ai/ready",
+        ]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -485,7 +555,13 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8086/api/v1/acafs/health')" ]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8086/api/v1/acafs/health')",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -574,7 +650,7 @@ services:
     networks:
       - gradeloop-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U keystroke_user -d keystroke-db" ]
+      test: ["CMD-SHELL", "pg_isready -U keystroke_user -d keystroke-db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -635,7 +711,13 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')" ]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -647,7 +729,64 @@ services:
         max-size: "10m"
         max-file: "3"
         compress: "true"
-        
+
+  # =============================================================================
+  # CIPAS XAI Service (Go Fiber — LLM Integration with OpenRouter)
+  # =============================================================================
+  cipas-xai:
+    build:
+      context: ./apps/services/cipas-services/cipas-xai
+      dockerfile: Dockerfile
+    container_name: cipas-xai
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cipas-xai.rule=PathPrefix(`/api/v1/chat`)"
+      - "traefik.http.routers.cipas-xai.entrypoints=web"
+      - "traefik.http.services.cipas-xai-service.loadbalancer.server.port=8085"
+      # Request Size Limiting (10MB for image uploads)
+      - "traefik.http.middlewares.cipas-xai-limit.buffering.maxRequestBodyBytes=10485760"
+      # Rate Limiting
+      - "traefik.http.middlewares.cipas-xai-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.cipas-xai-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.cipas-xai-ratelimit.ratelimit.burst=20"
+      # CORS
+      - "traefik.http.middlewares.cipas-xai-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,PATCH,OPTIONS"
+      - "traefik.http.middlewares.cipas-xai-cors.headers.accesscontrolalloworiginlist=http://localhost:3000,http://localhost:3001"
+      - "traefik.http.middlewares.cipas-xai-cors.headers.accesscontrolallowheaders=Origin,Content-Type,Accept,Authorization,X-Request-ID"
+      - "traefik.http.middlewares.cipas-xai-cors.headers.accesscontrolallowcredentials=true"
+      - "traefik.http.middlewares.cipas-xai-cors.headers.addvaryheader=true"
+      # Apply middlewares
+      - "traefik.http.routers.cipas-xai.middlewares=cipas-xai-limit,cipas-xai-ratelimit,cipas-xai-cors"
+
+    env_file:
+      - .env
+
+    environment:
+      - CIPAS_XAI_SVC_PORT=8085
+      - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
+      - LLM_API_KEY=${OPENROUTER_API_KEY}
+      - LLM_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - LLM_MODEL=${OPENROUTER_REASONER_MODEL:-qwen/qwen3-vl-235b-a22b-thinking}
+      - LLM_EXTRA_HEADERS=HTTP-Referer=${FRONTEND_URL:-http://localhost:3000},X-OpenRouter-Title=GradeLoop CIPAS-XAI
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-2048}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.7}
+      - LLM_TIMEOUT=${LLM_TIMEOUT:-60}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+    expose:
+      - "8085"
+
+    networks:
+      - gradeloop-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
   # =============================================================================
   # Redis (for session buffering)
   # =============================================================================
@@ -655,7 +794,7 @@ services:
     image: redis:7-alpine
     container_name: redis
     restart: unless-stopped
-    command: [ "redis-server", "--save", "", "--appendonly", "no" ]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
     ports:
       - "6379:6379"
 
@@ -666,7 +805,7 @@ services:
       - gradeloop-network
 
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
