@@ -142,3 +142,27 @@ export interface SubmissionWithAI extends SubmissionItem {
   ai_detection?: AIDetectionResponse;
   ai_loading?: boolean;
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Submission Analysis  (AI detection + semantic similarity — stored per-submission)
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Persisted analysis snapshot created when a student submits their code. */
+export interface SubmissionAnalysis {
+  submission_id: string;
+  /** AI-generated likelihood score (0.0 – 1.0). */
+  ai_likelihood: number;
+  /** Human-written likelihood score (0.0 – 1.0). */
+  human_likelihood: number;
+  /** Whether the model considers the submission AI-generated. */
+  is_ai_generated: boolean;
+  /** Model confidence in the AI/human classification (0.0 – 1.0). */
+  ai_confidence: number;
+  /**
+   * Semantic similarity vs the instructor's sample answer (0 – 100).
+   * `null` when the assignment has no sample answer.
+   */
+  semantic_similarity_score: number | null;
+  /** ISO-8601 timestamp of when the analysis was run. */
+  analyzed_at: string;
+}
