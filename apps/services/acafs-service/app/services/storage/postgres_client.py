@@ -1,4 +1,3 @@
-
 """PostgreSQL client for AST blueprint persistence."""
 
 # fmt: off
