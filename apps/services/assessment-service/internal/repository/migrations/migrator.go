@@ -205,6 +205,19 @@ func (m *Migrator) Run() error {
 		m.logger.Warn("failed to create index on submissions(execution_status)", zap.Error(err))
 	}
 
+	// ── Schema cleanup migrations ─────────────────────────────────────────────
+	// Drop legacy columns that were superseded by dedicated tables.
+	// Each statement is idempotent (IF EXISTS) so replaying is safe.
+
+	// assignments.sample_answer (jsonb) was an early design that stored the
+	// sample answer inline on the assignment row.  It has been replaced by the
+	// assignment_sample_answers table and must never be re-created.
+	if err := m.db.Exec(`
+		ALTER TABLE assignments DROP COLUMN IF EXISTS sample_answer
+	`).Error; err != nil {
+		m.logger.Warn("failed to drop legacy assignments.sample_answer column", zap.Error(err))
+	}
+
 	m.logger.Info("migrations completed successfully")
 	return nil
 }
