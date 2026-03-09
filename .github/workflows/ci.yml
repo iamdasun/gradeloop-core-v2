@@ -227,8 +227,15 @@ jobs:
               svc_dir=$(dirname "$df")
               # If Dockerfile is in a 'docker' subdirectory, use the parent for the tag name
               tag_dir="${svc_dir%/docker}"
-              echo "Building $svc_dir" >> ci_summary.txt
-              docker build -t gradeloop/${tag_dir//\//-}:pr-${PR_NUM} -f "$df" "$svc_dir"
+
+              # Special handling for apps/web - it requires root as build context
+              if [ "$svc_dir" = "apps/web" ]; then
+                echo "Building $svc_dir (with root context)" >> ci_summary.txt
+                docker build -t gradeloop/${tag_dir//\//-}:pr-${PR_NUM} -f "$df" .
+              else
+                echo "Building $svc_dir" >> ci_summary.txt
+                docker build -t gradeloop/${tag_dir//\//-}:pr-${PR_NUM} -f "$df" "$svc_dir"
+              fi
             done
           fi
 
