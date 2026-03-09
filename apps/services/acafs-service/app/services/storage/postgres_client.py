@@ -1,5 +1,6 @@
 """PostgreSQL client for AST blueprint persistence."""
 
+import asyncio
 import json
 from contextlib import asynccontextmanager
 from typing import Any, Optional
@@ -27,16 +28,54 @@ class PostgresClient:
 
     async def connect(self) -> None:
         """Initialize connection pool."""
-        self._pool = await asyncpg.create_pool(
-            self.dsn,
-            min_size=2,
-            max_size=10,
-            command_timeout=60,
-            # Recycle idle connections after 5 min so stale TCP sockets
-            # (common after container restarts) are replaced automatically.
-            max_inactive_connection_lifetime=300,
-        )
-        logger.info("postgres_pool_created")
+        import ssl as _ssl
+        from urllib.parse import urlparse, parse_qs
+
+        # Detect sslmode in DSN query params (e.g. ?sslmode=require)
+        use_ssl = False
+        try:
+            parsed = urlparse(self.dsn)
+            q = parse_qs(parsed.query)
+            if q.get("sslmode", [None])[0] in ("require", "verify-ca", "verify-full"):
+                use_ssl = True
+        except Exception:
+            # If parsing fails, fall back to string search
+            use_ssl = "sslmode=require" in (self.dsn or "")
+
+        ssl_ctx = None
+        if use_ssl:
+            ssl_ctx = _ssl.create_default_context()
+
+        # Retry loop for transient connection issues (e.g., DB not ready)
+        attempts = 0
+        max_attempts = 6
+        backoff = 1.0
+        while attempts < max_attempts:
+            try:
+                self._pool = await asyncpg.create_pool(
+                    self.dsn,
+                    min_size=2,
+                    max_size=10,
+                    command_timeout=60,
+                    # Recycle idle connections after 5 min so stale TCP sockets
+                    # (common after container restarts) are replaced automatically.
+                    max_inactive_connection_lifetime=300,
+                    ssl=ssl_ctx,
+                )
+                logger.info("postgres_pool_created")
+                return
+            except Exception as e:
+                attempts += 1
+                logger.error(
+                    "postgres_connect_failed",
+                    attempt=attempts,
+                    max_attempts=max_attempts,
+                    error=str(e),
+                )
+                if attempts >= max_attempts:
+                    raise
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 10.0)
 
     async def close(self) -> None:
         """Close connection pool."""
