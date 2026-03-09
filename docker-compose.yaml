@@ -578,13 +578,10 @@ services:
       - AST_MAX_LINES=${ACAFS_AST_MAX_LINES:-5000}
       - AST_TIMEOUT_SECONDS=${ACAFS_AST_TIMEOUT_SECONDS:-2}
 
-      # LLM – Gemini (rubric grading)
-      - GEMINI_API_KEY=${ACAFS_GEMINI_API_KEY}
-      - GEMINI_MODEL=${ACAFS_GEMINI_MODEL:-gemini-2.5-flash}
-
-      # LLM – OpenRouter (Pass-1 Qwen reasoning + Socratic chat)
+      # LLM – OpenRouter (Pass-1 Qwen reasoning + Pass-2 Qwen grading + Socratic chat)
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_REASONER_MODEL=${OPENROUTER_REASONER_MODEL:-qwen/qwen3-vl-235b-a22b-thinking}
+      - OPENROUTER_GRADER_MODEL=${OPENROUTER_GRADER_MODEL:-qwen/qwen3-235b-a22b}
       - OPENROUTER_MODEL=${OPENROUTER_MODEL:-arcee-ai/trinity-large-preview:free}
       - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
 
@@ -833,6 +830,74 @@ services:
   # =============================================================================
   # Redis (for session buffering)
   # =============================================================================
+  # =============================================================================
+  # Judge0 CE – Code Execution Service
+  # =============================================================================
+  judge0:
+    image: judge0/judge0:1.13.0
+    container_name: judge0
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - ./infra/judge0.conf:/judge0.conf:ro
+    ports:
+      - "2358:2358"
+    depends_on:
+      - judge0-db
+      - redis
+    networks:
+      - gradeloop-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  judge0-worker:
+    image: judge0/judge0:1.13.0
+    container_name: judge0-worker
+    restart: unless-stopped
+    command: ["./scripts/workers"]
+    privileged: true
+    volumes:
+      - ./infra/judge0.conf:/judge0.conf:ro
+    depends_on:
+      - judge0-db
+      - redis
+    networks:
+      - gradeloop-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
+  judge0-db:
+    image: postgres:13-alpine
+    container_name: judge0-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0
+    volumes:
+      - judge0-db-data:/var/lib/postgresql/data
+    networks:
+      - gradeloop-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U judge0"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        compress: "true"
+
   redis:
     image: redis:7-alpine
     container_name: redis
@@ -919,4 +984,7 @@ volumes:
     driver: local
 
   postgres-keystroke-data:
+    driver: local
+
+  judge0-db-data:
     driver: local

@@ -7,9 +7,9 @@ Grading pipeline
 3. Close any active Socratic chat session for this student + assignment.
 4. If rubric is present, run the full grading pipeline:
    a) Deterministic criteria  → Judge0 test-case pass/fail (authoritative).
-   b) LLM + AST criteria      → Gemini with AST blueprint context.
-   c) LLM-only criteria       → Gemini with student code + sample answer.
-   d) Gemini evaluates ALL criteria in one call; deterministic scores are
+   b) LLM + AST criteria      → Qwen grader with AST blueprint context.
+   c) LLM-only criteria       → Qwen grader with student code + sample answer.
+   d) Qwen grader evaluates ALL criteria in one call; deterministic scores are
       then patched in from Judge0 results (overriding any LLM estimate).
 5. Persist AST blueprint, grade breakdown, and per-criterion scores.
 """
@@ -189,7 +189,7 @@ class EvaluationWorker:
             c_dict["evidence"] = {"test_results": results_for_criterion}
             rubric_data.append(c_dict)
 
-        # ── Step D: LLM evaluation (all criteria, single Gemini call) ─────
+        # ── Step D: LLM evaluation (all criteria, single Qwen grader call) ──
         # Criterion isolation is achieved via the in-JSON reasoning chain:
         # analysis → band_selected → band_justification → score → reason → confidence
         # The model reasons about each criterion independently before scoring it.
@@ -290,7 +290,7 @@ class EvaluationWorker:
             criteria_scores=criteria_scores,
             grading_metadata={
                 "ast_truncated": blueprint.metadata.ast_truncated,
-                "model": self.settings.gemini_model,
+                "model": self.settings.openrouter_grader_model,
             },
         )
 

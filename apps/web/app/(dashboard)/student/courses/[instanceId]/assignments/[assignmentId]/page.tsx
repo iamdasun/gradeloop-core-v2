@@ -20,6 +20,7 @@ import {
     Trophy,
     Users,
     Mic2,
+    BrainCircuit,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,8 @@ import type { AssignmentResponse, SubmissionResponse, SubmissionGrade } from "@/
 import { handleApiError } from "@/lib/api/axios";
 import { useUIStore } from "@/lib/stores/uiStore";
 import { GradeResultPanel } from "@/components/assessments/grade-result-panel";
+import { AILikelihoodBadge } from "@/components/clone-detector/AILikelihoodBadge";
+import { SemanticSimilarityScore } from "@/components/ui/semantic-similarity-score";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 
 function submissionStatusBadge(status: string, executionStatus?: string) {
@@ -460,6 +463,38 @@ export default function StudentAssignmentDetailPage() {
                                         </p>
                                     </div>
                                 </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* AI Analysis */}
+                    {latestSubmission?.ai_likelihood !== undefined && (
+                        <Card className="border-border/60">
+                            <CardContent className="p-5 flex flex-col gap-3">
+                                <div className="flex items-center gap-2">
+                                    <BrainCircuit className="h-4 w-4 text-muted-foreground" />
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                        AI Analysis
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground mb-2">AI Generation Likelihood</p>
+                                    <AILikelihoodBadge
+                                        aiLikelihood={latestSubmission.ai_likelihood}
+                                        humanLikelihood={latestSubmission.human_likelihood ?? (1 - latestSubmission.ai_likelihood)}
+                                        showLabel
+                                        size="md"
+                                    />
+                                </div>
+                                {latestSubmission.semantic_similarity_score !== undefined && latestSubmission.semantic_similarity_score !== null && (
+                                    <>
+                                        <Separator />
+                                        <div>
+                                            <p className="text-xs text-muted-foreground mb-2">Similarity to sample answer</p>
+                                            <SemanticSimilarityScore score={latestSubmission.semantic_similarity_score} />
+                                        </div>
+                                    </>
+                                )}
                             </CardContent>
                         </Card>
                     )}
